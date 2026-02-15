@@ -322,8 +322,9 @@ async function recalculateStandings(db: D1Database, tournamentId: number, eventI
 
   for (const m of (matches || [])) {
     const match = m as any
-    const t1Score = (match.team1_set1 || 0) + (match.team1_set2 || 0) + (match.team1_set3 || 0)
-    const t2Score = (match.team2_set1 || 0) + (match.team2_set2 || 0) + (match.team2_set3 || 0)
+    // 1세트 단판: set1만 사용
+    const t1Score = match.team1_set1 || 0
+    const t2Score = match.team2_set1 || 0
 
     if (match.team1_id && stats[match.team1_id]) {
       stats[match.team1_id].scoreFor += t1Score
