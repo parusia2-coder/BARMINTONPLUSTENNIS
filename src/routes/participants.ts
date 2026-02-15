@@ -19,9 +19,10 @@ participantRoutes.post('/:tid/participants', async (c) => {
   const tid = c.req.param('tid')
   const db = c.env.DB
   const body = await c.req.json()
-  const { name, phone, level } = body
+  const { name, phone, gender, birth_year, level } = body
 
   if (!name) return c.json({ error: '이름은 필수입니다.' }, 400)
+  if (!gender) return c.json({ error: '성별은 필수입니다.' }, 400)
 
   // 대회 상태 확인
   const tournament = await db.prepare(
@@ -40,8 +41,8 @@ participantRoutes.post('/:tid/participants', async (c) => {
   if (existing) return c.json({ error: '이미 등록된 이름입니다.' }, 400)
 
   const result = await db.prepare(
-    `INSERT INTO participants (tournament_id, name, phone, level) VALUES (?, ?, ?, ?)`
-  ).bind(tid, name, phone || '', level || 'c').run()
+    `INSERT INTO participants (tournament_id, name, phone, gender, birth_year, level) VALUES (?, ?, ?, ?, ?, ?)`
+  ).bind(tid, name, phone || '', gender, birth_year || null, level || 'c').run()
 
   return c.json({ id: result.meta.last_row_id, message: '참가자가 등록되었습니다.' }, 201)
 })
@@ -52,11 +53,11 @@ participantRoutes.put('/:tid/participants/:pid', async (c) => {
   const pid = c.req.param('pid')
   const db = c.env.DB
   const body = await c.req.json()
-  const { name, phone, level, paid, checked_in } = body
+  const { name, phone, gender, birth_year, level, paid, checked_in } = body
 
   await db.prepare(
-    `UPDATE participants SET name=?, phone=?, level=?, paid=?, checked_in=? WHERE id=? AND tournament_id=? AND deleted=0`
-  ).bind(name, phone || '', level || 'c', paid ? 1 : 0, checked_in ? 1 : 0, pid, tid).run()
+    `UPDATE participants SET name=?, phone=?, gender=?, birth_year=?, level=?, paid=?, checked_in=? WHERE id=? AND tournament_id=? AND deleted=0`
+  ).bind(name, phone || '', gender || 'm', birth_year || null, level || 'c', paid ? 1 : 0, checked_in ? 1 : 0, pid, tid).run()
 
   return c.json({ message: '참가자 정보가 수정되었습니다.' })
 })
@@ -83,7 +84,6 @@ participantRoutes.patch('/:tid/participants/:pid/paid', async (c) => {
   const p = await db.prepare(
     `SELECT paid FROM participants WHERE id=? AND tournament_id=? AND deleted=0`
   ).bind(pid, tid).first()
-
   if (!p) return c.json({ error: '참가자를 찾을 수 없습니다.' }, 404)
 
   await db.prepare(
@@ -102,7 +102,6 @@ participantRoutes.patch('/:tid/participants/:pid/checkin', async (c) => {
   const p = await db.prepare(
     `SELECT checked_in FROM participants WHERE id=? AND tournament_id=? AND deleted=0`
   ).bind(pid, tid).first()
-
   if (!p) return c.json({ error: '참가자를 찾을 수 없습니다.' }, 404)
 
   await db.prepare(

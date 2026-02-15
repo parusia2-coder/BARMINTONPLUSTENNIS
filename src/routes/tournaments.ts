@@ -28,21 +28,22 @@ tournamentRoutes.get('/:id', async (c) => {
 tournamentRoutes.post('/', async (c) => {
   const db = c.env.DB
   const body = await c.req.json()
-  const { name, description, format, games_per_player, courts, admin_password } = body
+  const { name, description, format, games_per_player, courts, merge_threshold, admin_password } = body
 
   if (!name || !admin_password) {
     return c.json({ error: '대회명과 관리자 비밀번호는 필수입니다.' }, 400)
   }
 
   const result = await db.prepare(
-    `INSERT INTO tournaments (name, description, format, games_per_player, courts, admin_password)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO tournaments (name, description, format, games_per_player, courts, merge_threshold, admin_password)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     name,
     description || '',
     format || 'kdk',
     games_per_player || 4,
     courts || 2,
+    merge_threshold || 4,
     admin_password
   ).run()
 
@@ -61,11 +62,11 @@ tournamentRoutes.put('/:id', async (c) => {
     return c.json({ error: '관리자 인증 실패' }, 403)
   }
 
-  const { name, description, format, status, games_per_player, courts } = body
+  const { name, description, format, status, games_per_player, courts, merge_threshold } = body
   await db.prepare(
-    `UPDATE tournaments SET name=?, description=?, format=?, status=?, games_per_player=?, courts=?, updated_at=datetime('now')
+    `UPDATE tournaments SET name=?, description=?, format=?, status=?, games_per_player=?, courts=?, merge_threshold=?, updated_at=datetime('now')
      WHERE id=? AND deleted=0`
-  ).bind(name, description, format, status, games_per_player, courts, id).run()
+  ).bind(name, description, format, status, games_per_player, courts, merge_threshold || 4, id).run()
 
   return c.json({ message: '대회가 수정되었습니다.' })
 })

@@ -4,27 +4,33 @@ type Bindings = { DB: D1Database }
 
 export const matchRoutes = new Hono<{ Bindings: Bindings }>()
 
-// 경기 목록 조회
+// 경기 목록 조회 (종목별)
 matchRoutes.get('/:tid/matches', async (c) => {
   const tid = c.req.param('tid')
+  const eventId = c.req.query('event_id')
   const db = c.env.DB
-  const status = c.req.query('status')
 
   let query = `
-    SELECT m.*,
-      p1.name as t1p1_name, p2.name as t1p2_name,
-      p3.name as t2p1_name, p4.name as t2p2_name
+    SELECT m.*, e.name as event_name, e.category,
+      t1.team_name as team1_name, t2.team_name as team2_name
     FROM matches m
-    LEFT JOIN participants p1 ON m.team1_player1 = p1.id
-    LEFT JOIN participants p2 ON m.team1_player2 = p2.id
-    LEFT JOIN participants p3 ON m.team2_player1 = p3.id
-    LEFT JOIN participants p4 ON m.team2_player2 = p4.id
+    JOIN events e ON m.event_id = e.id
+    LEFT JOIN teams t1 ON m.team1_id = t1.id
+    LEFT JOIN teams t2 ON m.team2_id = t2.id
     WHERE m.tournament_id = ?`
 
-  if (status) query += ` AND m.status = '${status}'`
-  query += ` ORDER BY m.round ASC, m.match_order ASC`
+  const binds: any[] = [tid]
+  if (eventId) {
+    query += ` AND m.event_id = ?`
+    binds.push(eventId)
+  }
+  query += ` ORDER BY m.event_id, m.round ASC, m.match_order ASC`
 
-  const { results } = await db.prepare(query).bind(tid).all()
+  const stmt = binds.length === 1
+    ? db.prepare(query).bind(binds[0])
+    : db.prepare(query).bind(binds[0], binds[1])
+  const { results } = await stmt.all()
+
   return c.json({ matches: results })
 })
 
@@ -36,14 +42,12 @@ matchRoutes.put('/:tid/matches/:mid/score', async (c) => {
   const body = await c.req.json()
   const { team1_set1, team1_set2, team1_set3, team2_set1, team2_set2, team2_set3, status, winner_team } = body
 
-  // 현재 점수 조회 (감사 로그용)
   const oldMatch = await db.prepare(
     `SELECT * FROM matches WHERE id=? AND tournament_id=?`
   ).bind(mid, tid).first()
 
   if (!oldMatch) return c.json({ error: '경기를 찾을 수 없습니다.' }, 404)
 
-  // 점수 업데이트
   await db.prepare(
     `UPDATE matches SET 
       team1_set1=?, team1_set2=?, team1_set3=?,
@@ -57,31 +61,24 @@ matchRoutes.put('/:tid/matches/:mid/score', async (c) => {
     mid, tid
   ).run()
 
-  // 감사 로그 기록
+  // 감사 로그
   await db.prepare(
     `INSERT INTO audit_logs (tournament_id, match_id, action, old_value, new_value, updated_by)
      VALUES (?, ?, 'UPDATE_SCORE', ?, ?, 'admin')`
   ).bind(
     tid, mid,
-    JSON.stringify({
-      team1: [oldMatch.team1_set1, oldMatch.team1_set2, oldMatch.team1_set3],
-      team2: [oldMatch.team2_set1, oldMatch.team2_set2, oldMatch.team2_set3]
-    }),
-    JSON.stringify({
-      team1: [team1_set1 || 0, team1_set2 || 0, team1_set3 || 0],
-      team2: [team2_set1 || 0, team2_set2 || 0, team2_set3 || 0]
-    })
+    JSON.stringify({ team1: [oldMatch.team1_set1, oldMatch.team1_set2, oldMatch.team1_set3], team2: [oldMatch.team2_set1, oldMatch.team2_set2, oldMatch.team2_set3] }),
+    JSON.stringify({ team1: [team1_set1 || 0, team1_set2 || 0, team1_set3 || 0], team2: [team2_set1 || 0, team2_set2 || 0, team2_set3 || 0] })
   ).run()
 
-  // 경기 완료 시 순위 재계산
   if (status === 'completed' && winner_team) {
-    await recalculateStandings(db, parseInt(tid))
+    await recalculateStandings(db, parseInt(tid), oldMatch.event_id as number)
   }
 
   return c.json({ message: '점수가 업데이트되었습니다.' })
 })
 
-// 경기 상태 변경 (시작/완료)
+// 경기 상태 변경
 matchRoutes.patch('/:tid/matches/:mid/status', async (c) => {
   const tid = c.req.param('tid')
   const mid = c.req.param('mid')
@@ -95,24 +92,46 @@ matchRoutes.patch('/:tid/matches/:mid/status', async (c) => {
   return c.json({ message: `경기 상태가 '${status}'로 변경되었습니다.` })
 })
 
-// 순위 조회
+// 순위 조회 (종목별)
 matchRoutes.get('/:tid/standings', async (c) => {
   const tid = c.req.param('tid')
+  const eventId = c.req.query('event_id')
   const db = c.env.DB
 
-  // 순위 재계산
-  await recalculateStandings(db, parseInt(tid))
+  if (eventId) {
+    await recalculateStandings(db, parseInt(tid), parseInt(eventId))
+  } else {
+    // 모든 종목 재계산
+    const { results: events } = await db.prepare(`SELECT id FROM events WHERE tournament_id=?`).bind(tid).all()
+    for (const ev of (events || [])) {
+      await recalculateStandings(db, parseInt(tid), ev.id as number)
+    }
+  }
 
-  const { results } = await db.prepare(
-    `SELECT s.*, p.name, p.level 
-     FROM standings s 
-     JOIN participants p ON s.participant_id = p.id 
-     WHERE s.tournament_id = ? AND p.deleted = 0
-     ORDER BY s.points DESC, s.goal_difference DESC, s.score_for DESC`
-  ).bind(tid).all()
+  let query = `
+    SELECT s.*, t.team_name, e.name as event_name, e.category
+    FROM standings s
+    JOIN teams t ON s.team_id = t.id
+    JOIN events e ON s.event_id = e.id
+    WHERE s.tournament_id = ?`
+  const binds: any[] = [tid]
+  if (eventId) { query += ` AND s.event_id = ?`; binds.push(eventId) }
+  query += ` ORDER BY s.event_id, s.points DESC, s.goal_difference DESC, s.score_for DESC`
 
-  // 순위 할당
-  const standings = (results || []).map((s: any, i: number) => ({ ...s, rank: i + 1 }))
+  const stmt = binds.length === 1 ? db.prepare(query).bind(binds[0]) : db.prepare(query).bind(binds[0], binds[1])
+  const { results } = await stmt.all()
+
+  // 종목별 순위 매기기
+  const byEvent: Record<number, any[]> = {}
+  for (const s of (results || [])) {
+    const eid = s.event_id as number
+    if (!byEvent[eid]) byEvent[eid] = []
+    byEvent[eid].push(s)
+  }
+  const standings: any[] = []
+  for (const arr of Object.values(byEvent)) {
+    arr.forEach((s, i) => standings.push({ ...s, rank: i + 1 }))
+  }
 
   return c.json({ standings })
 })
@@ -128,25 +147,20 @@ matchRoutes.get('/:tid/audit-logs', async (c) => {
 })
 
 // 순위 재계산 함수
-async function recalculateStandings(db: D1Database, tournamentId: number) {
-  // 완료된 경기 조회
+async function recalculateStandings(db: D1Database, tournamentId: number, eventId: number) {
   const { results: matches } = await db.prepare(
-    `SELECT * FROM matches WHERE tournament_id=? AND status='completed'`
-  ).bind(tournamentId).all()
+    `SELECT * FROM matches WHERE tournament_id=? AND event_id=? AND status='completed'`
+  ).bind(tournamentId, eventId).all()
 
-  // 참가자 목록 조회
-  const { results: participants } = await db.prepare(
-    `SELECT id FROM participants WHERE tournament_id=? AND deleted=0`
-  ).bind(tournamentId).all()
+  const { results: teams } = await db.prepare(
+    `SELECT id FROM teams WHERE event_id=?`
+  ).bind(eventId).all()
 
-  if (!participants || participants.length === 0) return
+  if (!teams || teams.length === 0) return
 
-  // 참가자별 통계 계산
   const stats: Record<number, { wins: number; losses: number; scoreFor: number; scoreAgainst: number }> = {}
-
-  for (const p of participants) {
-    const pid = p.id as number
-    stats[pid] = { wins: 0, losses: 0, scoreFor: 0, scoreAgainst: 0 }
+  for (const t of teams) {
+    stats[t.id as number] = { wins: 0, losses: 0, scoreFor: 0, scoreAgainst: 0 }
   }
 
   for (const m of (matches || [])) {
@@ -154,40 +168,31 @@ async function recalculateStandings(db: D1Database, tournamentId: number) {
     const t1Score = (match.team1_set1 || 0) + (match.team1_set2 || 0) + (match.team1_set3 || 0)
     const t2Score = (match.team2_set1 || 0) + (match.team2_set2 || 0) + (match.team2_set3 || 0)
 
-    // 팀1 선수들
-    const team1Players = [match.team1_player1, match.team1_player2].filter(Boolean)
-    const team2Players = [match.team2_player1, match.team2_player2].filter(Boolean)
-
-    for (const pid of team1Players) {
-      if (!stats[pid]) continue
-      stats[pid].scoreFor += t1Score
-      stats[pid].scoreAgainst += t2Score
-      if (match.winner_team === 1) stats[pid].wins++
-      else if (match.winner_team === 2) stats[pid].losses++
+    if (match.team1_id && stats[match.team1_id]) {
+      stats[match.team1_id].scoreFor += t1Score
+      stats[match.team1_id].scoreAgainst += t2Score
+      if (match.winner_team === 1) stats[match.team1_id].wins++
+      else if (match.winner_team === 2) stats[match.team1_id].losses++
     }
-
-    for (const pid of team2Players) {
-      if (!stats[pid]) continue
-      stats[pid].scoreFor += t2Score
-      stats[pid].scoreAgainst += t1Score
-      if (match.winner_team === 2) stats[pid].wins++
-      else if (match.winner_team === 1) stats[pid].losses++
+    if (match.team2_id && stats[match.team2_id]) {
+      stats[match.team2_id].scoreFor += t2Score
+      stats[match.team2_id].scoreAgainst += t1Score
+      if (match.winner_team === 2) stats[match.team2_id].wins++
+      else if (match.winner_team === 1) stats[match.team2_id].losses++
     }
   }
 
-  // standings 테이블 업데이트
-  for (const pid of Object.keys(stats)) {
-    const s = stats[parseInt(pid)]
-    const points = s.wins * 3 // 승점: 승리 3점
+  for (const tid of Object.keys(stats)) {
+    const s = stats[parseInt(tid)]
+    const points = s.wins * 3
     const goalDiff = s.scoreFor - s.scoreAgainst
-
     await db.prepare(
-      `INSERT INTO standings (tournament_id, participant_id, wins, losses, points, score_for, score_against, goal_difference, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-       ON CONFLICT(tournament_id, participant_id) DO UPDATE SET
+      `INSERT INTO standings (tournament_id, event_id, team_id, wins, losses, points, score_for, score_against, goal_difference, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(event_id, team_id) DO UPDATE SET
        wins=?, losses=?, points=?, score_for=?, score_against=?, goal_difference=?, updated_at=datetime('now')`
     ).bind(
-      tournamentId, parseInt(pid), s.wins, s.losses, points, s.scoreFor, s.scoreAgainst, goalDiff,
+      tournamentId, eventId, parseInt(tid), s.wins, s.losses, points, s.scoreFor, s.scoreAgainst, goalDiff,
       s.wins, s.losses, points, s.scoreFor, s.scoreAgainst, goalDiff
     ).run()
   }

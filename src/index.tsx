@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { tournamentRoutes } from './routes/tournaments'
 import { participantRoutes } from './routes/participants'
+import { eventRoutes } from './routes/events'
 import { matchRoutes } from './routes/matches'
 import { bracketRoutes } from './routes/brackets'
 
@@ -16,6 +17,7 @@ app.use('/api/*', cors())
 // API Routes
 app.route('/api/tournaments', tournamentRoutes)
 app.route('/api/tournaments', participantRoutes)
+app.route('/api/tournaments', eventRoutes)
 app.route('/api/tournaments', matchRoutes)
 app.route('/api/tournaments', bracketRoutes)
 
