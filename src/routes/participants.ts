@@ -47,6 +47,73 @@ participantRoutes.post('/:tid/participants', async (c) => {
   return c.json({ id: result.meta.last_row_id, message: '참가자가 등록되었습니다.' }, 201)
 })
 
+// 참가자 일괄 등록
+participantRoutes.post('/:tid/participants/bulk', async (c) => {
+  const tid = c.req.param('tid')
+  const db = c.env.DB
+  const { participants } = await c.req.json()
+
+  if (!participants || !Array.isArray(participants) || participants.length === 0) {
+    return c.json({ error: '등록할 참가자 목록이 없습니다.' }, 400)
+  }
+
+  // 대회 상태 확인
+  const tournament = await db.prepare(
+    `SELECT status FROM tournaments WHERE id=? AND deleted=0`
+  ).bind(tid).first()
+  if (!tournament) return c.json({ error: '대회를 찾을 수 없습니다.' }, 404)
+  if (tournament.status !== 'draft' && tournament.status !== 'open') {
+    return c.json({ error: '현재 참가 접수가 불가능한 상태입니다.' }, 400)
+  }
+
+  // 기존 참가자 이름 조회
+  const { results: existing } = await db.prepare(
+    `SELECT name FROM participants WHERE tournament_id=? AND deleted=0`
+  ).bind(tid).all()
+  const existingNames = new Set((existing || []).map((e: any) => e.name))
+
+  const results: any[] = []
+  let successCount = 0
+  let skipCount = 0
+  const errors: string[] = []
+
+  for (const p of participants) {
+    const name = (p.name || '').trim()
+    if (!name) { errors.push('이름이 비어있는 항목이 있습니다.'); skipCount++; continue }
+    const gender = (p.gender || '').toLowerCase()
+    if (gender !== 'm' && gender !== 'f') { errors.push(`${name}: 성별이 올바르지 않습니다. (m/f)`); skipCount++; continue }
+
+    if (existingNames.has(name)) { errors.push(`${name}: 이미 등록된 이름입니다.`); skipCount++; continue }
+
+    const level = (p.level || 'c').toLowerCase()
+    const validLevels = ['s', 'a', 'b', 'c', 'd', 'e']
+    const finalLevel = validLevels.includes(level) ? level : 'c'
+
+    const birthYear = p.birth_year ? parseInt(p.birth_year) : null
+    const phone = p.phone || ''
+
+    try {
+      const res = await db.prepare(
+        `INSERT INTO participants (tournament_id, name, phone, gender, birth_year, level) VALUES (?, ?, ?, ?, ?, ?)`
+      ).bind(tid, name, phone, gender, birthYear, finalLevel).run()
+      existingNames.add(name)
+      results.push({ id: res.meta.last_row_id, name })
+      successCount++
+    } catch (e: any) {
+      errors.push(`${name}: 등록 실패 (${e.message})`)
+      skipCount++
+    }
+  }
+
+  return c.json({
+    message: `${successCount}명 등록 완료${skipCount > 0 ? `, ${skipCount}명 건너뜀` : ''}`,
+    success_count: successCount,
+    skip_count: skipCount,
+    registered: results,
+    errors: errors.length > 0 ? errors : undefined
+  }, 201)
+})
+
 // 참가자 수정
 participantRoutes.put('/:tid/participants/:pid', async (c) => {
   const tid = c.req.param('tid')

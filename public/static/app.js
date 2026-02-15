@@ -186,7 +186,10 @@ function renderTournament() {
 function renderParticipantsTab(isAdmin) {
   return `<div class="space-y-4">
     ${isAdmin ? `<div class="bg-white rounded-xl border border-gray-200 p-4">
-      <h3 class="font-semibold text-gray-800 mb-3"><i class="fas fa-user-plus mr-2 text-shuttle-500"></i>참가자 등록</h3>
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-gray-800"><i class="fas fa-user-plus mr-2 text-shuttle-500"></i>참가자 등록</h3>
+        <button onclick="showBulkModal()" class="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-100"><i class="fas fa-file-import mr-1"></i>일괄 등록</button>
+      </div>
       <form id="add-participant-form" class="flex flex-wrap gap-3">
         <input name="name" required placeholder="이름" class="flex-1 min-w-[100px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500">
         <input name="phone" placeholder="연락처" class="flex-1 min-w-[100px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500">
@@ -500,6 +503,229 @@ async function authenticate() {
 async function togglePaid(pid) { const tid = state.currentTournament.id; try { await api(`/tournaments/${tid}/participants/${pid}/paid`, { method: 'PATCH' }); await loadParticipants(tid); render(); } catch(e){} }
 async function toggleCheckin(pid) { const tid = state.currentTournament.id; try { await api(`/tournaments/${tid}/participants/${pid}/checkin`, { method: 'PATCH' }); await loadParticipants(tid); render(); } catch(e){} }
 async function deleteParticipant(pid) { if (!confirm('삭제하시겠습니까?')) return; const tid = state.currentTournament.id; try { await api(`/tournaments/${tid}/participants/${pid}`, { method: 'DELETE' }); showToast('삭제됨', 'success'); await loadParticipants(tid); render(); } catch(e){} }
+
+// ==========================================
+// BULK REGISTRATION
+// ==========================================
+function showBulkModal() {
+  const modal = document.createElement('div');
+  modal.id = 'bulk-modal';
+  modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-overlay';
+  modal.innerHTML = `<div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
+    <div class="p-6 border-b border-gray-200">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-gray-900"><i class="fas fa-file-import mr-2 text-indigo-500"></i>참가자 일괄 등록</h3>
+        <button onclick="closeBulkModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100"><i class="fas fa-times text-gray-400"></i></button>
+      </div>
+    </div>
+    <div class="p-6 overflow-y-auto flex-1">
+      <!-- Tab buttons -->
+      <div class="flex gap-1 mb-4 bg-gray-100 p-1 rounded-lg">
+        <button onclick="switchBulkTab('paste')" id="bulk-tab-paste" class="flex-1 py-2 px-3 rounded-md text-sm font-medium bg-white shadow-sm text-gray-900"><i class="fas fa-paste mr-1"></i>텍스트 붙여넣기</button>
+        <button onclick="switchBulkTab('csv')" id="bulk-tab-csv" class="flex-1 py-2 px-3 rounded-md text-sm font-medium text-gray-500"><i class="fas fa-file-csv mr-1"></i>CSV 파일 업로드</button>
+      </div>
+      <!-- Paste tab -->
+      <div id="bulk-content-paste">
+        <div class="mb-3 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+          <p class="font-semibold mb-1"><i class="fas fa-info-circle mr-1"></i>입력 형식 안내</p>
+          <p>한 줄에 한 명씩 입력합니다. 탭(Tab) 또는 콤마(,)로 구분합니다.</p>
+          <p class="mt-1 font-mono text-xs bg-blue-100 rounded p-2">이름, 성별(남/여), 출생년도, 급수(S~E), 연락처<br>김민수, 남, 1985, A, 010-1234-5678<br>박서연, 여, 1992, B<br>이정호, 남, 1990, C</p>
+          <p class="mt-1 text-xs text-blue-500">* 급수, 출생년도, 연락처는 생략 가능 (기본: C급)</p>
+          <p class="text-xs text-blue-500">* 엑셀에서 복사(Ctrl+C)하여 바로 붙여넣기(Ctrl+V) 가능!</p>
+        </div>
+        <textarea id="bulk-text" rows="10" class="w-full px-4 py-3 border border-gray-300 rounded-xl font-mono text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-y" placeholder="김민수, 남, 1985, A, 010-1234-5678&#10;박서연, 여, 1992, B&#10;이정호, 남, 1990, C&#10;최유진, 여, 1988, B, 010-5678-1234"></textarea>
+        <div class="mt-2 flex items-center justify-between">
+          <span id="bulk-count" class="text-sm text-gray-400">0명 감지</span>
+          <button onclick="previewBulk()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"><i class="fas fa-eye mr-1"></i>미리보기</button>
+        </div>
+      </div>
+      <!-- CSV tab -->
+      <div id="bulk-content-csv" class="hidden">
+        <div class="mb-3 p-3 bg-green-50 rounded-lg text-sm text-green-700">
+          <p class="font-semibold mb-1"><i class="fas fa-info-circle mr-1"></i>CSV 파일 형식</p>
+          <p>첫 번째 행은 헤더로 인식합니다. 헤더 예시:</p>
+          <p class="font-mono text-xs bg-green-100 rounded p-2 mt-1">이름,성별,출생년도,급수,연락처</p>
+        </div>
+        <div class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-indigo-400 transition cursor-pointer" onclick="document.getElementById('csv-file').click()">
+          <input type="file" id="csv-file" accept=".csv,.txt,.tsv" class="hidden" onchange="handleCSVFile(event)">
+          <i class="fas fa-cloud-upload-alt text-4xl text-gray-300 mb-3"></i>
+          <p class="text-gray-500 font-medium">CSV 파일을 선택하세요</p>
+          <p class="text-gray-400 text-sm mt-1">.csv, .txt, .tsv 파일 지원</p>
+        </div>
+        <div id="csv-filename" class="hidden mt-3 p-2 bg-gray-50 rounded-lg flex items-center gap-2">
+          <i class="fas fa-file-csv text-green-500"></i>
+          <span class="text-sm font-medium text-gray-700"></span>
+        </div>
+      </div>
+      <!-- Preview -->
+      <div id="bulk-preview" class="hidden mt-4">
+        <h4 class="font-semibold text-gray-800 mb-2"><i class="fas fa-list mr-1"></i>미리보기 (<span id="preview-count">0</span>명)</h4>
+        <div class="max-h-60 overflow-y-auto border rounded-lg">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 sticky top-0"><tr>
+              <th class="px-2 py-2 text-left text-xs font-semibold text-gray-500">#</th>
+              <th class="px-2 py-2 text-left text-xs font-semibold text-gray-500">이름</th>
+              <th class="px-2 py-2 text-center text-xs font-semibold text-gray-500">성별</th>
+              <th class="px-2 py-2 text-center text-xs font-semibold text-gray-500">출생</th>
+              <th class="px-2 py-2 text-center text-xs font-semibold text-gray-500">급수</th>
+              <th class="px-2 py-2 text-left text-xs font-semibold text-gray-500">연락처</th>
+              <th class="px-2 py-2 text-center text-xs font-semibold text-gray-500">상태</th>
+            </tr></thead>
+            <tbody id="preview-body" class="divide-y divide-gray-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="p-6 border-t border-gray-200 flex gap-3">
+      <button onclick="closeBulkModal()" class="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200">취소</button>
+      <button onclick="submitBulk()" id="bulk-submit-btn" class="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 shadow-md"><i class="fas fa-check mr-2"></i>일괄 등록</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+
+  // Auto-count on input
+  const ta = document.getElementById('bulk-text');
+  if (ta) ta.addEventListener('input', () => {
+    const lines = ta.value.split('\n').filter(l => l.trim());
+    document.getElementById('bulk-count').textContent = lines.length + '명 감지';
+  });
+}
+
+function closeBulkModal() { const m = document.getElementById('bulk-modal'); if (m) m.remove(); }
+
+function switchBulkTab(tab) {
+  document.getElementById('bulk-content-paste').classList.toggle('hidden', tab !== 'paste');
+  document.getElementById('bulk-content-csv').classList.toggle('hidden', tab !== 'csv');
+  const pasteTab = document.getElementById('bulk-tab-paste');
+  const csvTab = document.getElementById('bulk-tab-csv');
+  if (tab === 'paste') { pasteTab.classList.add('bg-white','shadow-sm','text-gray-900'); pasteTab.classList.remove('text-gray-500'); csvTab.classList.remove('bg-white','shadow-sm','text-gray-900'); csvTab.classList.add('text-gray-500'); }
+  else { csvTab.classList.add('bg-white','shadow-sm','text-gray-900'); csvTab.classList.remove('text-gray-500'); pasteTab.classList.remove('bg-white','shadow-sm','text-gray-900'); pasteTab.classList.add('text-gray-500'); }
+}
+
+function handleCSVFile(event) {
+  const file = event.target.files[0]; if (!file) return;
+  const fnEl = document.getElementById('csv-filename');
+  fnEl.classList.remove('hidden');
+  fnEl.querySelector('span').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    // Put CSV content into the text area for unified processing
+    document.getElementById('bulk-text').value = e.target.result;
+    switchBulkTab('paste');
+    const lines = e.target.result.split('\n').filter(l => l.trim());
+    document.getElementById('bulk-count').textContent = lines.length + '명 감지 (헤더 포함)';
+    showToast('CSV 파일 로드 완료! 미리보기를 확인하세요.', 'success');
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseBulkText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  if (lines.length === 0) return [];
+
+  // Check if first line is header
+  const headerPatterns = ['이름', 'name', '성별', 'gender', '급수', 'level', '연락처', 'phone'];
+  const firstLine = lines[0].toLowerCase();
+  const isHeader = headerPatterns.some(h => firstLine.includes(h));
+  const dataLines = isHeader ? lines.slice(1) : lines;
+
+  const genderMap = { '남': 'm', '여': 'f', '남자': 'm', '여자': 'f', 'm': 'm', 'f': 'f', 'male': 'm', 'female': 'f', 'M': 'm', 'F': 'f' };
+  const levelMap = { 's': 's', 'a': 'a', 'b': 'b', 'c': 'c', 'd': 'd', 'e': 'e', 'S': 's', 'A': 'a', 'B': 'b', 'C': 'c', 'D': 'd', 'E': 'e',
+    's급': 's', 'a급': 'a', 'b급': 'b', 'c급': 'c', 'd급': 'd', 'e급': 'e' };
+
+  return dataLines.map(line => {
+    // Split by tab first (Excel paste), then comma
+    let parts = line.includes('\t') ? line.split('\t') : line.split(',');
+    parts = parts.map(p => p.trim()).filter(p => p);
+
+    if (parts.length === 0) return null;
+
+    const result = { name: '', gender: '', birth_year: null, level: 'c', phone: '', valid: true, error: '' };
+    result.name = parts[0] || '';
+
+    // Parse remaining fields intelligently
+    for (let i = 1; i < parts.length; i++) {
+      const val = parts[i].trim();
+      const valLower = val.toLowerCase();
+
+      // Gender check
+      if (genderMap[val] || genderMap[valLower]) { result.gender = genderMap[val] || genderMap[valLower]; continue; }
+      // Level check
+      if (levelMap[val] || levelMap[valLower]) { result.level = levelMap[val] || levelMap[valLower]; continue; }
+      // Birth year check (4-digit number 1950-2010)
+      const num = parseInt(val);
+      if (!isNaN(num) && num >= 1950 && num <= 2015) { result.birth_year = num; continue; }
+      // Phone number check (contains dash or starts with 0)
+      if (val.includes('-') || (val.startsWith('0') && val.length >= 10)) { result.phone = val; continue; }
+    }
+
+    // Validation
+    if (!result.name) { result.valid = false; result.error = '이름 없음'; }
+    if (!result.gender) { result.valid = false; result.error = (result.error ? result.error + ', ' : '') + '성별 없음'; }
+
+    return result;
+  }).filter(r => r !== null);
+}
+
+function previewBulk() {
+  const text = document.getElementById('bulk-text').value;
+  const parsed = parseBulkText(text);
+  const previewDiv = document.getElementById('bulk-preview');
+  const body = document.getElementById('preview-body');
+  const countEl = document.getElementById('preview-count');
+
+  if (parsed.length === 0) { showToast('입력된 데이터가 없습니다.', 'warning'); return; }
+
+  previewDiv.classList.remove('hidden');
+  countEl.textContent = parsed.length;
+
+  body.innerHTML = parsed.map((p, i) => {
+    const status = p.valid
+      ? '<span class="badge bg-green-100 text-green-700"><i class="fas fa-check mr-1"></i>OK</span>'
+      : `<span class="badge bg-red-100 text-red-600"><i class="fas fa-exclamation mr-1"></i>${p.error}</span>`;
+    const gLabel = p.gender === 'm' ? '<span class="badge bg-blue-100 text-blue-700">남</span>' : p.gender === 'f' ? '<span class="badge bg-pink-100 text-pink-700">여</span>' : '<span class="text-red-500">?</span>';
+    const lvColor = LEVEL_COLORS[p.level] || '';
+    return `<tr class="${p.valid ? '' : 'bg-red-50'}">
+      <td class="px-2 py-1.5 text-gray-400">${i+1}</td>
+      <td class="px-2 py-1.5 font-medium">${p.name || '-'}</td>
+      <td class="px-2 py-1.5 text-center">${gLabel}</td>
+      <td class="px-2 py-1.5 text-center text-gray-500">${p.birth_year || '-'}</td>
+      <td class="px-2 py-1.5 text-center"><span class="badge ${lvColor}">${(LEVELS[p.level]||'C')}</span></td>
+      <td class="px-2 py-1.5 text-gray-500">${p.phone || '-'}</td>
+      <td class="px-2 py-1.5 text-center">${status}</td>
+    </tr>`;
+  }).join('');
+
+  const validCount = parsed.filter(p => p.valid).length;
+  const invalidCount = parsed.length - validCount;
+  if (invalidCount > 0) showToast(`${validCount}명 유효, ${invalidCount}명 오류 (성별 누락 등)`, 'warning');
+  else showToast(`${validCount}명 확인 완료!`, 'success');
+}
+
+async function submitBulk() {
+  const text = document.getElementById('bulk-text').value;
+  const parsed = parseBulkText(text);
+  const valid = parsed.filter(p => p.valid);
+
+  if (valid.length === 0) { showToast('등록 가능한 참가자가 없습니다. 미리보기를 확인해주세요.', 'error'); return; }
+
+  const btn = document.getElementById('bulk-submit-btn');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>등록 중...';
+
+  const tid = state.currentTournament.id;
+  try {
+    const data = valid.map(p => ({ name: p.name, gender: p.gender, birth_year: p.birth_year, level: p.level, phone: p.phone }));
+    const res = await api(`/tournaments/${tid}/participants/bulk`, { method: 'POST', body: JSON.stringify({ participants: data }) });
+    closeBulkModal();
+    showToast(res.message, 'success');
+    if (res.errors && res.errors.length > 0) {
+      setTimeout(() => showToast(`건너뛴 항목: ${res.errors.slice(0,3).join(', ')}${res.errors.length>3?'...':''}`, 'warning'), 500);
+    }
+    await loadParticipants(tid); render();
+  } catch(e) {
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-check mr-2"></i>일괄 등록';
+  }
+}
 
 // Event actions
 async function deleteEvent(eid) { if (!confirm('종목과 관련 팀/경기를 모두 삭제합니다.')) return; const tid = state.currentTournament.id; try { await api(`/tournaments/${tid}/events/${eid}`, { method: 'DELETE' }); showToast('종목 삭제됨', 'success'); await loadEvents(tid); render(); } catch(e){} }
