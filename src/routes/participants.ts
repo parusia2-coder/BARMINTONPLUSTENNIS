@@ -50,7 +50,7 @@ participantRoutes.post('/:tid/participants', async (c) => {
 
   const result = await db.prepare(
     `INSERT INTO participants (tournament_id, name, phone, level) VALUES (?, ?, ?, ?)`
-  ).bind(tid, name, phone || '', level || 'intermediate').run()
+  ).bind(tid, name, phone || '', level || 'c').run()
 
   return c.json({ id: result.meta.last_row_id, message: '참가자가 등록되었습니다.' }, 201)
 })
@@ -65,7 +65,7 @@ participantRoutes.put('/:tid/participants/:pid', async (c) => {
 
   await db.prepare(
     `UPDATE participants SET name=?, phone=?, level=?, paid=?, checked_in=? WHERE id=? AND tournament_id=? AND deleted=0`
-  ).bind(name, phone || '', level || 'intermediate', paid ? 1 : 0, checked_in ? 1 : 0, pid, tid).run()
+  ).bind(name, phone || '', level || 'c', paid ? 1 : 0, checked_in ? 1 : 0, pid, tid).run()
 
   return c.json({ message: '참가자 정보가 수정되었습니다.' })
 })

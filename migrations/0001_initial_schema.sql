@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS participants (
   tournament_id INTEGER NOT NULL,
   name TEXT NOT NULL,
   phone TEXT DEFAULT '',
-  level TEXT DEFAULT 'intermediate' CHECK(level IN ('beginner', 'intermediate', 'advanced')),
+  level TEXT DEFAULT 'c' CHECK(level IN ('s', 'a', 'b', 'c', 'd', 'e')),
   paid INTEGER DEFAULT 0,
   checked_in INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT (datetime('now')),

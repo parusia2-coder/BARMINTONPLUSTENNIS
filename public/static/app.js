@@ -270,9 +270,12 @@ function renderParticipantsTab(isAdmin) {
           <input name="name" required placeholder="이름" class="flex-1 min-w-[120px] px-4 py-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500">
           <input name="phone" placeholder="연락처" class="flex-1 min-w-[120px] px-4 py-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500">
           <select name="level" class="px-4 py-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500">
-            <option value="beginner">초급</option>
-            <option value="intermediate" selected>중급</option>
-            <option value="advanced">상급</option>
+            <option value="s">S급</option>
+            <option value="a">A급</option>
+            <option value="b">B급</option>
+            <option value="c" selected>C급</option>
+            <option value="d">D급</option>
+            <option value="e">E급</option>
           </select>
           <button type="submit" class="px-6 py-2.5 bg-shuttle-600 text-white rounded-lg font-medium hover:bg-shuttle-700 transition"><i class="fas fa-plus mr-1"></i>등록</button>
         </form>
@@ -301,8 +304,8 @@ function renderParticipantsTab(isAdmin) {
           <tbody class="divide-y divide-gray-100">
             ${participants.length === 0 ? `<tr><td colspan="${isAdmin ? 7 : 6}" class="px-4 py-8 text-center text-gray-400">등록된 참가자가 없습니다.</td></tr>` : ''}
             ${participants.map((p, i) => {
-              const levelMap = { beginner: { label: '초급', color: 'bg-green-100 text-green-700' }, intermediate: { label: '중급', color: 'bg-blue-100 text-blue-700' }, advanced: { label: '상급', color: 'bg-red-100 text-red-700' } };
-              const lv = levelMap[p.level] || levelMap.intermediate;
+              const levelMap = { s: { label: 'S', color: 'bg-red-100 text-red-700' }, a: { label: 'A', color: 'bg-orange-100 text-orange-700' }, b: { label: 'B', color: 'bg-yellow-100 text-yellow-700' }, c: { label: 'C', color: 'bg-green-100 text-green-700' }, d: { label: 'D', color: 'bg-blue-100 text-blue-700' }, e: { label: 'E', color: 'bg-gray-100 text-gray-600' } };
+              const lv = levelMap[p.level] || levelMap.c;
               return `<tr class="hover:bg-gray-50">
                 <td class="px-4 py-3 text-sm text-gray-500">${i + 1}</td>
                 <td class="px-4 py-3 font-medium text-gray-900">${p.name}</td>
