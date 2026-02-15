@@ -364,13 +364,19 @@ function renderScoreCard(m) {
   const t1 = m.team1_name || 'BYE', t2 = m.team2_name || 'BYE';
   const t1T = (m.team1_set1||0)+(m.team1_set2||0)+(m.team1_set3||0), t2T = (m.team2_set1||0)+(m.team2_set2||0)+(m.team2_set3||0);
   const live = m.status==='playing';
-  return `<div class="bg-white/10 rounded-xl p-4 ${live?'ring-2 ring-green-500/50':''}">
-    <div class="flex justify-between mb-2"><span class="text-xs text-gray-400">#${m.match_order} ${m.event_name||''}</span>${live?'<span class="text-xs text-green-400 flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 pulse-live"></span>LIVE</span>':'<span class="text-xs text-blue-400">완료</span>'}</div>
-    <div class="space-y-2">
-      <div class="flex justify-between ${m.winner_team===1?'text-yellow-400':''}"><span class="text-sm font-medium">${m.winner_team===1?'🏆 ':''}${t1}</span><span class="text-2xl font-extrabold scoreboard-num">${t1T}</span></div>
-      <div class="h-px bg-white/10"></div>
-      <div class="flex justify-between ${m.winner_team===2?'text-yellow-400':''}"><span class="text-sm font-medium">${m.winner_team===2?'🏆 ':''}${t2}</span><span class="text-2xl font-extrabold scoreboard-num">${t2T}</span></div>
+  const sets = [1,2,3].map(s => ({ t1: m[`team1_set${s}`]||0, t2: m[`team2_set${s}`]||0 })).filter(s => s.t1 > 0 || s.t2 > 0);
+  const setsHtml = sets.length > 0 ? `<div class="flex items-center gap-1 mt-2">${sets.map((s,i) => `<span class="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-gray-300">${i+1}: ${s.t1}-${s.t2}</span>`).join('')}</div>` : '';
+  return `<div class="bg-white/10 rounded-xl p-3 sm:p-4 ${live?'ring-2 ring-green-500/50':''}">
+    <div class="flex justify-between mb-2">
+      <span class="text-xs text-gray-400">${m.court_number ? m.court_number+'코트 ' : ''}#${m.match_order} ${m.event_name||''}</span>
+      ${live?'<span class="text-xs text-green-400 flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 pulse-live"></span>LIVE</span>':'<span class="text-xs text-blue-400">완료</span>'}
     </div>
+    <div class="space-y-1.5">
+      <div class="flex justify-between items-center ${m.winner_team===1?'text-yellow-400':''}"><span class="text-sm font-medium">${m.winner_team===1?'🏆 ':''}${t1}</span><span class="text-2xl font-extrabold scoreboard-num">${t1T}</span></div>
+      <div class="h-px bg-white/10"></div>
+      <div class="flex justify-between items-center ${m.winner_team===2?'text-yellow-400':''}"><span class="text-sm font-medium">${m.winner_team===2?'🏆 ':''}${t2}</span><span class="text-2xl font-extrabold scoreboard-num">${t2T}</span></div>
+    </div>
+    ${setsHtml}
   </div>`;
 }
 
