@@ -175,7 +175,7 @@ function renderCreate() {
             </div>
             <div>
               <label class="block text-sm font-semibold text-gray-700 mb-1">최대 인원</label>
-              <input name="max_participants" type="number" value="16" min="2" max="64" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-shuttle-500 outline-none">
+              <input name="max_participants" type="number" value="100" min="2" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-shuttle-500 outline-none">
             </div>
           </div>
           <div class="grid grid-cols-2 gap-4">

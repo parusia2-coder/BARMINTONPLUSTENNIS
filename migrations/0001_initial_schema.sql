@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS tournaments (
   description TEXT DEFAULT '',
   format TEXT NOT NULL DEFAULT 'kdk' CHECK(format IN ('kdk', 'league', 'tournament')),
   status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'open', 'in_progress', 'completed', 'cancelled')),
-  max_participants INTEGER DEFAULT 32,
+  max_participants INTEGER DEFAULT 100,
   games_per_player INTEGER DEFAULT 4,
   courts INTEGER DEFAULT 2,
   admin_password TEXT NOT NULL,

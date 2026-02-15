@@ -41,7 +41,7 @@ tournamentRoutes.post('/', async (c) => {
     name,
     description || '',
     format || 'kdk',
-    max_participants || 32,
+    max_participants || 100,
     games_per_player || 4,
     courts || 2,
     admin_password
