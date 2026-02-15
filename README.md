@@ -1,21 +1,61 @@
-```txt
-npm install
-npm run dev
-```
+# 🏸 배드민턴 대회 운영 시스템
 
-```txt
-npm run deploy
-```
+## 프로젝트 개요
+- **이름**: Badminton Tournament Management System
+- **목적**: 소규모 배드민턴 동호회/클럽을 위한 대회 운영 자동화
+- **기반**: "리액트와 파이어베이스 통합 실전 개발 가이드북"을 Cloudflare 스택으로 변환
 
-[For generating/synchronizing types based on your Worker configuration run](https://developers.cloudflare.com/workers/wrangler/commands/#types):
+## 기술 스택
+| 구분 | 기술 | 설명 |
+|------|------|------|
+| Backend | Hono | 경량 TypeScript 웹 프레임워크 |
+| Database | Cloudflare D1 (SQLite) | 관계형 데이터베이스 |
+| Frontend | Vanilla JS + TailwindCSS | CDN 기반 경량 프론트엔드 |
+| Hosting | Cloudflare Pages | 엣지 배포 |
+| PDF | jsPDF + html2canvas | 결과 PDF 출력 |
 
-```txt
-npm run cf-typegen
-```
+## 주요 기능 (구현 완료)
+- ✅ 대회 생성/수정/삭제 (Soft Delete)
+- ✅ 참가자 접수/관리 (이름, 연락처, 레벨, 참가비, 체크인)
+- ✅ 대진표 자동 생성 (KDK 랜덤복식, 풀리그, 토너먼트)
+- ✅ 실시간 점수 입력 (세트별 점수, 승자 선택)
+- ✅ 실시간 스코어보드 (전광판 스타일)
+- ✅ 자동 순위 계산 (승점 → 득실차 → 득점)
+- ✅ 결과 PDF 출력
+- ✅ 관리자 비밀번호 인증
+- ✅ 감사 로그 (점수 수정 이력 기록)
+- ✅ 오프라인 감지 경고
+- ✅ 반응형 모바일 UI
 
-Pass the `CloudflareBindings` as generics when instantiation `Hono`:
+## URL 구조
+| 경로 | 설명 |
+|------|------|
+| `/` | 메인 페이지 (SPA) |
+| `/api/health` | 헬스 체크 |
+| `/api/tournaments` | 대회 CRUD |
+| `/api/tournaments/:id/participants` | 참가자 관리 |
+| `/api/tournaments/:id/matches` | 경기/점수 관리 |
+| `/api/tournaments/:id/brackets/generate` | 대진표 생성 |
+| `/api/tournaments/:id/standings` | 순위 조회 |
+| `/api/tournaments/:id/audit-logs` | 감사 로그 |
 
-```ts
-// src/index.ts
-const app = new Hono<{ Bindings: CloudflareBindings }>()
-```
+## 데이터 모델 (D1 SQLite)
+- **tournaments**: 대회 정보 (name, format, status, courts, admin_password)
+- **participants**: 참가자 (name, phone, level, paid, checked_in)
+- **matches**: 경기 (team1/2 players, set scores, winner_team, status)
+- **standings**: 순위 캐시 (wins, losses, points, goal_difference)
+- **audit_logs**: 감사 로그 (action, old/new values)
+
+## 대진표 방식
+1. **KDK (랜덤 복식)**: 전체 조합 셔플 → 선수당 경기수 제한 → 연속경기 방지
+2. **풀리그**: 모든 참가자 1:1 라운드 로빈
+3. **토너먼트**: 싱글 엘리미네이션 + 시드 셔플
+
+## 테스트 데이터
+- 시드 대회: "2026 봄맞이 배드민턴 대회" (관리자 비밀번호: admin123)
+- 8명 참가자 사전 등록
+
+## 배포
+- **플랫폼**: Cloudflare Pages
+- **상태**: ✅ 로컬 개발 서버 동작중
+- **마지막 업데이트**: 2026-02-15
