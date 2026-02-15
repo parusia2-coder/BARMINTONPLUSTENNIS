@@ -17,7 +17,9 @@ const courtState = {
   autoRefreshTimer: null,
   currentSet: 1, // 현재 진행 세트
   scores: { team1: [0, 0, 0], team2: [0, 0, 0] },
-  setWins: { team1: 0, team2: 0 }
+  setWins: { team1: 0, team2: 0 },
+  targetScore: 25, // 기본 25점 (예선), 토너먼트는 21점
+  format: 'kdk'
 };
 
 // API Helper
@@ -140,6 +142,9 @@ function renderCourtScoreboard() {
         <span class="text-xs text-gray-500 ml-2">${m.event_name || ''}</span>
       </div>
       <div class="flex items-center gap-2">
+        <span class="px-2 py-0.5 rounded-full text-xs font-bold ${courtState.targetScore === 21 ? 'bg-red-500/30 text-red-300' : 'bg-yellow-500/30 text-yellow-300'}">
+          ${courtState.targetScore}점제 ${courtState.format === 'tournament' ? '(본선)' : '(예선)'}
+        </span>
         <span class="text-xs text-gray-500">세트 ${setWins.team1}-${setWins.team2}</span>
         <button onclick="exitCourt()" class="text-gray-500 hover:text-white text-sm px-2"><i class="fas fa-times"></i></button>
       </div>
@@ -182,6 +187,7 @@ function renderCourtScoreboard() {
         <div class="px-4 flex items-center gap-3">
           <span class="text-xs text-gray-400 font-bold uppercase">SET ${currentSet}</span>
           <span class="text-2xl font-black text-yellow-400">${scores.team1[currentSet-1]} : ${scores.team2[currentSet-1]}</span>
+          <span class="text-xs px-2 py-0.5 rounded-full ${getScoreProgressClass(currentSet)}">${getScoreProgressLabel(currentSet)}</span>
         </div>
         <div class="flex-1 h-px bg-white/20"></div>
       </div>
@@ -292,6 +298,10 @@ function renderWaitingScreen() {
         </div>
         <h2 class="text-3xl font-extrabold mb-2">경기 대기중</h2>
         <p class="text-gray-400">다음 경기를 시작해주세요</p>
+        <div class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl ${courtState.targetScore === 21 ? 'bg-red-500/20 text-red-300' : 'bg-yellow-500/20 text-yellow-300'}">
+          <i class="fas fa-info-circle"></i>
+          <span class="text-sm font-bold">${courtState.targetScore}점제 ${courtState.format === 'tournament' ? '(본선/토너먼트)' : '(예선)'} · 3세트 중 2세트 선취</span>
+        </div>
       </div>
 
       ${next.length > 0 ? `
@@ -350,7 +360,8 @@ function changeScore(team, delta) {
   const setIdx = courtState.currentSet - 1;
   const key = team === 1 ? 'team1' : 'team2';
   const oldVal = courtState.scores[key][setIdx];
-  const newVal = Math.max(0, Math.min(30, oldVal + delta));
+  const maxScore = courtState.targetScore + 10; // 목표점수 + 여유분
+  const newVal = Math.max(0, Math.min(maxScore, oldVal + delta));
   
   if (oldVal === newVal) return;
   
@@ -366,7 +377,58 @@ function changeScore(team, delta) {
   }
 
   updateSetWins();
+  
+  // 세트 목표 점수 도달 체크
+  checkSetComplete(setIdx);
+  
   renderCourt();
+}
+
+// 세트 목표 점수 도달 확인
+function checkSetComplete(setIdx) {
+  const target = courtState.targetScore;
+  const s1 = courtState.scores.team1[setIdx];
+  const s2 = courtState.scores.team2[setIdx];
+  const setNum = setIdx + 1;
+  
+  let setWinner = null;
+  if (s1 >= target && s1 > s2) setWinner = 1;
+  else if (s2 >= target && s2 > s1) setWinner = 2;
+  
+  if (!setWinner) return;
+  
+  // 세트 승수 계산
+  updateSetWins();
+  const wins1 = courtState.setWins.team1;
+  const wins2 = courtState.setWins.team2;
+  
+  // 2세트 선취 시 경기 종료 알림
+  if (wins1 >= 2 || wins2 >= 2) {
+    const winnerName = wins1 >= 2 
+      ? (courtState.currentMatch?.team1_name || '팀1') 
+      : (courtState.currentMatch?.team2_name || '팀2');
+    setTimeout(() => {
+      showCourtToast(`🏆 ${winnerName} 승리! (${wins1}-${wins2})`, 'success');
+      // 자동으로 경기종료 모달 표시
+      setTimeout(() => showFinishModal(), 500);
+    }, 300);
+    return;
+  }
+  
+  // 세트 완료 알림 및 자동 다음 세트 전환
+  const winnerName = setWinner === 1 
+    ? (courtState.currentMatch?.team1_name || '팀1') 
+    : (courtState.currentMatch?.team2_name || '팀2');
+  showCourtToast(`${setNum}세트 종료! ${winnerName} 승리 (${s1}:${s2})`, 'success');
+  
+  // 자동 다음 세트로 전환
+  if (setNum < 3) {
+    setTimeout(() => {
+      courtState.currentSet = setNum + 1;
+      renderCourt();
+      showCourtToast(`${setNum + 1}세트 시작!`, 'info');
+    }, 1000);
+  }
 }
 
 function undoLastAction() {
@@ -381,12 +443,18 @@ function undoLastAction() {
 
 function updateSetWins() {
   let t1Wins = 0, t2Wins = 0;
+  const target = courtState.targetScore;
   for (let s = 0; s < 3; s++) {
     const s1 = courtState.scores.team1[s];
     const s2 = courtState.scores.team2[s];
     if (s1 > 0 || s2 > 0) {
-      if (s1 > s2) t1Wins++;
-      else if (s2 > s1) t2Wins++;
+      // 목표 점수 이상 도달하고 리드하는 팀이 세트 승리
+      if (s1 >= target && s1 > s2) t1Wins++;
+      else if (s2 >= target && s2 > s1) t2Wins++;
+      // 목표 점수 미도달이면 현재 리드 중 (아직 진행중)
+      // 과거 세트에서 점수만 있고 목표 미달이면 수동 입력으로 간주
+      else if (s1 > s2 && (s1 >= target || (s < courtState.currentSet - 1))) t1Wins++;
+      else if (s2 > s1 && (s2 >= target || (s < courtState.currentSet - 1))) t2Wins++;
     }
   }
   courtState.setWins = { team1: t1Wins, team2: t2Wins };
@@ -414,10 +482,39 @@ function getSetScoreLabel(setNum) {
 function getSetResult(setNum) {
   const s1 = courtState.scores.team1[setNum-1];
   const s2 = courtState.scores.team2[setNum-1];
+  const target = courtState.targetScore;
   if (s1 === 0 && s2 === 0) return '';
+  // 세트 완료 판정 (목표점수 이상 + 리드)
+  if (s1 >= target && s1 > s2) return 'border-b-2 border-blue-400 bg-blue-500/10';
+  if (s2 >= target && s2 > s1) return 'border-b-2 border-orange-400 bg-orange-500/10';
   if (s1 > s2) return 'border-b-2 border-blue-400';
   if (s2 > s1) return 'border-b-2 border-orange-400';
   return '';
+}
+
+// 점수 진행률 관련 함수
+function getScoreProgressLabel(setNum) {
+  const target = courtState.targetScore;
+  const s1 = courtState.scores.team1[setNum-1];
+  const s2 = courtState.scores.team2[setNum-1];
+  const maxScore = Math.max(s1, s2);
+  
+  if (s1 >= target && s1 > s2) return '세트 완료';
+  if (s2 >= target && s2 > s1) return '세트 완료';
+  if (maxScore >= target - 3) return `${target}점까지 ${target - maxScore}점`;
+  return `목표 ${target}점`;
+}
+
+function getScoreProgressClass(setNum) {
+  const target = courtState.targetScore;
+  const s1 = courtState.scores.team1[setNum-1];
+  const s2 = courtState.scores.team2[setNum-1];
+  const maxScore = Math.max(s1, s2);
+  
+  if ((s1 >= target && s1 > s2) || (s2 >= target && s2 > s1)) return 'bg-green-500/30 text-green-300 font-bold';
+  if (maxScore >= target - 3) return 'bg-red-500/30 text-red-300 animate-pulse';
+  if (maxScore >= target - 5) return 'bg-yellow-500/30 text-yellow-300';
+  return 'bg-white/10 text-gray-400';
 }
 
 // ==========================================
@@ -541,6 +638,8 @@ async function refreshCourtData() {
     courtState.currentMatch = data.current_match;
     courtState.nextMatches = data.next_matches;
     courtState.recentMatches = data.recent_matches;
+    courtState.targetScore = data.target_score || 25;
+    courtState.format = data.tournament?.format || 'kdk';
     
     // 현재 경기가 있으면 점수 복원
     if (data.current_match) {

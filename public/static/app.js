@@ -291,6 +291,12 @@ function renderMatchesTab(isAdmin) {
   const matches = state.matches;
   if (matches.length === 0) return `<div class="text-center py-12 text-gray-400"><i class="fas fa-clipboard-list text-4xl mb-3"></i><p>대진표가 아직 생성되지 않았습니다.</p></div>`;
 
+  // 점수 규칙 안내
+  const scoreRuleHtml = `<div class="mb-4 p-3 rounded-xl flex items-center gap-2 ${state.format === 'tournament' ? 'bg-red-50 text-red-700' : 'bg-yellow-50 text-yellow-700'}">
+    <i class="fas fa-bullseye"></i>
+    <span class="text-sm font-bold">${state.targetScore}점제 (${state.format === 'tournament' ? '본선/토너먼트' : '예선'}) · 3세트 중 2세트 선취</span>
+  </div>`;
+
   // 종목별 → 라운드별 그룹핑
   const byEvent = {};
   matches.forEach(m => {
@@ -299,7 +305,7 @@ function renderMatchesTab(isAdmin) {
     byEvent[m.event_name][m.round].push(m);
   });
 
-  return `<div class="space-y-6">${Object.entries(byEvent).map(([eventName, rounds]) => `
+  return `<div class="space-y-6">${scoreRuleHtml}${Object.entries(byEvent).map(([eventName, rounds]) => `
     <div>
       <h3 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2"><i class="fas fa-layer-group text-shuttle-500"></i>${eventName}</h3>
       ${Object.entries(rounds).sort(([a],[b]) => a-b).map(([round, ms]) => `
@@ -318,6 +324,14 @@ function renderMatchCard(m, isAdmin) {
   const t1 = m.team1_name || 'BYE', t2 = m.team2_name || 'BYE';
   const t1T = (m.team1_set1||0)+(m.team1_set2||0)+(m.team1_set3||0);
   const t2T = (m.team2_set1||0)+(m.team2_set2||0)+(m.team2_set3||0);
+  const target = state.targetScore;
+  // 세트별 점수 표시
+  const setScores = [1,2,3].map(s => ({ t1: m[`team1_set${s}`]||0, t2: m[`team2_set${s}`]||0 })).filter(s => s.t1 > 0 || s.t2 > 0);
+  const setsHtml = setScores.length > 0 ? `<div class="flex items-center gap-1 mt-2">${setScores.map((s,i) => {
+    const won1 = s.t1 >= target && s.t1 > s.t2;
+    const won2 = s.t2 >= target && s.t2 > s.t1;
+    return `<span class="text-[10px] px-1.5 py-0.5 rounded ${won1?'bg-shuttle-100 text-shuttle-700 font-bold':won2?'bg-red-100 text-red-600 font-bold':'bg-gray-100 text-gray-500'}">${i+1}: ${s.t1}-${s.t2}</span>`;
+  }).join('')}</div>` : '';
   return `<div class="bg-white rounded-xl border ${m.status==='playing'?'border-green-300 ring-2 ring-green-100':'border-gray-200'} p-4">
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-2"><span class="text-xs text-gray-400">#${m.match_order}</span>${m.court_number?`<span class="badge bg-yellow-50 text-yellow-700">${m.court_number}코트</span>`:''}</div>
@@ -326,6 +340,7 @@ function renderMatchCard(m, isAdmin) {
     <div class="space-y-2">
       <div class="flex items-center justify-between ${m.winner_team===1?'font-bold text-shuttle-700':''}"><span class="text-sm">${m.winner_team===1?'🏆 ':''}${t1}</span><span class="scoreboard-num text-lg font-bold">${t1T}</span></div>
       <div class="flex items-center justify-between ${m.winner_team===2?'font-bold text-shuttle-700':''}"><span class="text-sm">${m.winner_team===2?'🏆 ':''}${t2}</span><span class="scoreboard-num text-lg font-bold">${t2T}</span></div>
+      ${setsHtml}
     </div>
     ${isAdmin && m.status!=='cancelled' ? `<div class="mt-3 pt-3 border-t border-gray-100 flex gap-2">
       ${m.status==='pending'?`<button onclick="startMatch(${m.id})" class="flex-1 py-2 bg-green-50 text-green-700 rounded-lg text-sm font-medium hover:bg-green-100"><i class="fas fa-play mr-1"></i>시작</button>`:''}
@@ -346,6 +361,11 @@ function renderScoreboard() {
       <div class="flex items-center justify-between mb-8">
         <div><button onclick="navigate('tournament')" class="text-gray-400 hover:text-white mb-2 inline-flex items-center text-sm"><i class="fas fa-arrow-left mr-2"></i>돌아가기</button><h1 class="text-3xl font-extrabold">${t?t.name:'스코어보드'}</h1></div>
         <button onclick="refreshScoreboard()" class="px-4 py-2 bg-white/10 rounded-lg text-sm hover:bg-white/20"><i class="fas fa-sync-alt mr-1"></i>새로고침</button>
+      </div>
+      <div class="text-center mb-4">
+        <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold ${state.format === 'tournament' ? 'bg-red-500/20 text-red-300' : 'bg-yellow-500/20 text-yellow-300'}">
+          <i class="fas fa-bullseye"></i>${state.targetScore}점제 ${state.format === 'tournament' ? '(본선/토너먼트)' : '(예선)'} · 3세트 중 2세트 선취
+        </span>
       </div>
       ${playing.length > 0 ? `<div class="mb-8"><h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-green-500 pulse-live"></span>진행 중</h2>
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">${playing.map(m => renderScoreCard(m)).join('')}</div></div>` : '<div class="text-center py-8 text-gray-500 mb-8"><p>진행 중인 경기 없음</p></div>'}
@@ -867,19 +887,25 @@ async function startMatch(mid) { const tid = state.currentTournament.id; try { a
 
 function showScoreModal(mid) {
   const m = state.matches.find(x => x.id === mid); if (!m) return;
+  const target = state.targetScore;
+  const formatLabel = state.format === 'tournament' ? '본선(토너먼트)' : '예선';
   const modal = document.createElement('div'); modal.id = 'score-modal';
   modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-overlay';
   modal.innerHTML = `<div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-    <h3 class="text-lg font-bold mb-4"><i class="fas fa-edit mr-2 text-shuttle-500"></i>점수 입력</h3>
+    <h3 class="text-lg font-bold mb-2"><i class="fas fa-edit mr-2 text-shuttle-500"></i>점수 입력</h3>
+    <div class="text-center mb-1"><span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${state.format === 'tournament' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">
+      <i class="fas fa-bullseye"></i>${target}점제 (${formatLabel}) · 3세트 중 2세트 선취
+    </span></div>
     <div class="text-center mb-4"><span class="font-semibold text-shuttle-700">${m.team1_name||'팀1'}</span><span class="mx-2 text-gray-400">vs</span><span class="font-semibold text-red-600">${m.team2_name||'팀2'}</span></div>
     <div class="space-y-3">${[1,2,3].map(s => `<div class="flex items-center gap-3"><span class="text-sm font-medium text-gray-500 w-12">${s}세트</span>
-      <input id="t1s${s}" type="number" min="0" max="30" value="${m[`team1_set${s}`]||0}" class="flex-1 px-3 py-2 border rounded-lg text-center text-lg font-bold outline-none focus:ring-2 focus:ring-shuttle-500"><span class="text-gray-400">:</span>
-      <input id="t2s${s}" type="number" min="0" max="30" value="${m[`team2_set${s}`]||0}" class="flex-1 px-3 py-2 border rounded-lg text-center text-lg font-bold outline-none focus:ring-2 focus:ring-red-500"></div>`).join('')}</div>
+      <input id="t1s${s}" type="number" min="0" max="${target+10}" value="${m[`team1_set${s}`]||0}" class="flex-1 px-3 py-2 border rounded-lg text-center text-lg font-bold outline-none focus:ring-2 focus:ring-shuttle-500"><span class="text-gray-400">:</span>
+      <input id="t2s${s}" type="number" min="0" max="${target+10}" value="${m[`team2_set${s}`]||0}" class="flex-1 px-3 py-2 border rounded-lg text-center text-lg font-bold outline-none focus:ring-2 focus:ring-red-500"></div>`).join('')}</div>
     <div class="mt-4"><label class="block text-sm font-semibold text-gray-700 mb-2">승자</label>
       <div class="flex gap-2">
         <button onclick="document.getElementById('winner-val').value=1;this.classList.add('ring-2','ring-shuttle-500');this.nextElementSibling.classList.remove('ring-2','ring-shuttle-500')" class="flex-1 py-2 bg-shuttle-50 text-shuttle-700 rounded-lg text-sm font-medium ${m.winner_team===1?'ring-2 ring-shuttle-500':''}">${m.team1_name||'팀1'}</button>
         <button onclick="document.getElementById('winner-val').value=2;this.classList.add('ring-2','ring-shuttle-500');this.previousElementSibling.classList.remove('ring-2','ring-shuttle-500')" class="flex-1 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-medium ${m.winner_team===2?'ring-2 ring-shuttle-500':''}">${m.team2_name||'팀2'}</button>
-      </div><input type="hidden" id="winner-val" value="${m.winner_team||''}"></div>
+      </div><input type="hidden" id="winner-val" value="${m.winner_team||''}">
+      <p class="text-xs text-gray-400 mt-2 text-center"><i class="fas fa-info-circle mr-1"></i>${target}점 이상 도달 + 리드 시 세트 승리</p></div>
     <div class="flex gap-2 mt-5"><button onclick="document.getElementById('score-modal').remove()" class="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium">취소</button><button onclick="submitScore(${mid})" class="flex-1 py-2.5 bg-shuttle-600 text-white rounded-xl font-medium">저장</button></div>
   </div>`;
   document.body.appendChild(modal);

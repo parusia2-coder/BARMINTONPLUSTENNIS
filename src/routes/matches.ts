@@ -31,7 +31,13 @@ matchRoutes.get('/:tid/matches', async (c) => {
     : db.prepare(query).bind(binds[0], binds[1])
   const { results } = await stmt.all()
 
-  return c.json({ matches: results })
+  // 대회 포맷 정보 포함 (점수 규칙 판단용)
+  const tournament = await db.prepare(
+    `SELECT format FROM tournaments WHERE id=? AND deleted=0`
+  ).bind(tid).first() as any
+  const targetScore = tournament?.format === 'tournament' ? 21 : 25
+
+  return c.json({ matches: results, target_score: targetScore, format: tournament?.format })
 })
 
 // 점수 업데이트
@@ -186,17 +192,21 @@ matchRoutes.get('/:tid/court/:courtNum', async (c) => {
     LIMIT 3
   `).bind(tid, courtNum).all()
 
-  // 대회 정보
+  // 대회 정보 (포맷 포함 - 점수 규칙 판단용)
   const tournament = await db.prepare(
-    `SELECT name, courts FROM tournaments WHERE id=? AND deleted=0`
+    `SELECT name, courts, format FROM tournaments WHERE id=? AND deleted=0`
   ).bind(tid).first()
+
+  // 점수 규칙: 예선(kdk/league) = 25점, 본선(tournament) = 21점
+  const targetScore = (tournament as any)?.format === 'tournament' ? 21 : 25
 
   return c.json({
     tournament,
     court_number: parseInt(courtNum as string),
     current_match: currentMatch,
     next_matches: nextMatches || [],
-    recent_matches: recentMatches || []
+    recent_matches: recentMatches || [],
+    target_score: targetScore
   })
 })
 
@@ -239,10 +249,12 @@ matchRoutes.get('/:tid/courts/overview', async (c) => {
   const db = c.env.DB
 
   const tournament = await db.prepare(
-    `SELECT name, courts FROM tournaments WHERE id=? AND deleted=0`
+    `SELECT name, courts, format FROM tournaments WHERE id=? AND deleted=0`
   ).bind(tid).first() as any
 
   if (!tournament) return c.json({ error: '대회를 찾을 수 없습니다.' }, 404)
+
+  const targetScore = tournament.format === 'tournament' ? 21 : 25
 
   const courts: any[] = []
   for (let i = 1; i <= (tournament.courts || 2); i++) {
@@ -278,7 +290,7 @@ matchRoutes.get('/:tid/courts/overview', async (c) => {
     FROM matches WHERE tournament_id=?
   `).bind(tid).first()
 
-  return c.json({ tournament, courts, stats })
+  return c.json({ tournament, courts, stats, target_score: targetScore })
 })
 
 // 감사 로그 조회
