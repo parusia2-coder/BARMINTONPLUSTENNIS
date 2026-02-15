@@ -255,7 +255,8 @@ function renderEventsTab(isAdmin) {
         <button type="submit" class="px-5 py-2.5 bg-shuttle-600 text-white rounded-lg font-medium hover:bg-shuttle-700"><i class="fas fa-plus mr-1"></i>종목 추가</button>
       </form>
     </div>` : ''}
-    ${isAdmin ? `<div class="flex gap-2">
+    ${isAdmin ? `<div class="flex flex-wrap gap-2">
+      <button onclick="autoAssignAll()" class="px-4 py-2 bg-teal-50 text-teal-700 rounded-lg text-sm font-medium hover:bg-teal-100"><i class="fas fa-random mr-1"></i>전체 자동 팀편성</button>
       <button onclick="checkMerge()" class="px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-100"><i class="fas fa-compress-arrows-alt mr-1"></i>급수합병 체크</button>
       ${state.events.length > 0 ? `<button onclick="generateAllBrackets()" class="px-4 py-2 bg-gradient-to-r from-shuttle-500 to-shuttle-700 text-white rounded-lg text-sm font-semibold shadow-md hover:shadow-lg"><i class="fas fa-magic mr-1"></i>전체 대진표 생성</button>` : ''}
     </div>` : ''}
@@ -271,6 +272,7 @@ function renderEventsTab(isAdmin) {
             ${ev.merged_from ? '<span class="badge bg-amber-100 text-amber-700"><i class="fas fa-compress-arrows-alt mr-1"></i>합병</span>' : ''}
           </div>
           <div class="flex items-center gap-2">
+            ${isAdmin ? `<button onclick="autoAssignEvent(${ev.id})" class="px-3 py-1.5 bg-teal-50 text-teal-700 rounded-lg text-xs font-medium hover:bg-teal-100"><i class="fas fa-random mr-1"></i>자동편성</button>` : ''}
             ${isAdmin ? `<button onclick="showTeamModal(${ev.id}, '${ev.category}')" class="px-3 py-1.5 bg-shuttle-50 text-shuttle-700 rounded-lg text-xs font-medium hover:bg-shuttle-100"><i class="fas fa-user-plus mr-1"></i>팀 등록</button>` : ''}
             ${isAdmin ? `<button onclick="deleteEvent(${ev.id})" class="text-red-400 hover:text-red-600 text-sm"><i class="fas fa-trash-alt"></i></button>` : ''}
           </div>
@@ -729,6 +731,32 @@ async function submitBulk() {
 
 // Event actions
 async function deleteEvent(eid) { if (!confirm('종목과 관련 팀/경기를 모두 삭제합니다.')) return; const tid = state.currentTournament.id; try { await api(`/tournaments/${tid}/events/${eid}`, { method: 'DELETE' }); showToast('종목 삭제됨', 'success'); await loadEvents(tid); render(); } catch(e){} }
+
+// 종목별 자동 팀 편성
+async function autoAssignEvent(eid) {
+  if (!confirm('이 종목의 기존 팀을 삭제하고 자동 편성합니다. 계속하시겠습니까?')) return;
+  const tid = state.currentTournament.id;
+  try {
+    const res = await api(`/tournaments/${tid}/events/${eid}/auto-assign`, { method: 'POST', body: '{}' });
+    showToast(res.message, 'success');
+    await loadEvents(tid); render();
+  } catch(e){}
+}
+
+// 전체 종목 자동 팀 편성
+async function autoAssignAll() {
+  if (!confirm('전체 종목의 기존 팀을 삭제하고 자동 편성합니다. 계속하시겠습니까?')) return;
+  const tid = state.currentTournament.id;
+  try {
+    const res = await api(`/tournaments/${tid}/events/auto-assign-all`, { method: 'POST', body: '{}' });
+    showToast(res.message, 'success');
+    if (res.events) {
+      const detail = res.events.map(e => `${e.event_name}: ${e.team_count}팀`).join('\n');
+      setTimeout(() => showToast(detail, 'info'), 500);
+    }
+    await loadEvents(tid); render();
+  } catch(e){}
+}
 
 async function loadTeams(eid) {
   const tid = state.currentTournament.id;

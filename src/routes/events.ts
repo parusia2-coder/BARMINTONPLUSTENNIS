@@ -140,6 +140,186 @@ eventRoutes.delete('/:tid/events/:eid/teams/:teamId', async (c) => {
   return c.json({ message: '팀이 삭제되었습니다.' })
 })
 
+// 종목별 자동 팀 편성
+eventRoutes.post('/:tid/events/:eid/auto-assign', async (c) => {
+  const tid = c.req.param('tid')
+  const eid = c.req.param('eid')
+  const db = c.env.DB
+
+  const event = await db.prepare(`SELECT * FROM events WHERE id=? AND tournament_id=?`).bind(eid, tid).first() as any
+  if (!event) return c.json({ error: '종목을 찾을 수 없습니다.' }, 404)
+
+  // 기존 팀 삭제
+  await db.prepare(`DELETE FROM standings WHERE event_id=?`).bind(eid).run()
+  await db.prepare(`DELETE FROM matches WHERE event_id=?`).bind(eid).run()
+  await db.prepare(`DELETE FROM teams WHERE event_id=?`).bind(eid).run()
+
+  // 참가자 필터: 성별 + 급수 조건
+  let genderFilter = ''
+  if (event.category === 'md') genderFilter = `AND gender='m'`
+  else if (event.category === 'wd') genderFilter = `AND gender='f'`
+  // xd는 남녀 각각 조회
+
+  let levelFilter = ''
+  if (event.level_group && event.level_group !== 'all' && event.level_group !== 'merged') {
+    levelFilter = `AND level='${event.level_group}'`
+  } else if (event.merged_from) {
+    // 합병된 종목: merged_from에서 원래 급수들 추출
+    try {
+      const origIds = JSON.parse(event.merged_from)
+      const origEvents: any[] = []
+      for (const oid of origIds) {
+        const oe = await db.prepare(`SELECT level_group FROM events WHERE id=?`).bind(oid).first()
+        if (oe) origEvents.push(oe)
+      }
+      if (origEvents.length > 0) {
+        const lvls = origEvents.map((oe: any) => `'${oe.level_group}'`).join(',')
+        levelFilter = `AND level IN (${lvls})`
+      }
+    } catch (e) { /* merged_from parse 실패 시 전체 */ }
+  }
+
+  const teams: { p1: any; p2: any }[] = []
+
+  if (event.category === 'xd') {
+    // 혼합복식: 남녀 각각 조회 후 짝짓기
+    const { results: males } = await db.prepare(
+      `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='m' ${levelFilter} ORDER BY level, RANDOM()`
+    ).bind(tid).all()
+    const { results: females } = await db.prepare(
+      `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='f' ${levelFilter} ORDER BY level, RANDOM()`
+    ).bind(tid).all()
+
+    const count = Math.min((males || []).length, (females || []).length)
+    for (let i = 0; i < count; i++) {
+      teams.push({ p1: males![i], p2: females![i] })
+    }
+  } else {
+    // 남복/여복: 같은 성별끼리 짝짓기
+    const { results: players } = await db.prepare(
+      `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 ${genderFilter} ${levelFilter} ORDER BY level, RANDOM()`
+    ).bind(tid).all()
+
+    if (players && players.length >= 2) {
+      // 비슷한 급수끼리 짝짓기: 셔플 후 인접 2명씩
+      const shuffled = [...players]
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+      }
+      // 급수 순 정렬 후 2명씩 묶기
+      const levelOrder: Record<string, number> = { s: 0, a: 1, b: 2, c: 3, d: 4, e: 5 }
+      shuffled.sort((a: any, b: any) => (levelOrder[a.level] || 3) - (levelOrder[b.level] || 3))
+      for (let i = 0; i + 1 < shuffled.length; i += 2) {
+        teams.push({ p1: shuffled[i], p2: shuffled[i + 1] })
+      }
+    }
+  }
+
+  if (teams.length === 0) return c.json({ error: '조건에 맞는 참가자가 부족합니다.', team_count: 0 }, 400)
+
+  // DB에 팀 등록
+  let created = 0
+  for (const t of teams) {
+    const teamName = `${(t.p1 as any).name} · ${(t.p2 as any).name}`
+    await db.prepare(
+      `INSERT INTO teams (event_id, tournament_id, player1_id, player2_id, team_name) VALUES (?, ?, ?, ?, ?)`
+    ).bind(eid, tid, (t.p1 as any).id, (t.p2 as any).id, teamName).run()
+    created++
+  }
+
+  return c.json({ message: `${created}팀이 자동 편성되었습니다.`, team_count: created })
+})
+
+// 전체 종목 자동 팀 편성
+eventRoutes.post('/:tid/events/auto-assign-all', async (c) => {
+  const tid = c.req.param('tid')
+  const db = c.env.DB
+
+  const { results: events } = await db.prepare(
+    `SELECT * FROM events WHERE tournament_id=? ORDER BY category, age_group, level_group`
+  ).bind(tid).all()
+
+  if (!events || events.length === 0) return c.json({ error: '종목이 없습니다.' }, 400)
+
+  const results: any[] = []
+  let totalTeams = 0
+
+  for (const ev of events) {
+    const event = ev as any
+    // 기존 팀 삭제
+    await db.prepare(`DELETE FROM standings WHERE event_id=?`).bind(event.id).run()
+    await db.prepare(`DELETE FROM matches WHERE event_id=?`).bind(event.id).run()
+    await db.prepare(`DELETE FROM teams WHERE event_id=?`).bind(event.id).run()
+
+    let genderFilter = ''
+    if (event.category === 'md') genderFilter = `AND gender='m'`
+    else if (event.category === 'wd') genderFilter = `AND gender='f'`
+
+    let levelFilter = ''
+    if (event.level_group && event.level_group !== 'all' && event.level_group !== 'merged') {
+      levelFilter = `AND level='${event.level_group}'`
+    } else if (event.merged_from) {
+      try {
+        const origIds = JSON.parse(event.merged_from)
+        const origEvents: any[] = []
+        for (const oid of origIds) {
+          const oe = await db.prepare(`SELECT level_group FROM events WHERE id=?`).bind(oid).first()
+          if (oe) origEvents.push(oe)
+        }
+        if (origEvents.length > 0) {
+          const lvls = origEvents.map((oe: any) => `'${oe.level_group}'`).join(',')
+          levelFilter = `AND level IN (${lvls})`
+        }
+      } catch (e) {}
+    }
+
+    const teams: { p1: any; p2: any }[] = []
+
+    if (event.category === 'xd') {
+      const { results: males } = await db.prepare(
+        `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='m' ${levelFilter} ORDER BY level, RANDOM()`
+      ).bind(tid).all()
+      const { results: females } = await db.prepare(
+        `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='f' ${levelFilter} ORDER BY level, RANDOM()`
+      ).bind(tid).all()
+      const count = Math.min((males || []).length, (females || []).length)
+      for (let i = 0; i < count; i++) {
+        teams.push({ p1: males![i], p2: females![i] })
+      }
+    } else {
+      const { results: players } = await db.prepare(
+        `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 ${genderFilter} ${levelFilter} ORDER BY level, RANDOM()`
+      ).bind(tid).all()
+      if (players && players.length >= 2) {
+        const shuffled = [...players]
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+        }
+        const levelOrder: Record<string, number> = { s: 0, a: 1, b: 2, c: 3, d: 4, e: 5 }
+        shuffled.sort((a: any, b: any) => (levelOrder[a.level] || 3) - (levelOrder[b.level] || 3))
+        for (let i = 0; i + 1 < shuffled.length; i += 2) {
+          teams.push({ p1: shuffled[i], p2: shuffled[i + 1] })
+        }
+      }
+    }
+
+    let created = 0
+    for (const t of teams) {
+      const teamName = `${(t.p1 as any).name} · ${(t.p2 as any).name}`
+      await db.prepare(
+        `INSERT INTO teams (event_id, tournament_id, player1_id, player2_id, team_name) VALUES (?, ?, ?, ?, ?)`
+      ).bind(event.id, tid, (t.p1 as any).id, (t.p2 as any).id, teamName).run()
+      created++
+    }
+    totalTeams += created
+    results.push({ event_id: event.id, event_name: event.name, team_count: created })
+  }
+
+  return c.json({ message: `전체 ${totalTeams}팀 자동 편성 완료`, total_teams: totalTeams, events: results })
+})
+
 // 급수 합병 체크 및 실행
 eventRoutes.post('/:tid/events/check-merge', async (c) => {
   const tid = c.req.param('tid')
