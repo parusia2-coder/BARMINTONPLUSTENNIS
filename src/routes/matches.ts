@@ -136,6 +136,151 @@ matchRoutes.get('/:tid/standings', async (c) => {
   return c.json({ standings })
 })
 
+// 코트별 경기 조회 (코트 점수판용)
+matchRoutes.get('/:tid/court/:courtNum', async (c) => {
+  const tid = c.req.param('tid')
+  const courtNum = c.req.param('courtNum')
+  const db = c.env.DB
+
+  // 현재 해당 코트에서 진행중인 경기
+  const currentMatch = await db.prepare(`
+    SELECT m.*, e.name as event_name, e.category,
+      t1.team_name as team1_name, t2.team_name as team2_name,
+      p1a.name as p1a_name, p1b.name as p1b_name,
+      p2a.name as p2a_name, p2b.name as p2b_name
+    FROM matches m
+    JOIN events e ON m.event_id = e.id
+    LEFT JOIN teams t1 ON m.team1_id = t1.id
+    LEFT JOIN teams t2 ON m.team2_id = t2.id
+    LEFT JOIN participants p1a ON t1.player1_id = p1a.id
+    LEFT JOIN participants p1b ON t1.player2_id = p1b.id
+    LEFT JOIN participants p2a ON t2.player1_id = p2a.id
+    LEFT JOIN participants p2b ON t2.player2_id = p2b.id
+    WHERE m.tournament_id = ? AND m.court_number = ? AND m.status = 'playing'
+    LIMIT 1
+  `).bind(tid, courtNum).first()
+
+  // 다음 대기 경기들 (이 코트)
+  const { results: nextMatches } = await db.prepare(`
+    SELECT m.*, e.name as event_name, e.category,
+      t1.team_name as team1_name, t2.team_name as team2_name
+    FROM matches m
+    JOIN events e ON m.event_id = e.id
+    LEFT JOIN teams t1 ON m.team1_id = t1.id
+    LEFT JOIN teams t2 ON m.team2_id = t2.id
+    WHERE m.tournament_id = ? AND m.court_number = ? AND m.status = 'pending'
+    ORDER BY m.round ASC, m.match_order ASC
+    LIMIT 5
+  `).bind(tid, courtNum).all()
+
+  // 최근 완료 경기
+  const { results: recentMatches } = await db.prepare(`
+    SELECT m.*, e.name as event_name,
+      t1.team_name as team1_name, t2.team_name as team2_name
+    FROM matches m
+    JOIN events e ON m.event_id = e.id
+    LEFT JOIN teams t1 ON m.team1_id = t1.id
+    LEFT JOIN teams t2 ON m.team2_id = t2.id
+    WHERE m.tournament_id = ? AND m.court_number = ? AND m.status = 'completed'
+    ORDER BY m.updated_at DESC
+    LIMIT 3
+  `).bind(tid, courtNum).all()
+
+  // 대회 정보
+  const tournament = await db.prepare(
+    `SELECT name, courts FROM tournaments WHERE id=? AND deleted=0`
+  ).bind(tid).first()
+
+  return c.json({
+    tournament,
+    court_number: parseInt(courtNum as string),
+    current_match: currentMatch,
+    next_matches: nextMatches || [],
+    recent_matches: recentMatches || []
+  })
+})
+
+// 코트에서 다음 경기 시작 (자동으로 다음 대기 경기를 playing으로)
+matchRoutes.post('/:tid/court/:courtNum/next', async (c) => {
+  const tid = c.req.param('tid')
+  const courtNum = c.req.param('courtNum')
+  const db = c.env.DB
+
+  // 현재 진행중인 경기가 있으면 차단
+  const playing = await db.prepare(
+    `SELECT id FROM matches WHERE tournament_id=? AND court_number=? AND status='playing' LIMIT 1`
+  ).bind(tid, courtNum).first()
+
+  if (playing) return c.json({ error: '현재 진행 중인 경기가 있습니다. 먼저 완료해주세요.' }, 400)
+
+  // 다음 대기 경기 가져오기
+  const next = await db.prepare(`
+    SELECT m.*, t1.team_name as team1_name, t2.team_name as team2_name, e.name as event_name
+    FROM matches m
+    LEFT JOIN teams t1 ON m.team1_id = t1.id
+    LEFT JOIN teams t2 ON m.team2_id = t2.id
+    LEFT JOIN events e ON m.event_id = e.id
+    WHERE m.tournament_id=? AND m.court_number=? AND m.status='pending'
+    ORDER BY m.round ASC, m.match_order ASC LIMIT 1
+  `).bind(tid, courtNum).first()
+
+  if (!next) return c.json({ error: '대기 중인 경기가 없습니다.' }, 404)
+
+  await db.prepare(
+    `UPDATE matches SET status='playing', updated_at=datetime('now') WHERE id=?`
+  ).bind(next.id).run()
+
+  return c.json({ message: '경기가 시작되었습니다.', match: next })
+})
+
+// 코트 전체 현황 (모든 코트 한눈에)
+matchRoutes.get('/:tid/courts/overview', async (c) => {
+  const tid = c.req.param('tid')
+  const db = c.env.DB
+
+  const tournament = await db.prepare(
+    `SELECT name, courts FROM tournaments WHERE id=? AND deleted=0`
+  ).bind(tid).first() as any
+
+  if (!tournament) return c.json({ error: '대회를 찾을 수 없습니다.' }, 404)
+
+  const courts: any[] = []
+  for (let i = 1; i <= (tournament.courts || 2); i++) {
+    const currentMatch = await db.prepare(`
+      SELECT m.*, e.name as event_name,
+        t1.team_name as team1_name, t2.team_name as team2_name
+      FROM matches m
+      JOIN events e ON m.event_id = e.id
+      LEFT JOIN teams t1 ON m.team1_id = t1.id
+      LEFT JOIN teams t2 ON m.team2_id = t2.id
+      WHERE m.tournament_id=? AND m.court_number=? AND m.status='playing'
+      LIMIT 1
+    `).bind(tid, i).first()
+
+    const pendingCount = await db.prepare(
+      `SELECT COUNT(*) as cnt FROM matches WHERE tournament_id=? AND court_number=? AND status='pending'`
+    ).bind(tid, i).first() as any
+
+    courts.push({
+      court_number: i,
+      current_match: currentMatch,
+      pending_count: pendingCount?.cnt || 0
+    })
+  }
+
+  // 전체 통계
+  const stats = await db.prepare(`
+    SELECT 
+      COUNT(CASE WHEN status='playing' THEN 1 END) as playing,
+      COUNT(CASE WHEN status='pending' THEN 1 END) as pending,
+      COUNT(CASE WHEN status='completed' THEN 1 END) as completed,
+      COUNT(*) as total
+    FROM matches WHERE tournament_id=?
+  `).bind(tid).first()
+
+  return c.json({ tournament, courts, stats })
+})
+
 // 감사 로그 조회
 matchRoutes.get('/:tid/audit-logs', async (c) => {
   const tid = c.req.param('tid')

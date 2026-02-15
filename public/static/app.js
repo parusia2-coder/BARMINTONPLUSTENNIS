@@ -161,6 +161,7 @@ function renderTournament() {
       <div class="flex items-center gap-2">
         ${!isAdmin ? `<button onclick="showAuthModal(${t.id})" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"><i class="fas fa-lock mr-1"></i>관리자</button>` : `<span class="badge bg-shuttle-100 text-shuttle-700"><i class="fas fa-shield-alt mr-1"></i>관리자</span>`}
         <button onclick="navigate('scoreboard')" class="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm hover:bg-blue-100"><i class="fas fa-tv mr-1"></i>스코어보드</button>
+        <button onclick="window.open('/court?tid='+state.currentTournament.id,'_blank')" class="px-4 py-2 bg-green-50 text-green-700 rounded-lg text-sm hover:bg-green-100"><i class="fas fa-tablet-alt mr-1"></i>코트 점수판</button>
         <button onclick="loadStandingsAndNavigate(${t.id})" class="px-4 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm hover:bg-purple-100"><i class="fas fa-medal mr-1"></i>결과</button>
       </div>
     </div>
