@@ -25,21 +25,12 @@ participantRoutes.post('/:tid/participants', async (c) => {
 
   // 대회 상태 확인
   const tournament = await db.prepare(
-    `SELECT status, max_participants FROM tournaments WHERE id=? AND deleted=0`
+    `SELECT status FROM tournaments WHERE id=? AND deleted=0`
   ).bind(tid).first()
 
   if (!tournament) return c.json({ error: '대회를 찾을 수 없습니다.' }, 404)
   if (tournament.status !== 'draft' && tournament.status !== 'open') {
     return c.json({ error: '현재 참가 접수가 불가능한 상태입니다.' }, 400)
-  }
-
-  // 현재 참가자 수 확인
-  const count = await db.prepare(
-    `SELECT COUNT(*) as count FROM participants WHERE tournament_id=? AND deleted=0`
-  ).bind(tid).first()
-
-  if (count && (count.count as number) >= (tournament.max_participants as number)) {
-    return c.json({ error: '참가자 정원이 초과되었습니다.' }, 400)
   }
 
   // 중복 이름 확인

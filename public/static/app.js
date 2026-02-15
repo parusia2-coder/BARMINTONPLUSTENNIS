@@ -136,7 +136,6 @@ function renderTournamentCard(t) {
       <p class="text-sm text-gray-500 mb-3 line-clamp-2">${t.description || '설명 없음'}</p>
       <div class="flex items-center gap-4 text-xs text-gray-400">
         <span><i class="fas fa-gamepad mr-1"></i>${formatMap[t.format] || t.format}</span>
-        <span><i class="fas fa-users mr-1"></i>최대 ${t.max_participants}명</span>
         <span><i class="fas fa-table-tennis-paddle-ball mr-1"></i>${t.courts}코트</span>
       </div>
       <div class="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
@@ -172,10 +171,6 @@ function renderCreate() {
                 <option value="league">풀리그 (단식)</option>
                 <option value="tournament">토너먼트 (단식)</option>
               </select>
-            </div>
-            <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-1">최대 인원</label>
-              <input name="max_participants" type="number" value="100" min="2" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-shuttle-500 outline-none">
             </div>
           </div>
           <div class="grid grid-cols-2 gap-4">
@@ -587,7 +582,6 @@ function bindEvents() {
       e.preventDefault();
       const fd = new FormData(e.target);
       const data = Object.fromEntries(fd);
-      data.max_participants = parseInt(data.max_participants);
       data.games_per_player = parseInt(data.games_per_player);
       data.courts = parseInt(data.courts);
       try {

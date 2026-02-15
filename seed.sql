@@ -1,6 +1,6 @@
 -- 테스트 대회 데이터
-INSERT OR IGNORE INTO tournaments (id, name, description, format, status, max_participants, games_per_player, courts, admin_password) VALUES 
-  (1, '2026 봄맞이 배드민턴 대회', '동호회 정기 대회입니다. 많은 참가 바랍니다!', 'kdk', 'open', 16, 4, 2, 'admin123');
+INSERT OR IGNORE INTO tournaments (id, name, description, format, status, games_per_player, courts, admin_password) VALUES 
+  (1, '2026 봄맞이 배드민턴 대회', '동호회 정기 대회입니다. 많은 참가 바랍니다!', 'kdk', 'open', 4, 2, 'admin123');
 
 -- 테스트 참가자 데이터
 INSERT OR IGNORE INTO participants (id, tournament_id, name, phone, level, paid, checked_in) VALUES 
