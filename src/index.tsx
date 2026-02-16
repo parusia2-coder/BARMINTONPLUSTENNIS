@@ -119,6 +119,12 @@ function getCourtHtml(): string {
       50% { box-shadow: 0 0 0 20px rgba(168,85,247,0); }
     }
 
+    /* 서명 캔버스 */
+    #sig-canvas {
+      cursor: crosshair;
+      background: white;
+    }
+
     /* 전체화면용 */
     html, body { height: 100%; overflow: hidden; }
     #app { height: 100%; overflow-y: auto; }

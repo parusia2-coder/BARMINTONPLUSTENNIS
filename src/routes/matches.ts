@@ -303,6 +303,60 @@ matchRoutes.get('/:tid/audit-logs', async (c) => {
   return c.json({ logs: results })
 })
 
+// 경기 서명 저장
+matchRoutes.put('/:tid/matches/:mid/signature', async (c) => {
+  const tid = c.req.param('tid')
+  const mid = c.req.param('mid')
+  const db = c.env.DB
+  const body = await c.req.json()
+  const { winner_signature, loser_signature } = body
+
+  const match = await db.prepare(
+    `SELECT * FROM matches WHERE id=? AND tournament_id=?`
+  ).bind(mid, tid).first()
+
+  if (!match) return c.json({ error: '경기를 찾을 수 없습니다.' }, 404)
+
+  await db.prepare(
+    `UPDATE matches SET 
+      winner_signature=?, loser_signature=?, signature_at=datetime('now'), updated_at=datetime('now')
+     WHERE id=? AND tournament_id=?`
+  ).bind(
+    winner_signature || null, loser_signature || null, mid, tid
+  ).run()
+
+  // 감사 로그
+  await db.prepare(
+    `INSERT INTO audit_logs (tournament_id, match_id, action, new_value, updated_by)
+     VALUES (?, ?, 'SIGNATURE', ?, 'court')`
+  ).bind(
+    tid, mid,
+    JSON.stringify({ has_winner_sig: !!winner_signature, has_loser_sig: !!loser_signature })
+  ).run()
+
+  return c.json({ message: '서명이 저장되었습니다.' })
+})
+
+// 경기 서명 조회
+matchRoutes.get('/:tid/matches/:mid/signature', async (c) => {
+  const tid = c.req.param('tid')
+  const mid = c.req.param('mid')
+  const db = c.env.DB
+
+  const match = await db.prepare(
+    `SELECT id, winner_signature, loser_signature, signature_at FROM matches WHERE id=? AND tournament_id=?`
+  ).bind(mid, tid).first()
+
+  if (!match) return c.json({ error: '경기를 찾을 수 없습니다.' }, 404)
+
+  return c.json({
+    match_id: match.id,
+    winner_signature: match.winner_signature,
+    loser_signature: match.loser_signature,
+    signature_at: match.signature_at
+  })
+})
+
 // 순위 재계산 함수
 async function recalculateStandings(db: D1Database, tournamentId: number, eventId: number) {
   const { results: matches } = await db.prepare(

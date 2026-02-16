@@ -12,7 +12,7 @@ const courtState = {
   nextMatches: [],
   recentMatches: [],
   tournament: null,
-  page: 'select', // select | side-select | court
+  page: 'select', // select | side-select | court | signature
   courts: [],
   stats: null,
   autoRefreshTimer: null,
@@ -20,9 +20,15 @@ const courtState = {
   leftTeam: 1,
   rightTeam: 2,
   swapped: false,
-  swapDone: false, // 이번 경기에서 중간 교체 완료 여부
+  swapDone: false,
+  swapPending: false,
   targetScore: 25,
-  format: 'kdk'
+  format: 'kdk',
+  // 서명 관련
+  finishedMatch: null,
+  finishedScore: null,
+  finishedWinner: null,
+  finishedNames: null
 };
 
 // 중간 교체 점수 계산
@@ -83,6 +89,7 @@ function renderCourt() {
     case 'select': app.innerHTML = renderCourtSelect(); break;
     case 'side-select': app.innerHTML = renderSideSelect(); break;
     case 'court': app.innerHTML = renderCourtScoreboard(); bindScoreboardEvents(); break;
+    case 'signature': app.innerHTML = renderSignatureScreen(); initSignaturePads(); break;
     default: app.innerHTML = renderCourtSelect();
   }
 }
@@ -802,6 +809,7 @@ async function confirmFinish() {
   
   const m = courtState.currentMatch;
   const winnerTeam = selectedWinnerSide === 'left' ? courtState.leftTeam : courtState.rightTeam;
+  const loserTeam = winnerTeam === 1 ? 2 : 1;
 
   const data = {
     team1_set1: getTeam1Score(),
@@ -816,9 +824,20 @@ async function confirmFinish() {
     await courtApi(`/tournaments/${courtState.tournamentId}/matches/${m.id}/score`, {
       method: 'PUT', body: JSON.stringify(data)
     });
-    showCourtToast('경기가 종료되었습니다!', 'success');
+    showCourtToast('경기가 종료되었습니다! 서명을 받아주세요.', 'success');
     closeFinishModal();
     
+    // 서명 화면으로 전환 (경기 정보 보존)
+    const winnerName = winnerTeam === 1 ? (m.team1_name || '팀1') : (m.team2_name || '팀2');
+    const loserName = loserTeam === 1 ? (m.team1_name || '팀1') : (m.team2_name || '팀2');
+    
+    courtState.finishedMatch = m;
+    courtState.finishedScore = { team1: getTeam1Score(), team2: getTeam2Score() };
+    courtState.finishedWinner = winnerTeam;
+    courtState.finishedNames = { winner: winnerName, loser: loserName };
+    courtState.page = 'signature';
+    
+    // 현재 경기 정보 초기화
     courtState.currentMatch = null;
     courtState.score = { left: 0, right: 0 };
     courtState.leftTeam = 1;
@@ -829,8 +848,290 @@ async function confirmFinish() {
     actionHistory = [];
     selectedWinnerSide = null;
     
-    await refreshCourtData();
+    renderCourt();
   } catch(e) {}
+}
+
+// ==========================================
+// 서명 확인 화면
+// ==========================================
+let signaturePads = { winner: null, loser: null };
+let signatureStep = 'winner'; // winner | loser | done
+
+function renderSignatureScreen() {
+  const fm = courtState.finishedMatch;
+  const fs = courtState.finishedScore;
+  const names = courtState.finishedNames;
+  if (!fm || !fs || !names) {
+    courtState.page = 'court';
+    renderCourt();
+    return '';
+  }
+
+  const winnerScore = courtState.finishedWinner === 1 ? fs.team1 : fs.team2;
+  const loserScore = courtState.finishedWinner === 1 ? fs.team2 : fs.team1;
+
+  return `<div class="h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col select-none" style="touch-action:none;overflow:hidden;">
+    <!-- 상단 바 -->
+    <div class="flex items-center justify-between px-4 py-2 bg-black/40 border-b border-white/10 shrink-0">
+      <div class="flex items-center gap-2">
+        <span class="bg-yellow-500 text-black text-xs font-bold px-3 py-1 rounded-full">${courtState.courtNumber}코트</span>
+        <span class="text-xs text-gray-400">#${fm.match_order} ${fm.event_name || ''}</span>
+      </div>
+      <span class="text-xs text-yellow-300 font-bold"><i class="fas fa-pen-fancy mr-1"></i>점수 확인 서명</span>
+    </div>
+
+    <!-- 경기 결과 요약 -->
+    <div class="px-4 pt-3 pb-2 shrink-0">
+      <div class="bg-white/5 rounded-2xl p-3 border border-white/10">
+        <div class="flex items-center justify-center gap-4">
+          <div class="text-center flex-1">
+            <p class="text-xs ${courtState.finishedWinner === 1 ? 'text-yellow-400' : 'text-gray-400'} font-bold mb-0.5">
+              ${courtState.finishedWinner === 1 ? '🏆 승리' : '패배'}
+            </p>
+            <p class="text-sm font-bold truncate">${names.winner}</p>
+            <p class="text-2xl font-black ${courtState.finishedWinner === 1 ? 'text-yellow-400' : ''}">${winnerScore}</p>
+          </div>
+          <span class="text-xl text-gray-600 font-bold">:</span>
+          <div class="text-center flex-1">
+            <p class="text-xs ${courtState.finishedWinner === 2 ? 'text-yellow-400' : 'text-gray-400'} font-bold mb-0.5">
+              ${courtState.finishedWinner === 2 ? '🏆 승리' : '패배'}
+            </p>
+            <p class="text-sm font-bold truncate">${names.loser}</p>
+            <p class="text-2xl font-black ${courtState.finishedWinner === 2 ? 'text-yellow-400' : ''}">${loserScore}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 서명 영역 -->
+    <div class="flex-1 flex flex-col px-4 pb-3 min-h-0">
+      <!-- 단계 표시 -->
+      <div class="flex justify-center gap-3 mb-2 shrink-0">
+        <div class="flex items-center gap-1.5">
+          <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
+            ${signatureStep === 'winner' ? 'bg-yellow-500 text-black' : signaturePads.winner ? 'bg-green-500 text-white' : 'bg-white/10 text-gray-500'}">
+            ${signaturePads.winner ? '✓' : '1'}
+          </div>
+          <span class="text-xs ${signatureStep === 'winner' ? 'text-yellow-300 font-bold' : 'text-gray-500'}">승리팀</span>
+        </div>
+        <div class="w-6 border-t border-white/20 self-center"></div>
+        <div class="flex items-center gap-1.5">
+          <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
+            ${signatureStep === 'loser' ? 'bg-blue-500 text-white' : signaturePads.loser ? 'bg-green-500 text-white' : 'bg-white/10 text-gray-500'}">
+            ${signaturePads.loser ? '✓' : '2'}
+          </div>
+          <span class="text-xs ${signatureStep === 'loser' ? 'text-blue-300 font-bold' : 'text-gray-500'}">패배팀</span>
+        </div>
+      </div>
+
+      <!-- 현재 서명 대상 -->
+      <div class="text-center mb-2 shrink-0">
+        <p class="text-base font-bold ${signatureStep === 'winner' ? 'text-yellow-400' : 'text-blue-400'}">
+          <i class="fas fa-pen-fancy mr-1"></i>
+          ${signatureStep === 'winner' ? `${names.winner} (승리팀)` : signatureStep === 'loser' ? `${names.loser} (패배팀)` : ''} 서명
+        </p>
+        <p class="text-xs text-gray-500 mt-0.5">위 점수가 맞다면 아래에 서명해주세요</p>
+      </div>
+
+      <!-- 캔버스 (터치 서명 영역) -->
+      <div class="flex-1 relative rounded-2xl overflow-hidden border-2 ${signatureStep === 'winner' ? 'border-yellow-500/40' : 'border-blue-500/40'} bg-white min-h-0" id="sig-container">
+        <canvas id="sig-canvas" class="w-full h-full" style="touch-action:none;"></canvas>
+        <!-- 가이드 라인 -->
+        <div class="absolute bottom-[30%] left-[10%] right-[10%] border-b border-dashed border-gray-300 pointer-events-none"></div>
+        <div class="absolute bottom-[28%] right-[10%] pointer-events-none">
+          <span class="text-gray-300 text-xs">서명</span>
+        </div>
+        <!-- 서명 안내 워터마크 -->
+        <div id="sig-watermark" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <p class="text-gray-300 text-lg font-medium">여기에 서명하세요</p>
+        </div>
+      </div>
+
+      <!-- 하단 버튼 -->
+      <div class="flex gap-2 mt-3 shrink-0">
+        <button onclick="clearSignature()" class="flex-1 py-3 bg-white/10 rounded-xl text-sm font-medium hover:bg-white/20 active:scale-95 transition">
+          <i class="fas fa-eraser mr-1"></i>다시 쓰기
+        </button>
+        ${signatureStep !== 'done' ? `
+        <button onclick="confirmSignature()" id="sig-confirm-btn" class="flex-1 py-3 ${signatureStep === 'winner' ? 'bg-yellow-600' : 'bg-blue-600'} rounded-xl text-sm font-bold hover:opacity-90 shadow-lg active:scale-95 transition disabled:opacity-50" disabled>
+          <i class="fas fa-check mr-1"></i>${signatureStep === 'winner' ? '승리팀 서명 완료' : '패배팀 서명 완료'}
+        </button>
+        ` : ''}
+        <button onclick="skipSignature()" class="py-3 px-4 bg-white/5 rounded-xl text-xs text-gray-500 hover:bg-white/10 active:scale-95 transition">
+          건너뛰기
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// 서명 캔버스 초기화
+function initSignaturePads() {
+  const canvas = document.getElementById('sig-canvas');
+  const container = document.getElementById('sig-container');
+  if (!canvas || !container) return;
+
+  // 캔버스 크기를 컨테이너에 맞춤
+  const rect = container.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+  
+  const ctx = canvas.getContext('2d');
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  
+  let drawing = false;
+  let hasStrokes = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  function getPos(e) {
+    const r = canvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    return {
+      x: (touch.clientX - r.left) * (canvas.width / r.width),
+      y: (touch.clientY - r.top) * (canvas.height / r.height)
+    };
+  }
+
+  function startDraw(e) {
+    e.preventDefault();
+    drawing = true;
+    const pos = getPos(e);
+    lastX = pos.x;
+    lastY = pos.y;
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  }
+
+  function draw(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    lastX = pos.x;
+    lastY = pos.y;
+    
+    if (!hasStrokes) {
+      hasStrokes = true;
+      const wm = document.getElementById('sig-watermark');
+      if (wm) wm.style.display = 'none';
+      const btn = document.getElementById('sig-confirm-btn');
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  function endDraw(e) {
+    if (drawing) {
+      e.preventDefault();
+      drawing = false;
+    }
+  }
+
+  // 터치 이벤트
+  canvas.addEventListener('touchstart', startDraw, { passive: false });
+  canvas.addEventListener('touchmove', draw, { passive: false });
+  canvas.addEventListener('touchend', endDraw, { passive: false });
+  canvas.addEventListener('touchcancel', endDraw, { passive: false });
+
+  // 마우스 이벤트 (PC 테스트용)
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', endDraw);
+  canvas.addEventListener('mouseleave', endDraw);
+
+  // 캔버스 참조 저장
+  canvas._hasStrokes = () => hasStrokes;
+  canvas._resetStrokes = () => { hasStrokes = false; };
+}
+
+function clearSignature() {
+  const canvas = document.getElementById('sig-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  canvas._resetStrokes && canvas._resetStrokes();
+  
+  const wm = document.getElementById('sig-watermark');
+  if (wm) wm.style.display = 'flex';
+  const btn = document.getElementById('sig-confirm-btn');
+  if (btn) btn.disabled = true;
+}
+
+function confirmSignature() {
+  const canvas = document.getElementById('sig-canvas');
+  if (!canvas || !(canvas._hasStrokes && canvas._hasStrokes())) {
+    showCourtToast('서명을 해주세요.', 'warning');
+    return;
+  }
+
+  // 서명 이미지 저장
+  const sigData = canvas.toDataURL('image/png');
+  
+  if (signatureStep === 'winner') {
+    signaturePads.winner = sigData;
+    signatureStep = 'loser';
+    renderCourt();
+    showCourtToast('승리팀 서명 완료! 패배팀 서명을 받아주세요.', 'success');
+  } else if (signatureStep === 'loser') {
+    signaturePads.loser = sigData;
+    signatureStep = 'done';
+    submitSignatures();
+  }
+}
+
+function skipSignature() {
+  if (signatureStep === 'winner') {
+    if (!confirm('서명 없이 진행하시겠습니까?')) return;
+    signaturePads.winner = null;
+    signaturePads.loser = null;
+    finishSignatureProcess();
+  } else if (signatureStep === 'loser') {
+    if (!confirm('패배팀 서명 없이 진행하시겠습니까?')) return;
+    signaturePads.loser = null;
+    submitSignatures();
+  }
+}
+
+async function submitSignatures() {
+  const fm = courtState.finishedMatch;
+  if (!fm) { finishSignatureProcess(); return; }
+
+  if (signaturePads.winner || signaturePads.loser) {
+    try {
+      await courtApi(`/tournaments/${courtState.tournamentId}/matches/${fm.id}/signature`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          winner_signature: signaturePads.winner || null,
+          loser_signature: signaturePads.loser || null
+        })
+      });
+      showCourtToast('서명이 저장되었습니다!', 'success');
+    } catch(e) {
+      showCourtToast('서명 저장 실패 - 경기 결과는 이미 저장됨', 'warning');
+    }
+  }
+  
+  finishSignatureProcess();
+}
+
+function finishSignatureProcess() {
+  // 상태 초기화
+  courtState.finishedMatch = null;
+  courtState.finishedScore = null;
+  courtState.finishedWinner = null;
+  courtState.finishedNames = null;
+  signaturePads = { winner: null, loser: null };
+  signatureStep = 'winner';
+  
+  // 코트 데이터 새로고침
+  refreshCourtData();
 }
 
 // ==========================================
