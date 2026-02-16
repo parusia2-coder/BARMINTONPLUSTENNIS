@@ -259,28 +259,336 @@
 <!-- ========================================== -->
 <h2>3. 네트워크 구성</h2>
 
-<div class="diagram">                    [인터넷 회선]
-                         │
-               ┌─────────┴─────────┐
-               │  Wi-Fi 공유기      │  ← 5GHz 듀얼밴드 권장
-               │  (코트 중앙 설치)   │
-               └─────────┬─────────┘
-          ┌──────┬───────┼───────┬───────┬──────┐
-        코트1  코트2   코트3   코트4   코트5  코트6
-       태블릿  태블릿  태블릿  태블릿  태블릿  태블릿
-                         │
-                    ┌────┼────┐
-                  본부   관중   참가자
-                 노트북  모니터  스마트폰</div>
+<h3>3-1. 체육관 Wi-Fi 환경의 문제점</h3>
+<p>배드민턴 체육관은 일반 실내 공간과 달리 Wi-Fi에 <strong>매우 불리한 환경</strong>입니다.</p>
+
+<table class="tbl-warn">
+  <tr><th style="width:30%">문제 요인</th><th>상세 설명</th><th style="width:25%">대응 방법</th></tr>
+  <tr>
+    <td><strong>넓은 공간</strong></td>
+    <td>일반 체육관 40m×30m 이상. 가정용 공유기 실내 유효 거리 10~15m에 비해 훨씬 넓어 코트 끝에서 신호가 약해짐</td>
+    <td>공유기를 <strong>코트 중앙 높은 곳</strong>에 설치</td>
+  </tr>
+  <tr>
+    <td><strong>금속 구조물</strong></td>
+    <td>철골 지붕, 철제 관중석, 금속 칸막이 등이 전파를 반사/차단하여 사각지대 발생</td>
+    <td>공유기 <strong>2대</strong>로 커버리지 확장</td>
+  </tr>
+  <tr>
+    <td><strong>다수 동시 접속</strong></td>
+    <td>참가자 177명 + 운영 장비 10여대가 동시에 접속. 저가 공유기는 동시 접속 10~15대에서 성능 저하</td>
+    <td><strong>동시 접속 50대+</strong> 지원 공유기 사용</td>
+  </tr>
+  <tr>
+    <td><strong>2.4GHz 간섭</strong></td>
+    <td>참가자 스마트폰, 블루투스 이어폰, 전자레인지 등이 2.4GHz 대역에 몰려 혼잡 발생</td>
+    <td>코트 태블릿은 반드시 <strong>5GHz 대역</strong> 사용</td>
+  </tr>
+</table>
+
+<h3>3-2. 권장 네트워크 구성</h3>
+
+<h4>A안: 기본 구성 (체육관 30m 이내, 6코트)</h4>
+<div class="diagram">                        [인터넷 회선 (유선)]
+                               │
+                    ┌──────────┴──────────┐
+                    │  Wi-Fi 공유기 (메인)  │  ← 코트 중앙, 높은 곳 (2m+)
+                    │  SSID-5G  /  SSID   │     테이블/삼각대 위 설치
+                    └──────────┬──────────┘
+                               │
+       ┌────────┬────────┬─────┼─────┬────────┬────────┐
+     코트1    코트2    코트3        코트4    코트5    코트6
+    [5GHz]  [5GHz]  [5GHz]       [5GHz]  [5GHz]  [5GHz]
+                               │
+                    ┌──────────┼──────────┐
+                  본부        관중        참가자
+                 [5GHz]     [5GHz]      [2.4GHz]</div>
+
+<h4>B안: 확장 구성 (체육관 40m 이상, 8코트+)</h4>
+<div class="diagram">  [인터넷 회선]──── [메인 공유기] ─────── LAN 케이블 (20~30m) ─── [보조 공유기]
+                    (본부 근처)                                    (코트 중앙)
+                       │                                              │
+                  ┌────┼────┐                          ┌──────┬───────┼───────┬──────┐
+                본부  관중  코트1~2                   코트3  코트4  코트5  코트6  코트7~8
+               모니터 모니터  [5GHz]                  [5GHz] [5GHz] [5GHz] [5GHz] [5GHz]
+
+  ※ 보조 공유기는 "AP(브릿지) 모드"로 설정 → IP 충돌 방지
+  ※ 메인과 보조의 SSID/비밀번호를 동일하게 설정 → 장비가 자동 로밍</div>
+
+<h3>3-3. 5GHz vs 2.4GHz 대역 분리</h3>
+<p>대부분의 듀얼밴드 공유기는 <strong>2개의 Wi-Fi 이름(SSID)</strong>을 동시에 방송합니다. 이 두 대역을 용도별로 나눠 사용하면 서로 간섭 없이 안정적으로 운영할 수 있습니다.</p>
+
+<table>
+  <tr><th style="width:18%">구분</th><th style="width:22%">5GHz 대역</th><th style="width:22%">2.4GHz 대역</th><th>비교 설명</th></tr>
+  <tr>
+    <td><strong>Wi-Fi 이름 예시</strong></td>
+    <td><code>BADMINTON-5G</code></td>
+    <td><code>BADMINTON</code></td>
+    <td>공유기 설정에서 SSID를 다르게 지정</td>
+  </tr>
+  <tr>
+    <td><strong>속도</strong></td>
+    <td class="hl-green">빠름 (최대 1,200Mbps)</td>
+    <td>보통 (최대 300Mbps)</td>
+    <td>5GHz가 약 2~4배 빠름</td>
+  </tr>
+  <tr>
+    <td><strong>도달 거리</strong></td>
+    <td class="hl-red">짧음 (10~20m)</td>
+    <td class="hl-green">김 (20~35m)</td>
+    <td>2.4GHz가 벽/장애물 통과 유리</td>
+  </tr>
+  <tr>
+    <td><strong>간섭</strong></td>
+    <td class="hl-green">적음</td>
+    <td class="hl-red">많음 (블루투스, 전자레인지 등)</td>
+    <td>5GHz 채널이 훨씬 여유로움</td>
+  </tr>
+  <tr>
+    <td><strong>연결 장비</strong></td>
+    <td>코트 태블릿 (6대)<br>본부 노트북 (2대)<br>관중 모니터 (2대)</td>
+    <td>참가자 스마트폰 (100대+)<br>운영진 스마트폰</td>
+    <td>핵심 운영 장비는 5GHz,<br>일반 조회는 2.4GHz</td>
+  </tr>
+</table>
+
+<div class="box box-blue">
+  <div class="box-title">💡 대역 분리가 중요한 이유</div>
+  <p>참가자 177명이 모두 <code>BADMINTON-5G</code>에 접속하면 코트 태블릿의 점수 전송이 지연될 수 있습니다. <strong>핵심 운영 장비(태블릿, 본부)는 5GHz 전용</strong>으로, 참가자 스마트폰은 2.4GHz로 분리하면 점수 입력이 끊김 없이 안정적으로 동작합니다.</p>
+</div>
+
+<div class="box box-green">
+  <div class="box-title">📱 태블릿 Wi-Fi 연결 방법 (대역 지정)</div>
+  <div class="cols-2">
+    <div>
+      <strong>iPad:</strong>
+      <ol>
+        <li>설정 → Wi-Fi</li>
+        <li><code>BADMINTON-5G</code> 선택 (5G 붙은 이름)</li>
+        <li>비밀번호 입력 후 연결</li>
+        <li><code>BADMINTON</code>(2.4GHz)는 "이 네트워크 지우기"로 자동연결 방지</li>
+      </ol>
+    </div>
+    <div>
+      <strong>안드로이드 태블릿:</strong>
+      <ol>
+        <li>설정 → 연결 → Wi-Fi</li>
+        <li><code>BADMINTON-5G</code> 선택</li>
+        <li>비밀번호 입력 후 연결</li>
+        <li><code>BADMINTON</code>(2.4GHz)는 길게 눌러 "삭제"</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<div class="page-break"></div>
+<h3>3-4. 공유기 설치 위치 & 높이</h3>
+
+<div class="diagram">  ┌───────────────────────────────────────────────────┐
+  │                    체육관 평면도                      │
+  │                                                     │
+  │   [코트1]   [코트2]   [코트3]   [코트4]   [코트5]    │  [코트6]
+  │                                                     │
+  │                    ★ 공유기                          │
+  │                   (중앙 높은곳)                       │
+  │                                                     │
+  │   ──────── 관중석 ────────                           │
+  │                                                     │
+  │   [본부석]           [접수처]        [관중 모니터]     │
+  └───────────────────────────────────────────────────┘
+
+  ★ 공유기 설치 포인트:
+  • 코트와 코트 사이 중앙 위치
+  • 바닥에서 2m 이상 높이 (삼각대, 선반, 매달기)
+  • 사방이 트인 곳 (구석이나 벽 뒤 ✕)</div>
+
+<table>
+  <tr><th style="width:25%">설치 기준</th><th>권장</th><th>피해야 할 위치</th></tr>
+  <tr>
+    <td><strong>수평 위치</strong></td>
+    <td>코트 전체의 <strong>중앙</strong> (가장 먼 태블릿까지 거리 최소화)</td>
+    <td>구석, 벽면 바로 옆, 관중석 뒤</td>
+  </tr>
+  <tr>
+    <td><strong>높이</strong></td>
+    <td><strong>바닥에서 2m 이상</strong> (삼각대, 접이식 선반, 천장 근처)</td>
+    <td>바닥, 테이블 아래, 가방 속</td>
+  </tr>
+  <tr>
+    <td><strong>주변 환경</strong></td>
+    <td>사방이 트인 곳, 금속 구조물에서 1m 이상 떨어진 곳</td>
+    <td>철제 캐비닛 옆, 배전함 근처, 금속 칸막이 뒤</td>
+  </tr>
+  <tr>
+    <td><strong>안테나 방향</strong></td>
+    <td>외장 안테나 → 수직으로 세움. 내장 안테나 → 수평 배치</td>
+    <td>안테나를 눕히거나 벽 쪽으로 향하게</td>
+  </tr>
+</table>
+
+<h3>3-5. 공유기 권장 사양 & 추천 제품</h3>
+<table>
+  <tr><th style="width:25%">사양 항목</th><th>최소</th><th class="hl">권장</th><th>설명</th></tr>
+  <tr>
+    <td><strong>대역</strong></td>
+    <td>듀얼밴드 (2.4+5GHz)</td>
+    <td class="hl">듀얼밴드 이상</td>
+    <td>대역 분리 필수</td>
+  </tr>
+  <tr>
+    <td><strong>동시 접속</strong></td>
+    <td>20대</td>
+    <td class="hl">50대 이상</td>
+    <td>참가자 스마트폰 포함</td>
+  </tr>
+  <tr>
+    <td><strong>Wi-Fi 규격</strong></td>
+    <td>Wi-Fi 5 (802.11ac)</td>
+    <td class="hl">Wi-Fi 6 (802.11ax)</td>
+    <td>다수 접속 시 성능 유지</td>
+  </tr>
+  <tr>
+    <td><strong>전송 속도</strong></td>
+    <td>AC1200 (867+300Mbps)</td>
+    <td class="hl">AX1800 이상</td>
+    <td>-</td>
+  </tr>
+  <tr>
+    <td><strong>LAN 포트</strong></td>
+    <td>1개 이상</td>
+    <td>4개 이상</td>
+    <td>유선 연결 백업용</td>
+  </tr>
+</table>
 
 <div class="box box-yellow">
-  <div class="box-title">⚠️ 네트워크 주의사항</div>
+  <div class="box-title">💰 예산별 추천 (2026년 기준 참고)</div>
   <ul>
-    <li>체육관은 Wi-Fi 사각지대가 많음 → <strong>5GHz 듀얼밴드 공유기</strong> 사용</li>
-    <li>코트 태블릿은 5GHz, 참가자 스마트폰은 2.4GHz로 대역 분리 권장</li>
-    <li>체육관이 넓으면 공유기 <strong>2대</strong> (본부 + 코트 중앙)</li>
-    <li><strong>핫스팟 백업</strong>: 공유기 장애 대비 스마트폰 테더링 준비</li>
+    <li><strong>3~5만원대:</strong> ipTIME AX2004M, TP-Link Archer AX23 — 소규모(3코트) 충분</li>
+    <li><strong>7~10만원대:</strong> ipTIME AX8004M, ASUS RT-AX58U — 6코트 권장, 동시 50대+ 안정</li>
+    <li><strong>15만원대+:</strong> ASUS RT-AX86U, TP-Link Archer AX73 — 10코트 대규모, 메시 확장 가능</li>
+    <li><strong>메시 시스템 (2대 세트):</strong> TP-Link Deco X50, ipTIME A9004M-X2 — 넓은 체육관 완벽 커버</li>
   </ul>
+  <p class="small">※ 이미 소유한 가정용 공유기도 사용 가능하나, 동시 접속이 15대 이상이면 성능 저하 가능성 있음</p>
+</div>
+
+<h3>3-6. 인터넷 회선 확보 방법</h3>
+<table>
+  <tr><th style="width:22%">방법</th><th>장점</th><th>단점</th><th style="width:22%">적합한 상황</th></tr>
+  <tr>
+    <td><strong>① 체육관 유선 인터넷</strong></td>
+    <td>가장 안정적, 속도 빠름</td>
+    <td>사전 확인 필요, LAN 포트 위치 제한</td>
+    <td class="hl-green">최우선 권장</td>
+  </tr>
+  <tr>
+    <td><strong>② LTE/5G 에그 (포켓와이파이)</strong></td>
+    <td>어디서든 사용, 별도 회선 불요</td>
+    <td>속도 불안정, 데이터 제한, 동시 접속 10대 내외</td>
+    <td>유선 없는 체육관</td>
+  </tr>
+  <tr>
+    <td><strong>③ 스마트폰 테더링</strong></td>
+    <td>긴급 백업, 별도 장비 불필요</td>
+    <td>배터리 소모 빠름, 동시 접속 5~10대</td>
+    <td class="hl-red">비상용 백업 전용</td>
+  </tr>
+</table>
+
+<div class="box box-red">
+  <div class="box-title">🔴 인터넷 회선 사전 확인 (대회 1주 전)</div>
+  <ul>
+    <li>체육관에 유선 인터넷(LAN 포트)이 있는지 관리사무소에 확인</li>
+    <li>LAN 포트 위치 확인 → 공유기까지 LAN 케이블 길이 산정 (여유분 5m 추가)</li>
+    <li>유선 인터넷 없는 경우: LTE 에그 렌탈 또는 데이터 무제한 요금제 스마트폰 준비</li>
+    <li>현장 답사 시 스마트폰으로 LTE/5G 신호 강도 확인 (지하 체육관은 약할 수 있음)</li>
+  </ul>
+</div>
+
+<h3>3-7. 비상 대응: 인터넷 끊김 시</h3>
+
+<div class="diagram">  인터넷 끊김 감지 (태블릿에 "오프라인" 경고 표시)
+         │
+         ├─ 1단계: 공유기 전원 껐다 켜기 (30초 대기)
+         │         → 복구되면 모든 장비 자동 재연결
+         │
+         ├─ 2단계: 공유기 복구 안 됨
+         │         → 백업 스마트폰 핫스팟 ON
+         │         → 핫스팟 SSID/비밀번호를 공유기와 동일하게 설정하면
+         │            장비 재연결 없이 자동 전환 (사전 설정 권장)
+         │
+         └─ 3단계: 인터넷 자체 불가 (지하 체육관 등)
+                   → 수기 기록으로 전환 (점수 용지 비치)
+                   → 대회 종료 후 시스템에 일괄 입력</div>
+
+<div class="box box-yellow">
+  <div class="box-title">💡 핫스팟 백업 사전 설정 (권장)</div>
+  <p>대회 전날에 백업용 스마트폰의 <strong>핫스팟 이름(SSID)과 비밀번호를 공유기와 동일하게</strong> 설정해두면, 공유기 장애 시 핫스팟만 켜면 태블릿이 자동으로 연결됩니다. 장비를 하나하나 재설정할 필요가 없어 <strong>30초 이내에 복구</strong>됩니다.</p>
+  <div class="cols-2" style="margin-top:2mm">
+    <div>
+      <strong>iPhone 핫스팟 이름 변경:</strong>
+      <ol>
+        <li>설정 → 일반 → 정보 → 이름</li>
+        <li>공유기 SSID와 동일하게 변경</li>
+        <li>설정 → 개인용 핫스팟 → 비밀번호를 공유기와 동일하게</li>
+      </ol>
+    </div>
+    <div>
+      <strong>안드로이드 핫스팟 이름 변경:</strong>
+      <ol>
+        <li>설정 → 연결 → 모바일 핫스팟</li>
+        <li>네트워크 이름을 공유기 SSID와 동일하게</li>
+        <li>비밀번호를 공유기와 동일하게</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<h3>3-8. 당일 아침 네트워크 테스트</h3>
+<table class="tbl-blue">
+  <tr><th style="width:8%">순서</th><th style="width:30%">테스트 항목</th><th>방법</th><th style="width:22%">합격 기준</th></tr>
+  <tr>
+    <td>①</td>
+    <td>인터넷 연결 확인</td>
+    <td>공유기 연결 후 스마트폰으로 네이버 접속</td>
+    <td>3초 이내 페이지 로드</td>
+  </tr>
+  <tr>
+    <td>②</td>
+    <td>5GHz 신호 강도</td>
+    <td>가장 먼 코트 태블릿에서 Wi-Fi 신호 확인</td>
+    <td>신호 막대 2칸 이상</td>
+  </tr>
+  <tr>
+    <td>③</td>
+    <td>속도 테스트</td>
+    <td>가장 먼 코트에서 브라우저 → fast.com 접속</td>
+    <td class="hl">다운로드 5Mbps 이상</td>
+  </tr>
+  <tr>
+    <td>④</td>
+    <td>시스템 접속 확인</td>
+    <td>각 태블릿에서 코트 URL 접속</td>
+    <td>5초 이내 화면 표시</td>
+  </tr>
+  <tr>
+    <td>⑤</td>
+    <td>점수 전송 테스트</td>
+    <td>태블릿에서 테스트 점수 입력 → 본부에서 반영 확인</td>
+    <td>2초 이내 반영</td>
+  </tr>
+  <tr>
+    <td>⑥</td>
+    <td>동시 접속 테스트</td>
+    <td>운영진 5~6명이 동시에 다른 페이지 접속</td>
+    <td>모든 장비 정상 로드</td>
+  </tr>
+</table>
+
+<div class="box box-green">
+  <div class="box-title">✅ 테스트 통과 후</div>
+  <p>테스트 점수 데이터 원복 (본부에서 점수 0으로 수정) → 네트워크 정보를 체크리스트 메모란에 기록</p>
+  <p><strong>기록할 정보:</strong> 5GHz SSID, 2.4GHz SSID, Wi-Fi 비밀번호, 공유기 관리자 IP (보통 192.168.0.1)</p>
 </div>
 
 <!-- ========================================== -->
