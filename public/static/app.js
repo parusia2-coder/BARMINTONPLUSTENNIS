@@ -104,7 +104,7 @@ function renderTournamentCard(t) {
   return `<div class="bg-white rounded-xl border border-gray-200 p-5 card-hover cursor-pointer" onclick="openTournament(${t.id})">
     <div class="flex items-start justify-between mb-3"><h3 class="font-bold text-gray-900 text-lg">${t.name}</h3><span class="badge ${s.c} ml-2 whitespace-nowrap"><i class="fas ${s.i} mr-1"></i>${s.l}</span></div>
     <p class="text-sm text-gray-500 mb-3">${t.description || ''}</p>
-    <div class="flex items-center gap-4 text-xs text-gray-400"><span><i class="fas fa-gamepad mr-1"></i>${fmt[t.format] || t.format}</span><span><i class="fas fa-table-tennis-paddle-ball mr-1"></i>${t.courts}코트</span></div>
+    <div class="flex items-center gap-4 text-xs text-gray-400"><span><i class="fas fa-gamepad mr-1"></i>${fmt[t.format] || t.format}</span><span>🏸 ${t.courts}코트</span></div>
   </div>`;
 }
 
@@ -170,7 +170,7 @@ function renderTournament() {
     <div class="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl">
       <button onclick="switchTab('participants')" id="tab-participants" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='participants' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}"><i class="fas fa-users mr-1"></i>참가자 (${state.participants.length})</button>
       <button onclick="switchTab('events')" id="tab-events" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='events' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}"><i class="fas fa-layer-group mr-1"></i>종목/팀 (${state.events.length})</button>
-      <button onclick="switchTab('matches')" id="tab-matches" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='matches' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}"><i class="fas fa-table-tennis-paddle-ball mr-1"></i>경기</button>
+      <button onclick="switchTab('matches')" id="tab-matches" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='matches' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}">🏸 경기</button>
     </div>
     <div id="tab-content">${state.activeTab==='participants' ? renderParticipantsTab(isAdmin) : state.activeTab==='events' ? renderEventsTab(isAdmin) : renderMatchesTab(isAdmin)}</div>
   </div>

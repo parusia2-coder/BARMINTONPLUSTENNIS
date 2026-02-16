@@ -101,7 +101,7 @@ function renderCourtSelect() {
   return `<div class="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col">
     <div class="flex items-center justify-between px-6 py-4 border-b border-white/10">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center"><i class="fas fa-table-tennis-paddle-ball text-white"></i></div>
+        <div class="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center"><svg viewBox="0 0 32 32" fill="white" width="22" height="22"><ellipse cx="16" cy="8" rx="5" ry="6"/><path d="M11 12c0 0-3 4-3 10 0 2 1.5 4 4 5l4 1 4-1c2.5-1 4-3 4-5 0-6-3-10-3-10" fill="white" opacity="0.85"/><line x1="13" y1="14" x2="13" y2="26" stroke="white" stroke-width="0.5" opacity="0.4"/><line x1="16" y1="12" x2="16" y2="28" stroke="white" stroke-width="0.5" opacity="0.4"/><line x1="19" y1="14" x2="19" y2="26" stroke="white" stroke-width="0.5" opacity="0.4"/></svg></div>
         <div><h1 class="text-xl font-bold">코트 점수판</h1><p class="text-xs text-gray-400">Court Scoreboard</p></div>
       </div>
       <a href="/" class="text-sm text-gray-400 hover:text-white"><i class="fas fa-home mr-1"></i>메인으로</a>
