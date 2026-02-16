@@ -639,27 +639,24 @@ async function recalculateStandings(db: D1Database, tournamentId: number, eventI
   }
 }
 
-// 코트별 타임라인 API — 전체 경기를 코트별로 순서대로 반환
+// 코트별 타임라인 API — 경량화: 짧은 키 + 완료 경기는 점수만
 matchRoutes.get('/:tid/timeline', async (c) => {
   const tid = c.req.param('tid')
   const db = c.env.DB
 
-  // 대회 정보
   const tournament = await db.prepare(
     'SELECT id, name, courts, format FROM tournaments WHERE id = ? AND deleted = 0'
   ).bind(tid).first()
   if (!tournament) return c.json({ error: '대회를 찾을 수 없습니다' }, 404)
 
-  // 전체 경기를 코트번호, 경기순서 기준으로 조회
+  // 최소 필드만 조회 (team_name 은 비완료 경기만 필요하지만, 툴팁에서 쓰이므로 유지)
   const matches = await db.prepare(`
-    SELECT m.id, m.event_id, m.round, m.match_order, m.court_number,
-      m.team1_id, m.team2_id,
-      m.team1_set1, m.team1_set2, m.team1_set3,
-      m.team2_set1, m.team2_set2, m.team2_set3,
-      m.status, m.winner_team, m.group_num,
-      m.created_at, m.updated_at,
-      e.name as event_name, e.category,
-      t1.team_name as team1_name, t2.team_name as team2_name
+    SELECT m.id, m.match_order as o, m.court_number as c,
+      m.team1_set1+m.team1_set2+m.team1_set3 as s1,
+      m.team2_set1+m.team2_set2+m.team2_set3 as s2,
+      m.status as st, m.winner_team as w, m.group_num as g,
+      e.category as cat,
+      t1.team_name as t1, t2.team_name as t2
     FROM matches m
     JOIN events e ON m.event_id = e.id
     LEFT JOIN teams t1 ON m.team1_id = t1.id
@@ -668,52 +665,27 @@ matchRoutes.get('/:tid/timeline', async (c) => {
     ORDER BY m.court_number ASC, m.match_order ASC
   `).bind(tid).all()
 
-  // 코트별로 그룹핑
-  const courts: Record<number, any[]> = {}
+  // 코트별 그룹핑 — 배열 인덱스 사용
   const numCourts = (tournament as any).courts || 6
-  for (let i = 1; i <= numCourts; i++) {
-    courts[i] = []
-  }
+  const courts: any[][] = []
+  for (let i = 0; i <= numCourts; i++) courts.push([])
 
-  for (const m of (matches.results || [])) {
-    const cn = (m as any).court_number
-    if (!courts[cn]) courts[cn] = []
-    courts[cn].push({
-      id: (m as any).id,
-      match_order: (m as any).match_order,
-      round: (m as any).round,
-      group_num: (m as any).group_num,
-      event_name: (m as any).event_name,
-      category: (m as any).category,
-      team1_name: (m as any).team1_name,
-      team2_name: (m as any).team2_name,
-      team1_score: ((m as any).team1_set1 || 0) + ((m as any).team1_set2 || 0) + ((m as any).team1_set3 || 0),
-      team2_score: ((m as any).team2_set1 || 0) + ((m as any).team2_set2 || 0) + ((m as any).team2_set3 || 0),
-      team1_sets: [(m as any).team1_set1, (m as any).team1_set2, (m as any).team1_set3],
-      team2_sets: [(m as any).team2_set1, (m as any).team2_set2, (m as any).team2_set3],
-      status: (m as any).status,
-      winner_team: (m as any).winner_team,
-      updated_at: (m as any).updated_at
-    })
-  }
-
-  // 통계
-  const allMatches = matches.results || []
-  const stats = {
-    total: allMatches.length,
-    completed: allMatches.filter((m: any) => m.status === 'completed').length,
-    playing: allMatches.filter((m: any) => m.status === 'playing').length,
-    pending: allMatches.filter((m: any) => m.status === 'pending').length,
+  let cntDone = 0, cntPlay = 0, cntPend = 0
+  for (const m of (matches.results || []) as any[]) {
+    const cn = m.c
+    if (cn >= 1 && cn <= numCourts) {
+      courts[cn].push([m.st, m.cat, m.s1, m.s2, m.w, m.g, m.t1, m.t2, m.o])
+      // idx:               0      1     2    3   4   5   6    7    8
+    }
+    if (m.st === 'completed') cntDone++
+    else if (m.st === 'playing') cntPlay++
+    else cntPend++
   }
 
   return c.json({
-    tournament: {
-      id: (tournament as any).id,
-      name: (tournament as any).name,
-      courts: numCourts,
-      format: (tournament as any).format
-    },
-    courts,
-    stats
+    t: { id: (tournament as any).id, n: (tournament as any).name, c: numCourts, f: (tournament as any).format },
+    // courts[0] is unused, courts[1..N] are arrays of match-tuples
+    d: courts.slice(1),
+    s: [cntDone, cntPlay, cntPend]
   })
 })
