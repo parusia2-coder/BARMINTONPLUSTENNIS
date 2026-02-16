@@ -143,7 +143,9 @@ bracketRoutes.post('/:tid/brackets/generate', async (c) => {
 
     await db.prepare(`UPDATE events SET status='in_progress' WHERE id=?`).bind(eid).run()
     totalMatches += matches.length
-    eventResults.push({ event_id: eid, format: actualFormat, matches: matches.length })
+    // 종목 이름 조회
+    const eventInfo = await db.prepare(`SELECT name FROM events WHERE id=?`).bind(eid).first() as any
+    eventResults.push({ event_id: eid, event_name: eventInfo?.name || '', format: actualFormat, match_count: matches.length })
   }
 
   await db.prepare(
@@ -157,6 +159,7 @@ bracketRoutes.post('/:tid/brackets/generate', async (c) => {
 
   return c.json({
     message: '대진표가 생성되었습니다.',
+    total_matches: totalMatches,
     matchCount: totalMatches,
     events: eventResults,
     options: { format: bracketFormat, avoidSameClub, gamesPerTeam: defaultGamesPerTeam, groupSize }
