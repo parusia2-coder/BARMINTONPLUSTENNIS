@@ -19,7 +19,7 @@ participantRoutes.post('/:tid/participants', async (c) => {
   const tid = c.req.param('tid')
   const db = c.env.DB
   const body = await c.req.json()
-  const { name, phone, gender, birth_year, level, mixed_doubles } = body
+  const { name, phone, gender, birth_year, level, mixed_doubles, club } = body
 
   if (!name) return c.json({ error: '이름은 필수입니다.' }, 400)
   if (!gender) return c.json({ error: '성별은 필수입니다.' }, 400)
@@ -41,8 +41,8 @@ participantRoutes.post('/:tid/participants', async (c) => {
   if (existing) return c.json({ error: '이미 등록된 이름입니다.' }, 400)
 
   const result = await db.prepare(
-    `INSERT INTO participants (tournament_id, name, phone, gender, birth_year, level, mixed_doubles) VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(tid, name, phone || '', gender, birth_year || null, level || 'c', mixed_doubles ? 1 : 0).run()
+    `INSERT INTO participants (tournament_id, name, phone, gender, birth_year, level, mixed_doubles, club) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(tid, name, phone || '', gender, birth_year || null, level || 'c', mixed_doubles ? 1 : 0, club || '').run()
 
   return c.json({ id: result.meta.last_row_id, message: '참가자가 등록되었습니다.' }, 201)
 })
@@ -93,11 +93,12 @@ participantRoutes.post('/:tid/participants/bulk', async (c) => {
     const phone = p.phone || ''
 
     const mixedDoubles = p.mixed_doubles ? 1 : 0
+    const club = (p.club || '').trim()
 
     try {
       const res = await db.prepare(
-        `INSERT INTO participants (tournament_id, name, phone, gender, birth_year, level, mixed_doubles) VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(tid, name, phone, gender, birthYear, finalLevel, mixedDoubles).run()
+        `INSERT INTO participants (tournament_id, name, phone, gender, birth_year, level, mixed_doubles, club) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(tid, name, phone, gender, birthYear, finalLevel, mixedDoubles, club).run()
       existingNames.add(name)
       results.push({ id: res.meta.last_row_id, name })
       successCount++
@@ -122,11 +123,11 @@ participantRoutes.put('/:tid/participants/:pid', async (c) => {
   const pid = c.req.param('pid')
   const db = c.env.DB
   const body = await c.req.json()
-  const { name, phone, gender, birth_year, level, paid, checked_in, mixed_doubles } = body
+  const { name, phone, gender, birth_year, level, paid, checked_in, mixed_doubles, club } = body
 
   await db.prepare(
-    `UPDATE participants SET name=?, phone=?, gender=?, birth_year=?, level=?, paid=?, checked_in=?, mixed_doubles=? WHERE id=? AND tournament_id=? AND deleted=0`
-  ).bind(name, phone || '', gender || 'm', birth_year || null, level || 'c', paid ? 1 : 0, checked_in ? 1 : 0, mixed_doubles ? 1 : 0, pid, tid).run()
+    `UPDATE participants SET name=?, phone=?, gender=?, birth_year=?, level=?, paid=?, checked_in=?, mixed_doubles=?, club=? WHERE id=? AND tournament_id=? AND deleted=0`
+  ).bind(name, phone || '', gender || 'm', birth_year || null, level || 'c', paid ? 1 : 0, checked_in ? 1 : 0, mixed_doubles ? 1 : 0, club || '', pid, tid).run()
 
   return c.json({ message: '참가자 정보가 수정되었습니다.' })
 })

@@ -38,10 +38,10 @@ function showToast(msg, type = 'info') {
   const t = document.createElement('div');
   const c = { info: 'bg-blue-500', success: 'bg-green-500', error: 'bg-red-500', warning: 'bg-yellow-500 text-gray-900' };
   const ic = { info: 'fa-info-circle', success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle' };
-  t.className = `fixed top-4 right-4 z-[9999] px-5 py-3 rounded-lg text-white shadow-lg ${c[type]} fade-in flex items-center gap-2`;
+  t.className = `fixed top-4 right-4 z-[9999] px-5 py-3 rounded-lg text-white shadow-lg ${c[type]} fade-in flex items-center gap-2 max-w-md`;
   t.innerHTML = `<i class="fas ${ic[type]}"></i><span>${msg}</span>`;
   document.body.appendChild(t);
-  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(() => t.remove(), 300); }, 3000);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(() => t.remove(), 300); }, 4000);
 }
 
 function navigate(page, params = {}) { state.currentPage = page; Object.assign(state, params); render(); }
@@ -119,7 +119,7 @@ function renderCreate() {
       <h2 class="text-2xl font-bold text-gray-900 mb-6"><i class="fas fa-plus-circle mr-2 text-shuttle-500"></i>새 대회 만들기</h2>
       <form id="create-form" class="space-y-5">
         <div><label class="block text-sm font-semibold text-gray-700 mb-1">대회명 <span class="text-red-500">*</span></label>
-          <input name="name" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-shuttle-500 outline-none" placeholder="예: 2026 봄맞이 배드민턴 대회"></div>
+          <input name="name" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-shuttle-500 outline-none" placeholder="예: 2026 안양시장배 배드민턴 대회"></div>
         <div><label class="block text-sm font-semibold text-gray-700 mb-1">설명</label>
           <textarea name="description" rows="2" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-shuttle-500 outline-none" placeholder="대회 안내 사항"></textarea></div>
         <div class="grid grid-cols-2 gap-4">
@@ -127,7 +127,7 @@ function renderCreate() {
             <select name="format" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-shuttle-500 outline-none">
               <option value="kdk">KDK (랜덤 대진)</option><option value="league">풀리그</option><option value="tournament">토너먼트</option></select></div>
           <div><label class="block text-sm font-semibold text-gray-700 mb-1">코트 수</label>
-            <input name="courts" type="number" value="2" min="1" max="20" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-shuttle-500 outline-none"></div>
+            <input name="courts" type="number" value="6" min="1" max="20" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-shuttle-500 outline-none"></div>
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div><label class="block text-sm font-semibold text-gray-700 mb-1">팀당 경기 수 (KDK)</label>
@@ -145,7 +145,7 @@ function renderCreate() {
 }
 
 // ==========================================
-// TOURNAMENT DETAIL (Tabs: 참가자, 종목/팀, 경기)
+// TOURNAMENT DETAIL
 // ==========================================
 function renderTournament() {
   const t = state.currentTournament;
@@ -186,6 +186,15 @@ function renderTournament() {
 
 // ---- PARTICIPANTS TAB ----
 function renderParticipantsTab(isAdmin) {
+  // 클럽별 통계
+  const clubs = {};
+  state.participants.forEach(p => {
+    const c = p.club || '(미소속)';
+    if (!clubs[c]) clubs[c] = 0;
+    clubs[c]++;
+  });
+  const clubList = Object.entries(clubs).sort((a, b) => b[1] - a[1]);
+
   return `<div class="space-y-4">
     ${isAdmin ? `<div class="bg-white rounded-xl border border-gray-200 p-4">
       <div class="flex items-center justify-between mb-3">
@@ -193,13 +202,14 @@ function renderParticipantsTab(isAdmin) {
         <button onclick="showBulkModal()" class="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-100"><i class="fas fa-file-import mr-1"></i>일괄 등록</button>
       </div>
       <form id="add-participant-form" class="flex flex-wrap gap-3">
-        <input name="name" required placeholder="이름" class="flex-1 min-w-[100px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500">
-        <input name="phone" placeholder="연락처" class="flex-1 min-w-[100px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500">
+        <input name="name" required placeholder="이름" class="flex-1 min-w-[80px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500">
+        <input name="phone" placeholder="연락처" class="flex-1 min-w-[90px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500">
         <select name="gender" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500"><option value="m">남</option><option value="f">여</option></select>
-        <input name="birth_year" type="number" placeholder="출생년도" min="1950" max="2010" class="w-[100px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500">
+        <input name="birth_year" type="number" placeholder="출생년도" min="1950" max="2010" class="w-[90px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500">
         <select name="level" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500">
           ${Object.entries(LEVELS).map(([k,v]) => `<option value="${k}" ${k==='c'?'selected':''}>${v}급</option>`).join('')}
         </select>
+        <input name="club" placeholder="소속 클럽" class="flex-1 min-w-[80px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500">
         <label class="flex items-center gap-1.5 px-3 py-2.5 border rounded-lg cursor-pointer hover:bg-purple-50 transition" title="혼합복식 참가 희망">
           <input type="checkbox" name="mixed_doubles" value="1" class="w-4 h-4 text-purple-600 rounded focus:ring-purple-500">
           <span class="text-sm font-medium text-purple-700"><i class="fas fa-venus-mars mr-0.5"></i>혼복</span>
@@ -207,40 +217,43 @@ function renderParticipantsTab(isAdmin) {
         <button type="submit" class="px-5 py-2.5 bg-shuttle-600 text-white rounded-lg font-medium hover:bg-shuttle-700"><i class="fas fa-plus mr-1"></i>등록</button>
       </form>
     </div>` : ''}
-    <!-- 참가자 통계 요약 -->
-    <div class="flex flex-wrap gap-3 mb-3">
+    <!-- 참가자 통계 -->
+    <div class="flex flex-wrap gap-2 mb-2">
       <span class="badge bg-gray-100 text-gray-700"><i class="fas fa-users mr-1"></i>총 ${state.participants.length}명</span>
       <span class="badge bg-blue-100 text-blue-700"><i class="fas fa-mars mr-1"></i>남 ${state.participants.filter(p=>p.gender==='m').length}명</span>
       <span class="badge bg-pink-100 text-pink-700"><i class="fas fa-venus mr-1"></i>여 ${state.participants.filter(p=>p.gender==='f').length}명</span>
-      <span class="badge bg-purple-100 text-purple-700"><i class="fas fa-venus-mars mr-1"></i>혼복신청 ${state.participants.filter(p=>p.mixed_doubles).length}명 (남 ${state.participants.filter(p=>p.mixed_doubles && p.gender==='m').length} / 여 ${state.participants.filter(p=>p.mixed_doubles && p.gender==='f').length})</span>
+      <span class="badge bg-purple-100 text-purple-700"><i class="fas fa-venus-mars mr-1"></i>혼복 ${state.participants.filter(p=>p.mixed_doubles).length}명</span>
     </div>
+    ${clubList.length > 1 ? `<div class="flex flex-wrap gap-1 mb-2">
+      ${clubList.slice(0, 10).map(([name, count]) => `<span class="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700">${name}: ${count}명</span>`).join('')}
+    </div>` : ''}
     <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
       <table class="w-full">
         <thead class="bg-gray-50"><tr>
-          <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500">#</th>
-          <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500">이름</th>
-          <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">성별</th>
-          <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">출생</th>
-          <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">급수</th>
-          <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">혼복</th>
-          <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">참가비</th>
-          <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">체크인</th>
-          ${isAdmin ? '<th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">관리</th>' : ''}
+          <th class="px-2 py-3 text-left text-xs font-semibold text-gray-500">#</th>
+          <th class="px-2 py-3 text-left text-xs font-semibold text-gray-500">이름</th>
+          <th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">성별</th>
+          <th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">급수</th>
+          <th class="px-2 py-3 text-left text-xs font-semibold text-gray-500">소속</th>
+          <th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">혼복</th>
+          <th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">참가비</th>
+          <th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">체크인</th>
+          ${isAdmin ? '<th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">관리</th>' : ''}
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
           ${state.participants.length === 0 ? `<tr><td colspan="${isAdmin?9:8}" class="px-4 py-8 text-center text-gray-400">등록된 참가자가 없습니다.</td></tr>` : ''}
           ${state.participants.map((p, i) => {
             const lv = LEVEL_COLORS[p.level] || LEVEL_COLORS.c;
             return `<tr class="hover:bg-gray-50">
-              <td class="px-3 py-3 text-sm text-gray-500">${i+1}</td>
-              <td class="px-3 py-3 font-medium text-gray-900">${p.name}</td>
-              <td class="px-3 py-3 text-center"><span class="badge ${p.gender==='m' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender==='m'?'남':'여'}</span></td>
-              <td class="px-3 py-3 text-center text-sm text-gray-500">${p.birth_year || '-'}</td>
-              <td class="px-3 py-3 text-center"><span class="badge ${lv}">${LEVELS[p.level]||'C'}</span></td>
-              <td class="px-3 py-3 text-center">${isAdmin ? `<button onclick="toggleMixedDoubles(${p.id})" class="text-lg ${p.mixed_doubles?'text-purple-500':'text-gray-300'} hover:scale-110" title="혼복 참가 토글">${p.mixed_doubles?'<i class="fas fa-venus-mars"></i>':'<i class="far fa-circle"></i>'}</button>` : (p.mixed_doubles?'<span class="badge bg-purple-100 text-purple-700"><i class="fas fa-venus-mars"></i></span>':'<span class="text-gray-300">-</span>')}</td>
-              <td class="px-3 py-3 text-center">${isAdmin ? `<button onclick="togglePaid(${p.id})" class="text-lg ${p.paid?'text-green-500':'text-gray-300'} hover:scale-110">${p.paid?'<i class="fas fa-check-circle"></i>':'<i class="far fa-circle"></i>'}</button>` : (p.paid?'<i class="fas fa-check-circle text-green-500"></i>':'<i class="fas fa-times-circle text-gray-300"></i>')}</td>
-              <td class="px-3 py-3 text-center">${isAdmin ? `<button onclick="toggleCheckin(${p.id})" class="text-lg ${p.checked_in?'text-blue-500':'text-gray-300'} hover:scale-110">${p.checked_in?'<i class="fas fa-check-circle"></i>':'<i class="far fa-circle"></i>'}</button>` : (p.checked_in?'<i class="fas fa-check-circle text-blue-500"></i>':'<i class="fas fa-times-circle text-gray-300"></i>')}</td>
-              ${isAdmin ? `<td class="px-3 py-3 text-center"><button onclick="deleteParticipant(${p.id})" class="text-red-400 hover:text-red-600"><i class="fas fa-trash-alt"></i></button></td>` : ''}
+              <td class="px-2 py-2 text-sm text-gray-400">${i+1}</td>
+              <td class="px-2 py-2 font-medium text-gray-900 text-sm">${p.name}</td>
+              <td class="px-2 py-2 text-center"><span class="badge text-xs ${p.gender==='m' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender==='m'?'남':'여'}</span></td>
+              <td class="px-2 py-2 text-center"><span class="badge text-xs ${lv}">${LEVELS[p.level]||'C'}</span></td>
+              <td class="px-2 py-2 text-xs text-gray-500">${p.club || '-'}</td>
+              <td class="px-2 py-2 text-center">${isAdmin ? `<button onclick="toggleMixedDoubles(${p.id})" class="text-base ${p.mixed_doubles?'text-purple-500':'text-gray-300'} hover:scale-110">${p.mixed_doubles?'<i class="fas fa-venus-mars"></i>':'<i class="far fa-circle"></i>'}</button>` : (p.mixed_doubles?'<span class="text-purple-500"><i class="fas fa-venus-mars"></i></span>':'<span class="text-gray-300">-</span>')}</td>
+              <td class="px-2 py-2 text-center">${isAdmin ? `<button onclick="togglePaid(${p.id})" class="text-base ${p.paid?'text-green-500':'text-gray-300'} hover:scale-110">${p.paid?'<i class="fas fa-check-circle"></i>':'<i class="far fa-circle"></i>'}</button>` : (p.paid?'<i class="fas fa-check-circle text-green-500"></i>':'<i class="fas fa-times-circle text-gray-300"></i>')}</td>
+              <td class="px-2 py-2 text-center">${isAdmin ? `<button onclick="toggleCheckin(${p.id})" class="text-base ${p.checked_in?'text-blue-500':'text-gray-300'} hover:scale-110">${p.checked_in?'<i class="fas fa-check-circle"></i>':'<i class="far fa-circle"></i>'}</button>` : (p.checked_in?'<i class="fas fa-check-circle text-blue-500"></i>':'<i class="fas fa-times-circle text-gray-300"></i>')}</td>
+              ${isAdmin ? `<td class="px-2 py-2 text-center"><button onclick="deleteParticipant(${p.id})" class="text-red-400 hover:text-red-600"><i class="fas fa-trash-alt"></i></button></td>` : ''}
             </tr>`;
           }).join('')}
         </tbody>
@@ -262,7 +275,7 @@ function renderEventsTab(isAdmin) {
       <div class="mb-3 flex flex-wrap gap-2 text-xs">
         <span class="badge bg-blue-50 text-blue-600"><i class="fas fa-mars mr-1"></i>남자 ${maleP.length}명</span>
         <span class="badge bg-pink-50 text-pink-600"><i class="fas fa-venus mr-1"></i>여자 ${femaleP.length}명</span>
-        <span class="badge bg-purple-50 text-purple-600"><i class="fas fa-venus-mars mr-1"></i>혼복신청 남${mixedMales.length}/여${mixedFemales.length}명 → 최대 ${Math.min(mixedMales.length, mixedFemales.length)}팀</span>
+        <span class="badge bg-purple-50 text-purple-600"><i class="fas fa-venus-mars mr-1"></i>혼복 남${mixedMales.length}/여${mixedFemales.length}명 → 최대 ${Math.min(mixedMales.length, mixedFemales.length)}팀</span>
       </div>
       <form id="add-event-form" class="flex flex-wrap gap-3 items-end">
         <div><label class="block text-xs font-semibold text-gray-500 mb-1">종류</label>
@@ -278,9 +291,9 @@ function renderEventsTab(isAdmin) {
       </form>
     </div>` : ''}
     ${isAdmin ? `<div class="flex flex-wrap gap-2">
-      <button onclick="autoAssignAll()" class="px-4 py-2 bg-teal-50 text-teal-700 rounded-lg text-sm font-medium hover:bg-teal-100"><i class="fas fa-random mr-1"></i>전체 자동 팀편성</button>
+      <button onclick="showTeamAssignModal()" class="px-4 py-2.5 bg-teal-500 text-white rounded-lg text-sm font-semibold hover:bg-teal-600 shadow-sm"><i class="fas fa-users-cog mr-1"></i>조편성 옵션</button>
+      <button onclick="showBracketOptionsModal()" class="px-4 py-2.5 bg-gradient-to-r from-shuttle-500 to-shuttle-700 text-white rounded-lg text-sm font-semibold shadow-md hover:shadow-lg"><i class="fas fa-magic mr-1"></i>대진표 옵션</button>
       <button onclick="checkMerge()" class="px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-100"><i class="fas fa-compress-arrows-alt mr-1"></i>급수합병 체크</button>
-      ${state.events.length > 0 ? `<button onclick="generateAllBrackets()" class="px-4 py-2 bg-gradient-to-r from-shuttle-500 to-shuttle-700 text-white rounded-lg text-sm font-semibold shadow-md hover:shadow-lg"><i class="fas fa-magic mr-1"></i>전체 대진표 생성</button>` : ''}
     </div>` : ''}
     <div id="merge-result"></div>
     ${state.events.length === 0 ? '<div class="text-center py-12 text-gray-400"><i class="fas fa-layer-group text-4xl mb-3"></i><p>등록된 종목이 없습니다.</p></div>' : ''}
@@ -291,10 +304,9 @@ function renderEventsTab(isAdmin) {
             <span class="badge ${ev.category==='md'?'bg-blue-100 text-blue-700':ev.category==='wd'?'bg-pink-100 text-pink-700':'bg-purple-100 text-purple-700'}">${CATEGORIES[ev.category]}</span>
             <h4 class="font-semibold text-gray-800">${ev.name}</h4>
             <span class="text-xs text-gray-400">${ev.team_count || 0}팀</span>
-            ${ev.merged_from ? '<span class="badge bg-amber-100 text-amber-700"><i class="fas fa-compress-arrows-alt mr-1"></i>합병</span>' : ''}
+            ${ev.merged_from ? '<span class="badge bg-amber-100 text-amber-700 text-xs"><i class="fas fa-compress-arrows-alt mr-1"></i>합병</span>' : ''}
           </div>
           <div class="flex items-center gap-2">
-            ${isAdmin ? `<button onclick="autoAssignEvent(${ev.id})" class="px-3 py-1.5 bg-teal-50 text-teal-700 rounded-lg text-xs font-medium hover:bg-teal-100"><i class="fas fa-random mr-1"></i>자동편성</button>` : ''}
             ${isAdmin ? `<button onclick="showTeamModal(${ev.id}, '${ev.category}')" class="px-3 py-1.5 bg-shuttle-50 text-shuttle-700 rounded-lg text-xs font-medium hover:bg-shuttle-100"><i class="fas fa-user-plus mr-1"></i>팀 등록</button>` : ''}
             ${isAdmin ? `<button onclick="deleteEvent(${ev.id})" class="text-red-400 hover:text-red-600 text-sm"><i class="fas fa-trash-alt"></i></button>` : ''}
           </div>
@@ -307,32 +319,333 @@ function renderEventsTab(isAdmin) {
   </div>`;
 }
 
+// ==========================================
+// ★ 조편성 옵션 모달 ★
+// ==========================================
+function showTeamAssignModal() {
+  const modal = document.createElement('div');
+  modal.id = 'team-assign-modal';
+  modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-overlay';
+  modal.innerHTML = `<div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
+    <div class="p-6 border-b border-gray-200">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-gray-900"><i class="fas fa-users-cog mr-2 text-teal-500"></i>조편성 옵션 설정</h3>
+        <button onclick="document.getElementById('team-assign-modal').remove()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100"><i class="fas fa-times text-gray-400"></i></button>
+      </div>
+    </div>
+    <div class="p-6 overflow-y-auto flex-1 space-y-5">
+      <!-- 1. 팀 편성 방식 -->
+      <div>
+        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-handshake mr-1 text-teal-500"></i>1. 팀 편성 방식</h4>
+        <div class="space-y-2">
+          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-teal-50 transition has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50">
+            <input type="radio" name="team_mode" value="club_priority" checked class="mt-1 w-4 h-4 text-teal-600">
+            <div><p class="font-semibold text-sm">같은 클럽 우선 편성</p><p class="text-xs text-gray-500">같은 소속 클럽 멤버끼리 먼저 매칭 → 남은 인원은 급수 순 매칭</p></div>
+          </label>
+          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-teal-50 transition has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50">
+            <input type="radio" name="team_mode" value="level_match" class="mt-1 w-4 h-4 text-teal-600">
+            <div><p class="font-semibold text-sm">같은 급수 매칭</p><p class="text-xs text-gray-500">클럽 무관, 같은 급수끼리 우선 매칭 (급수 밸런스 중시)</p></div>
+          </label>
+          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-teal-50 transition has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50">
+            <input type="radio" name="team_mode" value="random" class="mt-1 w-4 h-4 text-teal-600">
+            <div><p class="font-semibold text-sm">완전 랜덤</p><p class="text-xs text-gray-500">클럽·급수 무관 랜덤 매칭</p></div>
+          </label>
+        </div>
+      </div>
+      <!-- 2. 조 배정 옵션 -->
+      <div>
+        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-th-large mr-1 text-indigo-500"></i>2. 조(그룹) 배정</h4>
+        <label class="flex items-center gap-3 p-3 border rounded-xl cursor-pointer hover:bg-indigo-50 transition mb-2">
+          <input type="checkbox" id="assign-groups-check" checked class="w-4 h-4 text-indigo-600 rounded">
+          <div><p class="font-semibold text-sm">조 배정 실행</p><p class="text-xs text-gray-500">팀 편성 후 자동으로 조 배정까지 진행</p></div>
+        </label>
+        <div id="group-options" class="pl-4 space-y-3">
+          <div class="flex items-center gap-3">
+            <label class="text-sm font-medium text-gray-700 w-24">조당 팀 수</label>
+            <input type="number" id="group-size-input" value="5" min="3" max="8" class="w-20 px-3 py-2 border rounded-lg text-center focus:ring-2 focus:ring-indigo-500 outline-none">
+            <span class="text-xs text-gray-500">(4~5팀 풀리그 권장)</span>
+          </div>
+          <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-indigo-50">
+            <input type="checkbox" id="avoid-same-club" checked class="w-4 h-4 text-indigo-600 rounded">
+            <div><p class="font-semibold text-sm">같은 클럽 다른 조 배정</p><p class="text-xs text-gray-500">같은 클럽 팀끼리 다른 조에 배정 (클럽 내 대결 최소화)</p></div>
+          </label>
+        </div>
+      </div>
+      <!-- 미리보기 -->
+      <div id="assign-preview" class="hidden p-3 bg-gray-50 rounded-xl">
+        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-eye mr-1"></i>편성 미리보기</h4>
+        <div id="assign-preview-content"></div>
+      </div>
+    </div>
+    <div class="p-6 border-t border-gray-200 flex gap-3">
+      <button onclick="previewAssignment()" class="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200"><i class="fas fa-eye mr-1"></i>미리보기</button>
+      <button onclick="executeTeamAssignment()" class="flex-1 py-3 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700 shadow-md"><i class="fas fa-check mr-2"></i>편성 실행</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+// 미리보기 기능
+async function previewAssignment() {
+  const teamMode = document.querySelector('input[name="team_mode"]:checked')?.value || 'club_priority';
+  const assignGroups = document.getElementById('assign-groups-check')?.checked;
+  const groupSize = parseInt(document.getElementById('group-size-input')?.value || '5');
+  const avoidSameClub = document.getElementById('avoid-same-club')?.checked;
+
+  const tid = state.currentTournament.id;
+  try {
+    const res = await api(`/tournaments/${tid}/events/preview-assignment`, {
+      method: 'POST',
+      body: JSON.stringify({ team_mode: teamMode, group_size: groupSize, avoid_same_club: avoidSameClub })
+    });
+
+    const previewDiv = document.getElementById('assign-preview');
+    const content = document.getElementById('assign-preview-content');
+    previewDiv.classList.remove('hidden');
+
+    content.innerHTML = `
+      <div class="space-y-2 text-sm">
+        <div class="grid grid-cols-2 gap-2">
+          <div class="p-2 bg-white rounded-lg"><span class="text-gray-500">총 종목:</span> <b>${res.summary.total_events}개</b></div>
+          <div class="p-2 bg-white rounded-lg"><span class="text-gray-500">총 팀 수:</span> <b>${res.summary.total_teams}팀</b></div>
+          <div class="p-2 bg-white rounded-lg"><span class="text-gray-500">예상 경기:</span> <b>${res.summary.total_estimated_matches}경기</b></div>
+          <div class="p-2 bg-white rounded-lg"><span class="text-gray-500">조당 팀:</span> <b>${groupSize}팀</b></div>
+        </div>
+        <div class="mt-2 max-h-40 overflow-y-auto">
+          <table class="w-full text-xs">
+            <thead class="bg-gray-100"><tr>
+              <th class="px-2 py-1 text-left">종목</th>
+              <th class="px-2 py-1 text-center">참가자</th>
+              <th class="px-2 py-1 text-center">팀</th>
+              <th class="px-2 py-1 text-center">조</th>
+              <th class="px-2 py-1 text-center">예상경기</th>
+              <th class="px-2 py-1 text-center">추천방식</th>
+            </tr></thead>
+            <tbody class="divide-y divide-gray-50">
+              ${res.preview.map(p => `<tr>
+                <td class="px-2 py-1 font-medium">${p.event_name}</td>
+                <td class="px-2 py-1 text-center">${p.player_count}명</td>
+                <td class="px-2 py-1 text-center font-bold">${p.team_count}팀</td>
+                <td class="px-2 py-1 text-center">${assignGroups ? p.group_count + '조' : '-'}</td>
+                <td class="px-2 py-1 text-center">${p.estimated_matches}</td>
+                <td class="px-2 py-1 text-center"><span class="badge ${p.team_count <= 5 ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'} text-xs">${p.format_suggestion}</span></td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    showToast('미리보기가 생성되었습니다!', 'info');
+  } catch(e) {}
+}
+
+// 편성 실행
+async function executeTeamAssignment() {
+  if (!confirm('모든 종목의 기존 팀/조를 삭제하고 새로 편성합니다.\n\n계속하시겠습니까?')) return;
+
+  const teamMode = document.querySelector('input[name="team_mode"]:checked')?.value || 'club_priority';
+  const doAssignGroups = document.getElementById('assign-groups-check')?.checked;
+  const groupSize = parseInt(document.getElementById('group-size-input')?.value || '5');
+  const avoidSameClub = document.getElementById('avoid-same-club')?.checked;
+
+  const tid = state.currentTournament.id;
+  const modeLabels = { club_priority: '같은 클럽 우선', level_match: '같은 급수 매칭', random: '완전 랜덤' };
+
+  try {
+    // Step 1: 팀 편성
+    const teamRes = await api(`/tournaments/${tid}/events/auto-assign-all`, {
+      method: 'POST',
+      body: JSON.stringify({ team_mode: teamMode })
+    });
+    showToast(`팀 편성 완료! (${modeLabels[teamMode]}) → ${teamRes.total_teams}팀`, 'success');
+
+    // Step 2: 조 배정 (옵션 선택 시)
+    if (doAssignGroups) {
+      const groupRes = await api(`/tournaments/${tid}/events/assign-groups-all`, {
+        method: 'POST',
+        body: JSON.stringify({ group_size: groupSize, avoid_same_club: avoidSameClub })
+      });
+      showToast(`조 배정 완료! ${groupRes.total_groups}개 조 (${avoidSameClub ? '같은 클럽 회피' : '랜덤'})`, 'success');
+    }
+
+    document.getElementById('team-assign-modal')?.remove();
+    await loadEvents(tid);
+    render();
+  } catch(e) {}
+}
+
+// ==========================================
+// ★ 대진표 옵션 모달 ★
+// ==========================================
+function showBracketOptionsModal() {
+  const t = state.currentTournament;
+  const modal = document.createElement('div');
+  modal.id = 'bracket-options-modal';
+  modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-overlay';
+  modal.innerHTML = `<div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
+    <div class="p-6 border-b border-gray-200">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-gray-900"><i class="fas fa-magic mr-2 text-shuttle-500"></i>대진표 옵션 설정</h3>
+        <button onclick="document.getElementById('bracket-options-modal').remove()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100"><i class="fas fa-times text-gray-400"></i></button>
+      </div>
+    </div>
+    <div class="p-6 overflow-y-auto flex-1 space-y-5">
+      <!-- 1. 대진 포맷 -->
+      <div>
+        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-sitemap mr-1 text-shuttle-500"></i>1. 대진 방식</h4>
+        <div class="space-y-2">
+          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-shuttle-50 transition has-[:checked]:border-shuttle-500 has-[:checked]:bg-shuttle-50">
+            <input type="radio" name="bracket_format" value="auto" checked class="mt-1 w-4 h-4 text-shuttle-600">
+            <div><p class="font-semibold text-sm">자동 결정 (권장)</p><p class="text-xs text-gray-500">팀 수와 조 배정 여부에 따라 자동으로 최적 방식 결정<br>• 조 배정 있으면 → 조별 리그 (같은 조끼리 풀리그)<br>• 5팀 이하 → 풀리그 / 그 외 → KDK</p></div>
+          </label>
+          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-shuttle-50 transition has-[:checked]:border-shuttle-500 has-[:checked]:bg-shuttle-50">
+            <input type="radio" name="bracket_format" value="group_league" class="mt-1 w-4 h-4 text-shuttle-600">
+            <div><p class="font-semibold text-sm">조별 리그 (Group Stage)</p><p class="text-xs text-gray-500">같은 조 팀끼리만 풀리그 진행 (4~5팀 풀리그 권장)</p></div>
+          </label>
+          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-shuttle-50 transition has-[:checked]:border-shuttle-500 has-[:checked]:bg-shuttle-50">
+            <input type="radio" name="bracket_format" value="kdk" class="mt-1 w-4 h-4 text-shuttle-600">
+            <div><p class="font-semibold text-sm">KDK (팀당 N경기)</p><p class="text-xs text-gray-500">모든 팀이 설정된 경기 수만큼 진행 (랜덤 대진)</p></div>
+          </label>
+          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-shuttle-50 transition has-[:checked]:border-shuttle-500 has-[:checked]:bg-shuttle-50">
+            <input type="radio" name="bracket_format" value="league" class="mt-1 w-4 h-4 text-shuttle-600">
+            <div><p class="font-semibold text-sm">풀리그</p><p class="text-xs text-gray-500">모든 팀이 다른 모든 팀과 한 번씩 대전 (소규모 종목)</p></div>
+          </label>
+          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-shuttle-50 transition has-[:checked]:border-shuttle-500 has-[:checked]:bg-shuttle-50">
+            <input type="radio" name="bracket_format" value="tournament" class="mt-1 w-4 h-4 text-shuttle-600">
+            <div><p class="font-semibold text-sm">싱글 엘리미네이션 (토너먼트)</p><p class="text-xs text-gray-500">지면 탈락, 결승까지 승자끼리 대전</p></div>
+          </label>
+        </div>
+      </div>
+      <!-- 2. 대진 옵션 -->
+      <div>
+        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-cog mr-1 text-gray-500"></i>2. 대진 옵션</h4>
+        <div class="space-y-3">
+          <label class="flex items-center gap-3 p-3 border rounded-xl cursor-pointer hover:bg-gray-50">
+            <input type="checkbox" id="bracket-avoid-club" checked class="w-4 h-4 text-shuttle-600 rounded">
+            <div><p class="font-semibold text-sm">같은 클럽 대결 회피</p><p class="text-xs text-gray-500">같은 소속 팀끼리 가능한 한 대결하지 않도록 배정</p></div>
+          </label>
+          <div class="flex items-center gap-3 px-3">
+            <label class="text-sm font-medium text-gray-700 w-28">팀당 경기 수</label>
+            <input type="number" id="bracket-games" value="${t?.games_per_player || 4}" min="2" max="10" class="w-20 px-3 py-2 border rounded-lg text-center focus:ring-2 focus:ring-shuttle-500 outline-none">
+            <span class="text-xs text-gray-500">(KDK 전용)</span>
+          </div>
+        </div>
+      </div>
+      <!-- 3. 대상 종목 -->
+      <div>
+        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-list-check mr-1 text-green-500"></i>3. 대상 종목</h4>
+        <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-green-50 mb-2">
+          <input type="checkbox" id="bracket-all-events" checked onchange="toggleBracketEvents(this.checked)" class="w-4 h-4 text-green-600 rounded">
+          <p class="font-semibold text-sm">전체 종목</p>
+        </label>
+        <div id="bracket-event-list" class="hidden max-h-32 overflow-y-auto space-y-1 pl-4">
+          ${state.events.map(ev => `
+            <label class="flex items-center gap-2 p-1.5 rounded cursor-pointer hover:bg-gray-50">
+              <input type="checkbox" class="bracket-event-cb" value="${ev.id}" checked class="w-4 h-4 text-green-600 rounded">
+              <span class="text-sm">${ev.name} (${ev.team_count || 0}팀)</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="p-6 border-t border-gray-200 flex gap-3">
+      <button onclick="document.getElementById('bracket-options-modal').remove()" class="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200">취소</button>
+      <button onclick="executeBracketGeneration()" class="flex-1 py-3 bg-gradient-to-r from-shuttle-500 to-shuttle-700 text-white rounded-xl font-semibold shadow-md"><i class="fas fa-magic mr-2"></i>대진표 생성</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+function toggleBracketEvents(allChecked) {
+  const list = document.getElementById('bracket-event-list');
+  list.classList.toggle('hidden', allChecked);
+  if (allChecked) {
+    document.querySelectorAll('.bracket-event-cb').forEach(cb => cb.checked = true);
+  }
+}
+
+async function executeBracketGeneration() {
+  const bracketFormat = document.querySelector('input[name="bracket_format"]:checked')?.value || 'auto';
+  const avoidSameClub = document.getElementById('bracket-avoid-club')?.checked;
+  const gamesPerTeam = parseInt(document.getElementById('bracket-games')?.value || '4');
+  const allEvents = document.getElementById('bracket-all-events')?.checked;
+
+  const formatLabels = { auto: '자동', group_league: '조별 리그', kdk: 'KDK', league: '풀리그', tournament: '토너먼트' };
+
+  if (!confirm(`대진표를 생성합니다.\n\n• 방식: ${formatLabels[bracketFormat]}\n• 클럽 회피: ${avoidSameClub ? '예' : '아니오'}\n• 팀당 경기: ${gamesPerTeam}경기\n\n기존 경기 데이터가 초기화됩니다. 계속하시겠습니까?`)) return;
+
+  const tid = state.currentTournament.id;
+  const body = {
+    format: bracketFormat,
+    avoid_same_club: avoidSameClub,
+    games_per_team: gamesPerTeam
+  };
+
+  if (!allEvents) {
+    const checked = [...document.querySelectorAll('.bracket-event-cb:checked')].map(cb => parseInt(cb.value));
+    if (checked.length === 0) { showToast('최소 하나의 종목을 선택하세요.', 'warning'); return; }
+    // 종목별로 하나씩 생성
+    try {
+      let totalMatches = 0;
+      for (const eid of checked) {
+        const res = await api(`/tournaments/${tid}/brackets/generate`, {
+          method: 'POST', body: JSON.stringify({ ...body, event_id: eid })
+        });
+        totalMatches += res.matchCount;
+      }
+      showToast(`대진표 생성 완료! (${totalMatches}경기)`, 'success');
+    } catch(e) { return; }
+  } else {
+    try {
+      const res = await api(`/tournaments/${tid}/brackets/generate`, {
+        method: 'POST', body: JSON.stringify(body)
+      });
+      showToast(`대진표 생성 완료! (${res.matchCount}경기, ${formatLabels[bracketFormat]})`, 'success');
+    } catch(e) { return; }
+  }
+
+  document.getElementById('bracket-options-modal')?.remove();
+  await loadMatches(tid);
+  const tData = await api(`/tournaments/${tid}`);
+  state.currentTournament = tData.tournament;
+  switchTab('matches');
+}
+
 // ---- MATCHES TAB ----
 function renderMatchesTab(isAdmin) {
   const matches = state.matches;
-  if (matches.length === 0) return `<div class="text-center py-12 text-gray-400"><i class="fas fa-clipboard-list text-4xl mb-3"></i><p>대진표가 아직 생성되지 않았습니다.</p></div>`;
+  if (matches.length === 0) return `<div class="text-center py-12 text-gray-400"><i class="fas fa-clipboard-list text-4xl mb-3"></i><p>대진표가 아직 생성되지 않았습니다.</p>
+    ${isAdmin ? `<button onclick="showBracketOptionsModal()" class="mt-4 px-6 py-2.5 bg-gradient-to-r from-shuttle-500 to-shuttle-700 text-white rounded-xl font-semibold shadow-md"><i class="fas fa-magic mr-2"></i>대진표 생성하기</button>` : ''}
+  </div>`;
 
-  // 점수 규칙 안내
   const scoreRuleHtml = `<div class="mb-4 p-3 rounded-xl flex items-center gap-2 ${state.format === 'tournament' ? 'bg-red-50 text-red-700' : 'bg-yellow-50 text-yellow-700'}">
     <i class="fas fa-bullseye"></i>
     <span class="text-sm font-bold">${state.targetScore}점 선취제 · 1세트 단판 (${state.format === 'tournament' ? '본선/토너먼트' : '예선'})</span>
   </div>`;
 
-  // 종목별 → 라운드별 그룹핑
+  // 종목별 → 조별 → 라운드별 그룹핑
   const byEvent = {};
   matches.forEach(m => {
-    if (!byEvent[m.event_name]) byEvent[m.event_name] = {};
-    if (!byEvent[m.event_name][m.round]) byEvent[m.event_name][m.round] = [];
-    byEvent[m.event_name][m.round].push(m);
+    const evKey = m.event_name || '전체';
+    if (!byEvent[evKey]) byEvent[evKey] = {};
+    const groupKey = m.group_num ? `${m.group_num}조` : '전체';
+    if (!byEvent[evKey][groupKey]) byEvent[evKey][groupKey] = {};
+    if (!byEvent[evKey][groupKey][m.round]) byEvent[evKey][groupKey][m.round] = [];
+    byEvent[evKey][groupKey][m.round].push(m);
   });
 
-  return `<div class="space-y-6">${scoreRuleHtml}${Object.entries(byEvent).map(([eventName, rounds]) => `
+  return `<div class="space-y-6">${scoreRuleHtml}${Object.entries(byEvent).map(([eventName, groups]) => `
     <div>
       <h3 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2"><i class="fas fa-layer-group text-shuttle-500"></i>${eventName}</h3>
-      ${Object.entries(rounds).sort(([a],[b]) => a-b).map(([round, ms]) => `
+      ${Object.entries(groups).map(([groupName, rounds]) => `
         <div class="mb-4">
-          <h4 class="text-sm font-semibold text-gray-500 mb-2">${round}라운드</h4>
-          <div class="grid gap-3 sm:grid-cols-2">${ms.map(m => renderMatchCard(m, isAdmin)).join('')}</div>
+          ${groupName !== '전체' ? `<h4 class="text-sm font-bold text-indigo-600 mb-2 flex items-center gap-1"><i class="fas fa-th-large"></i>${groupName}</h4>` : ''}
+          ${Object.entries(rounds).sort(([a],[b]) => a-b).map(([round, ms]) => `
+            <div class="mb-3">
+              <h5 class="text-xs font-semibold text-gray-400 mb-2">${round}라운드</h5>
+              <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">${ms.map(m => renderMatchCard(m, isAdmin)).join('')}</div>
+            </div>
+          `).join('')}
         </div>
       `).join('')}
     </div>
@@ -343,21 +656,20 @@ function renderMatchCard(m, isAdmin) {
   const st = { pending: { l: '대기', c: 'bg-gray-100 text-gray-600' }, playing: { l: '진행중', c: 'bg-green-100 text-green-700' }, completed: { l: '완료', c: 'bg-blue-100 text-blue-700' } };
   const s = st[m.status] || st.pending;
   const t1 = m.team1_name || 'BYE', t2 = m.team2_name || 'BYE';
-  const t1T = m.team1_set1||0;
-  const t2T = m.team2_set1||0;
-  return `<div class="bg-white rounded-xl border ${m.status==='playing'?'border-green-300 ring-2 ring-green-100':'border-gray-200'} p-4">
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-2"><span class="text-xs text-gray-400">#${m.match_order}</span>${m.court_number?`<span class="badge bg-yellow-50 text-yellow-700">${m.court_number}코트</span>`:''}</div>
-      <div class="flex items-center gap-2">${m.status==='playing'?'<span class="w-2 h-2 rounded-full bg-green-500 pulse-live"></span>':''}<span class="badge ${s.c}">${s.l}</span></div>
+  const t1T = m.team1_set1||0, t2T = m.team2_set1||0;
+  return `<div class="bg-white rounded-xl border ${m.status==='playing'?'border-green-300 ring-2 ring-green-100':'border-gray-200'} p-3">
+    <div class="flex items-center justify-between mb-2">
+      <div class="flex items-center gap-1.5"><span class="text-xs text-gray-400">#${m.match_order}</span>${m.court_number?`<span class="badge bg-yellow-50 text-yellow-700 text-xs">${m.court_number}코트</span>`:''} ${m.group_num ? `<span class="badge bg-indigo-50 text-indigo-600 text-xs">${m.group_num}조</span>` : ''}</div>
+      <div class="flex items-center gap-1">${m.status==='playing'?'<span class="w-2 h-2 rounded-full bg-green-500 pulse-live"></span>':''}<span class="badge ${s.c} text-xs">${s.l}</span></div>
     </div>
-    <div class="space-y-2">
+    <div class="space-y-1">
       <div class="flex items-center justify-between ${m.winner_team===1?'font-bold text-shuttle-700':''}"><span class="text-sm">${m.winner_team===1?'🏆 ':''}${t1}</span><span class="scoreboard-num text-lg font-bold">${t1T}</span></div>
       <div class="flex items-center justify-between ${m.winner_team===2?'font-bold text-shuttle-700':''}"><span class="text-sm">${m.winner_team===2?'🏆 ':''}${t2}</span><span class="scoreboard-num text-lg font-bold">${t2T}</span></div>
     </div>
-    ${isAdmin && m.status!=='cancelled' ? `<div class="mt-3 pt-3 border-t border-gray-100 flex gap-2">
-      ${m.status==='pending'?`<button onclick="startMatch(${m.id})" class="flex-1 py-2 bg-green-50 text-green-700 rounded-lg text-sm font-medium hover:bg-green-100"><i class="fas fa-play mr-1"></i>시작</button>`:''}
-      ${m.status==='playing'?`<button onclick="showScoreModal(${m.id})" class="flex-1 py-2 bg-shuttle-50 text-shuttle-700 rounded-lg text-sm font-medium hover:bg-shuttle-100"><i class="fas fa-edit mr-1"></i>점수 입력</button>`:''}
-      ${m.status==='completed'?`<button onclick="showScoreModal(${m.id})" class="flex-1 py-2 bg-gray-50 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-100"><i class="fas fa-edit mr-1"></i>수정</button>`:''}
+    ${isAdmin && m.status!=='cancelled' ? `<div class="mt-2 pt-2 border-t border-gray-100 flex gap-2">
+      ${m.status==='pending'?`<button onclick="startMatch(${m.id})" class="flex-1 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100"><i class="fas fa-play mr-1"></i>시작</button>`:''}
+      ${m.status==='playing'?`<button onclick="showScoreModal(${m.id})" class="flex-1 py-1.5 bg-shuttle-50 text-shuttle-700 rounded-lg text-xs font-medium hover:bg-shuttle-100"><i class="fas fa-edit mr-1"></i>점수</button>`:''}
+      ${m.status==='completed'?`<button onclick="showScoreModal(${m.id})" class="flex-1 py-1.5 bg-gray-50 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-100"><i class="fas fa-edit mr-1"></i>수정</button>`:''}
     </div>` : ''}
   </div>`;
 }
@@ -373,11 +685,6 @@ function renderScoreboard() {
       <div class="flex items-center justify-between mb-8">
         <div><button onclick="navigate('tournament')" class="text-gray-400 hover:text-white mb-2 inline-flex items-center text-sm"><i class="fas fa-arrow-left mr-2"></i>돌아가기</button><h1 class="text-3xl font-extrabold">${t?t.name:'스코어보드'}</h1></div>
         <button onclick="refreshScoreboard()" class="px-4 py-2 bg-white/10 rounded-lg text-sm hover:bg-white/20"><i class="fas fa-sync-alt mr-1"></i>새로고침</button>
-      </div>
-      <div class="text-center mb-4">
-        <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold ${state.format === 'tournament' ? 'bg-red-500/20 text-red-300' : 'bg-yellow-500/20 text-yellow-300'}">
-          <i class="fas fa-bullseye"></i>${state.targetScore}점 선취제 · 1세트 단판 ${state.format === 'tournament' ? '(본선/토너먼트)' : '(예선)'}
-        </span>
       </div>
       ${playing.length > 0 ? `<div class="mb-8"><h2 class="text-lg font-bold mb-4 flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-green-500 pulse-live"></span>진행 중</h2>
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">${playing.map(m => renderScoreCard(m)).join('')}</div></div>` : '<div class="text-center py-8 text-gray-500 mb-8"><p>진행 중인 경기 없음</p></div>'}
@@ -396,12 +703,12 @@ function renderScoreCard(m) {
   const t1 = m.team1_name || 'BYE', t2 = m.team2_name || 'BYE';
   const t1T = m.team1_set1||0, t2T = m.team2_set1||0;
   const live = m.status==='playing';
-  return `<div class="bg-white/10 rounded-xl p-3 sm:p-4 ${live?'ring-2 ring-green-500/50':''}">
+  return `<div class="bg-white/10 rounded-xl p-3 ${live?'ring-2 ring-green-500/50':''}">
     <div class="flex justify-between mb-2">
-      <span class="text-xs text-gray-400">${m.court_number ? m.court_number+'코트 ' : ''}#${m.match_order} ${m.event_name||''}</span>
+      <span class="text-xs text-gray-400">${m.court_number ? m.court_number+'코트 ' : ''}#${m.match_order} ${m.event_name||''} ${m.group_num ? m.group_num+'조' : ''}</span>
       ${live?'<span class="text-xs text-green-400 flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 pulse-live"></span>LIVE</span>':'<span class="text-xs text-blue-400">완료</span>'}
     </div>
-    <div class="space-y-1.5">
+    <div class="space-y-1">
       <div class="flex justify-between items-center ${m.winner_team===1?'text-yellow-400':''}"><span class="text-sm font-medium">${m.winner_team===1?'🏆 ':''}${t1}</span><span class="text-2xl font-extrabold scoreboard-num">${t1T}</span></div>
       <div class="h-px bg-white/10"></div>
       <div class="flex justify-between items-center ${m.winner_team===2?'text-yellow-400':''}"><span class="text-sm font-medium">${m.winner_team===2?'🏆 ':''}${t2}</span><span class="text-2xl font-extrabold scoreboard-num">${t2T}</span></div>
@@ -412,7 +719,6 @@ function renderScoreCard(m) {
 // ---- RESULTS ----
 function renderResults() {
   const t = state.currentTournament;
-  // 종목별 그룹핑
   const byEvent = {};
   state.standings.forEach(s => {
     const key = s.event_name || '전체';
@@ -474,7 +780,6 @@ function bindEvents() {
     const fd = new FormData(e.target);
     const data = Object.fromEntries(fd);
     if (data.birth_year) data.birth_year = parseInt(data.birth_year);
-    // 체크박스: 체크되어있으면 '1', 아니면 FormData에 없음
     data.mixed_doubles = fd.has('mixed_doubles') ? 1 : 0;
     const tid = state.currentTournament.id;
     try { await api(`/tournaments/${tid}/participants`, { method: 'POST', body: JSON.stringify(data) }); showToast(`${data.name}님 등록!`, 'success'); e.target.reset(); await loadParticipants(tid); render(); } catch(e){}
@@ -560,58 +865,24 @@ function showBulkModal() {
       </div>
     </div>
     <div class="p-6 overflow-y-auto flex-1">
-      <!-- Tab buttons -->
-      <div class="flex gap-1 mb-4 bg-gray-100 p-1 rounded-lg">
-        <button onclick="switchBulkTab('paste')" id="bulk-tab-paste" class="flex-1 py-2 px-3 rounded-md text-sm font-medium bg-white shadow-sm text-gray-900"><i class="fas fa-paste mr-1"></i>텍스트 붙여넣기</button>
-        <button onclick="switchBulkTab('csv')" id="bulk-tab-csv" class="flex-1 py-2 px-3 rounded-md text-sm font-medium text-gray-500"><i class="fas fa-file-csv mr-1"></i>CSV 파일 업로드</button>
+      <div class="mb-3 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+        <p class="font-semibold mb-1"><i class="fas fa-info-circle mr-1"></i>입력 형식 안내</p>
+        <p>한 줄에 한 명씩 · 탭(Tab) 또는 콤마(,)로 구분</p>
+        <p class="mt-1 font-mono text-xs bg-blue-100 rounded p-2">이름, 성별(남/여), 출생년도, 급수, 연락처, 혼복(O/X), 소속클럽<br>김민수, 남, 1985, A, 010-1234-5678, O, 안양시청<br>박서연, 여, 1992, B, , X, 만안클럽</p>
+        <p class="mt-1 text-xs text-blue-500">* 엑셀에서 복사(Ctrl+C)하여 바로 붙여넣기(Ctrl+V) 가능!</p>
       </div>
-      <!-- Paste tab -->
-      <div id="bulk-content-paste">
-        <div class="mb-3 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
-          <p class="font-semibold mb-1"><i class="fas fa-info-circle mr-1"></i>입력 형식 안내</p>
-          <p>한 줄에 한 명씩 입력합니다. 탭(Tab) 또는 콤마(,)로 구분합니다.</p>
-          <p class="mt-1 font-mono text-xs bg-blue-100 rounded p-2">이름, 성별(남/여), 출생년도, 급수(S~E), 연락처, 혼복여부(O/X)<br>김민수, 남, 1985, A, 010-1234-5678, O<br>박서연, 여, 1992, B, , X<br>이정호, 남, 1990, C</p>
-          <p class="mt-1 text-xs text-blue-500">* 급수, 출생년도, 연락처, 혼복여부는 생략 가능 (기본: C급, 혼복 미참가)</p>
-          <p class="text-xs text-blue-500">* 엑셀에서 복사(Ctrl+C)하여 바로 붙여넣기(Ctrl+V) 가능!</p>
-        </div>
-        <textarea id="bulk-text" rows="10" class="w-full px-4 py-3 border border-gray-300 rounded-xl font-mono text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-y" placeholder="김민수, 남, 1985, A, 010-1234-5678, O&#10;박서연, 여, 1992, B, , O&#10;이정호, 남, 1990, C&#10;최유진, 여, 1988, B, 010-5678-1234, X"></textarea>
-        <div class="mt-2 flex items-center justify-between">
-          <span id="bulk-count" class="text-sm text-gray-400">0명 감지</span>
-          <button onclick="previewBulk()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"><i class="fas fa-eye mr-1"></i>미리보기</button>
-        </div>
+      <textarea id="bulk-text" rows="10" class="w-full px-4 py-3 border border-gray-300 rounded-xl font-mono text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-y" placeholder="김민수, 남, 1985, A, 010-1234-5678, O, 안양시청&#10;박서연, 여, 1992, B, , O, 동안셔틀&#10;이정호, 남, 1990, C, , , 만안클럽"></textarea>
+      <div class="mt-2 flex items-center justify-between">
+        <span id="bulk-count" class="text-sm text-gray-400">0명 감지</span>
+        <button onclick="previewBulk()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"><i class="fas fa-eye mr-1"></i>미리보기</button>
       </div>
-      <!-- CSV tab -->
-      <div id="bulk-content-csv" class="hidden">
-        <div class="mb-3 p-3 bg-green-50 rounded-lg text-sm text-green-700">
-          <p class="font-semibold mb-1"><i class="fas fa-info-circle mr-1"></i>CSV 파일 형식</p>
-          <p>첫 번째 행은 헤더로 인식합니다. 헤더 예시:</p>
-          <p class="font-mono text-xs bg-green-100 rounded p-2 mt-1">이름,성별,출생년도,급수,연락처</p>
-        </div>
-        <div class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-indigo-400 transition cursor-pointer" onclick="document.getElementById('csv-file').click()">
-          <input type="file" id="csv-file" accept=".csv,.txt,.tsv" class="hidden" onchange="handleCSVFile(event)">
-          <i class="fas fa-cloud-upload-alt text-4xl text-gray-300 mb-3"></i>
-          <p class="text-gray-500 font-medium">CSV 파일을 선택하세요</p>
-          <p class="text-gray-400 text-sm mt-1">.csv, .txt, .tsv 파일 지원</p>
-        </div>
-        <div id="csv-filename" class="hidden mt-3 p-2 bg-gray-50 rounded-lg flex items-center gap-2">
-          <i class="fas fa-file-csv text-green-500"></i>
-          <span class="text-sm font-medium text-gray-700"></span>
-        </div>
-      </div>
-      <!-- Preview -->
       <div id="bulk-preview" class="hidden mt-4">
         <h4 class="font-semibold text-gray-800 mb-2"><i class="fas fa-list mr-1"></i>미리보기 (<span id="preview-count">0</span>명)</h4>
         <div class="max-h-60 overflow-y-auto border rounded-lg">
           <table class="w-full text-sm">
             <thead class="bg-gray-50 sticky top-0"><tr>
-              <th class="px-2 py-2 text-left text-xs font-semibold text-gray-500">#</th>
-              <th class="px-2 py-2 text-left text-xs font-semibold text-gray-500">이름</th>
-              <th class="px-2 py-2 text-center text-xs font-semibold text-gray-500">성별</th>
-              <th class="px-2 py-2 text-center text-xs font-semibold text-gray-500">출생</th>
-              <th class="px-2 py-2 text-center text-xs font-semibold text-gray-500">급수</th>
-              <th class="px-2 py-2 text-left text-xs font-semibold text-gray-500">연락처</th>
-              <th class="px-2 py-2 text-center text-xs font-semibold text-gray-500">혼복</th>
-              <th class="px-2 py-2 text-center text-xs font-semibold text-gray-500">상태</th>
+              <th class="px-2 py-2 text-left text-xs">#</th><th class="px-2 py-2 text-left text-xs">이름</th><th class="px-2 py-2 text-center text-xs">성별</th>
+              <th class="px-2 py-2 text-center text-xs">급수</th><th class="px-2 py-2 text-left text-xs">소속</th><th class="px-2 py-2 text-center text-xs">혼복</th><th class="px-2 py-2 text-center text-xs">상태</th>
             </tr></thead>
             <tbody id="preview-body" class="divide-y divide-gray-100"></tbody>
           </table>
@@ -624,8 +895,6 @@ function showBulkModal() {
     </div>
   </div>`;
   document.body.appendChild(modal);
-
-  // Auto-count on input
   const ta = document.getElementById('bulk-text');
   if (ta) ta.addEventListener('input', () => {
     const lines = ta.value.split('\n').filter(l => l.trim());
@@ -635,79 +904,41 @@ function showBulkModal() {
 
 function closeBulkModal() { const m = document.getElementById('bulk-modal'); if (m) m.remove(); }
 
-function switchBulkTab(tab) {
-  document.getElementById('bulk-content-paste').classList.toggle('hidden', tab !== 'paste');
-  document.getElementById('bulk-content-csv').classList.toggle('hidden', tab !== 'csv');
-  const pasteTab = document.getElementById('bulk-tab-paste');
-  const csvTab = document.getElementById('bulk-tab-csv');
-  if (tab === 'paste') { pasteTab.classList.add('bg-white','shadow-sm','text-gray-900'); pasteTab.classList.remove('text-gray-500'); csvTab.classList.remove('bg-white','shadow-sm','text-gray-900'); csvTab.classList.add('text-gray-500'); }
-  else { csvTab.classList.add('bg-white','shadow-sm','text-gray-900'); csvTab.classList.remove('text-gray-500'); pasteTab.classList.remove('bg-white','shadow-sm','text-gray-900'); pasteTab.classList.add('text-gray-500'); }
-}
-
-function handleCSVFile(event) {
-  const file = event.target.files[0]; if (!file) return;
-  const fnEl = document.getElementById('csv-filename');
-  fnEl.classList.remove('hidden');
-  fnEl.querySelector('span').textContent = file.name;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    // Put CSV content into the text area for unified processing
-    document.getElementById('bulk-text').value = e.target.result;
-    switchBulkTab('paste');
-    const lines = e.target.result.split('\n').filter(l => l.trim());
-    document.getElementById('bulk-count').textContent = lines.length + '명 감지 (헤더 포함)';
-    showToast('CSV 파일 로드 완료! 미리보기를 확인하세요.', 'success');
-  };
-  reader.readAsText(file, 'UTF-8');
-}
-
 function parseBulkText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l);
   if (lines.length === 0) return [];
-
-  // Check if first line is header
-  const headerPatterns = ['이름', 'name', '성별', 'gender', '급수', 'level', '연락처', 'phone', '혼복'];
+  const headerPatterns = ['이름', 'name', '성별', 'gender', '급수', 'level', '소속', 'club'];
   const firstLine = lines[0].toLowerCase();
   const isHeader = headerPatterns.some(h => firstLine.includes(h));
   const dataLines = isHeader ? lines.slice(1) : lines;
 
-  const genderMap = { '남': 'm', '여': 'f', '남자': 'm', '여자': 'f', 'm': 'm', 'f': 'f', 'male': 'm', 'female': 'f', 'M': 'm', 'F': 'f' };
-  const levelMap = { 's': 's', 'a': 'a', 'b': 'b', 'c': 'c', 'd': 'd', 'e': 'e', 'S': 's', 'A': 'a', 'B': 'b', 'C': 'c', 'D': 'd', 'E': 'e',
-    's급': 's', 'a급': 'a', 'b급': 'b', 'c급': 'c', 'd급': 'd', 'e급': 'e' };
+  const genderMap = { '남': 'm', '여': 'f', '남자': 'm', '여자': 'f', 'm': 'm', 'f': 'f', 'M': 'm', 'F': 'f' };
+  const levelMap = { 's': 's', 'a': 'a', 'b': 'b', 'c': 'c', 'd': 'd', 'e': 'e', 'S': 's', 'A': 'a', 'B': 'b', 'C': 'c', 'D': 'd', 'E': 'e' };
 
   return dataLines.map(line => {
-    // Split by tab first (Excel paste), then comma
     let parts = line.includes('\t') ? line.split('\t') : line.split(',');
     parts = parts.map(p => p.trim()).filter(p => p);
-
     if (parts.length === 0) return null;
 
-    const result = { name: '', gender: '', birth_year: null, level: 'c', phone: '', mixed_doubles: false, valid: true, error: '' };
+    const result = { name: '', gender: '', birth_year: null, level: 'c', phone: '', mixed_doubles: false, club: '', valid: true, error: '' };
     result.name = parts[0] || '';
 
-    // Parse remaining fields intelligently
     for (let i = 1; i < parts.length; i++) {
       const val = parts[i].trim();
       const valLower = val.toLowerCase();
-
-      // Gender check
       if (genderMap[val] || genderMap[valLower]) { result.gender = genderMap[val] || genderMap[valLower]; continue; }
-      // Mixed doubles check (O, X, 혼복, yes, no, 1, 0)
-      const mixedMap = { 'o': true, 'x': false, '혼복': true, 'yes': true, 'no': false, '1': true, '0': false, 'y': true, 'n': false, '참가': true, '미참가': false };
+      const mixedMap = { 'o': true, 'x': false, '혼복': true, 'yes': true, 'no': false, '1': true, '0': false, 'y': true, 'n': false };
       if (mixedMap[valLower] !== undefined) { result.mixed_doubles = mixedMap[valLower]; continue; }
-      // Level check
       if (levelMap[val] || levelMap[valLower]) { result.level = levelMap[val] || levelMap[valLower]; continue; }
-      // Birth year check (4-digit number 1950-2010)
       const num = parseInt(val);
       if (!isNaN(num) && num >= 1950 && num <= 2015) { result.birth_year = num; continue; }
-      // Phone number check (contains dash or starts with 0)
       if (val.includes('-') || (val.startsWith('0') && val.length >= 10)) { result.phone = val; continue; }
+      // 남은 문자열은 클럽명으로
+      if (val.length >= 2 && !result.club) { result.club = val; continue; }
     }
 
-    // Validation
     if (!result.name) { result.valid = false; result.error = '이름 없음'; }
     if (!result.gender) { result.valid = false; result.error = (result.error ? result.error + ', ' : '') + '성별 없음'; }
-
     return result;
   }).filter(r => r !== null);
 }
@@ -718,89 +949,42 @@ function previewBulk() {
   const previewDiv = document.getElementById('bulk-preview');
   const body = document.getElementById('preview-body');
   const countEl = document.getElementById('preview-count');
-
   if (parsed.length === 0) { showToast('입력된 데이터가 없습니다.', 'warning'); return; }
-
   previewDiv.classList.remove('hidden');
   countEl.textContent = parsed.length;
-
   body.innerHTML = parsed.map((p, i) => {
-    const status = p.valid
-      ? '<span class="badge bg-green-100 text-green-700"><i class="fas fa-check mr-1"></i>OK</span>'
-      : `<span class="badge bg-red-100 text-red-600"><i class="fas fa-exclamation mr-1"></i>${p.error}</span>`;
+    const status = p.valid ? '<span class="badge bg-green-100 text-green-700"><i class="fas fa-check mr-1"></i>OK</span>' : `<span class="badge bg-red-100 text-red-600">${p.error}</span>`;
     const gLabel = p.gender === 'm' ? '<span class="badge bg-blue-100 text-blue-700">남</span>' : p.gender === 'f' ? '<span class="badge bg-pink-100 text-pink-700">여</span>' : '<span class="text-red-500">?</span>';
-    const lvColor = LEVEL_COLORS[p.level] || '';
     return `<tr class="${p.valid ? '' : 'bg-red-50'}">
       <td class="px-2 py-1.5 text-gray-400">${i+1}</td>
-      <td class="px-2 py-1.5 font-medium">${p.name || '-'}</td>
+      <td class="px-2 py-1.5 font-medium">${p.name||'-'}</td>
       <td class="px-2 py-1.5 text-center">${gLabel}</td>
-      <td class="px-2 py-1.5 text-center text-gray-500">${p.birth_year || '-'}</td>
-      <td class="px-2 py-1.5 text-center"><span class="badge ${lvColor}">${(LEVELS[p.level]||'C')}</span></td>
-      <td class="px-2 py-1.5 text-gray-500">${p.phone || '-'}</td>
-      <td class="px-2 py-1.5 text-center">${p.mixed_doubles ? '<span class="badge bg-purple-100 text-purple-700"><i class="fas fa-venus-mars"></i>O</span>' : '<span class="text-gray-300">-</span>'}</td>
+      <td class="px-2 py-1.5 text-center"><span class="badge ${LEVEL_COLORS[p.level]||''}">${LEVELS[p.level]||'C'}</span></td>
+      <td class="px-2 py-1.5 text-gray-500">${p.club || '-'}</td>
+      <td class="px-2 py-1.5 text-center">${p.mixed_doubles ? '<span class="text-purple-500"><i class="fas fa-venus-mars"></i></span>' : '-'}</td>
       <td class="px-2 py-1.5 text-center">${status}</td>
     </tr>`;
   }).join('');
-
-  const validCount = parsed.filter(p => p.valid).length;
-  const invalidCount = parsed.length - validCount;
-  if (invalidCount > 0) showToast(`${validCount}명 유효, ${invalidCount}명 오류 (성별 누락 등)`, 'warning');
-  else showToast(`${validCount}명 확인 완료!`, 'success');
 }
 
 async function submitBulk() {
   const text = document.getElementById('bulk-text').value;
   const parsed = parseBulkText(text);
   const valid = parsed.filter(p => p.valid);
-
-  if (valid.length === 0) { showToast('등록 가능한 참가자가 없습니다. 미리보기를 확인해주세요.', 'error'); return; }
-
+  if (valid.length === 0) { showToast('등록 가능한 참가자가 없습니다.', 'error'); return; }
   const btn = document.getElementById('bulk-submit-btn');
   btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>등록 중...';
-
   const tid = state.currentTournament.id;
   try {
-    const data = valid.map(p => ({ name: p.name, gender: p.gender, birth_year: p.birth_year, level: p.level, phone: p.phone, mixed_doubles: p.mixed_doubles ? 1 : 0 }));
+    const data = valid.map(p => ({ name: p.name, gender: p.gender, birth_year: p.birth_year, level: p.level, phone: p.phone, mixed_doubles: p.mixed_doubles ? 1 : 0, club: p.club }));
     const res = await api(`/tournaments/${tid}/participants/bulk`, { method: 'POST', body: JSON.stringify({ participants: data }) });
-    closeBulkModal();
-    showToast(res.message, 'success');
-    if (res.errors && res.errors.length > 0) {
-      setTimeout(() => showToast(`건너뛴 항목: ${res.errors.slice(0,3).join(', ')}${res.errors.length>3?'...':''}`, 'warning'), 500);
-    }
+    closeBulkModal(); showToast(res.message, 'success');
     await loadParticipants(tid); render();
-  } catch(e) {
-    btn.disabled = false; btn.innerHTML = '<i class="fas fa-check mr-2"></i>일괄 등록';
-  }
+  } catch(e) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check mr-2"></i>일괄 등록'; }
 }
 
 // Event actions
 async function deleteEvent(eid) { if (!confirm('종목과 관련 팀/경기를 모두 삭제합니다.')) return; const tid = state.currentTournament.id; try { await api(`/tournaments/${tid}/events/${eid}`, { method: 'DELETE' }); showToast('종목 삭제됨', 'success'); await loadEvents(tid); render(); } catch(e){} }
-
-// 종목별 자동 팀 편성
-async function autoAssignEvent(eid) {
-  if (!confirm('이 종목의 기존 팀을 삭제하고 자동 편성합니다. 계속하시겠습니까?')) return;
-  const tid = state.currentTournament.id;
-  try {
-    const res = await api(`/tournaments/${tid}/events/${eid}/auto-assign`, { method: 'POST', body: '{}' });
-    showToast(res.message, 'success');
-    await loadEvents(tid); render();
-  } catch(e){}
-}
-
-// 전체 종목 자동 팀 편성
-async function autoAssignAll() {
-  if (!confirm('전체 종목의 기존 팀을 삭제하고 자동 편성합니다. 계속하시겠습니까?')) return;
-  const tid = state.currentTournament.id;
-  try {
-    const res = await api(`/tournaments/${tid}/events/auto-assign-all`, { method: 'POST', body: '{}' });
-    showToast(res.message, 'success');
-    if (res.events) {
-      const detail = res.events.map(e => `${e.event_name}: ${e.team_count}팀`).join('\n');
-      setTimeout(() => showToast(detail, 'info'), 500);
-    }
-    await loadEvents(tid); render();
-  } catch(e){}
-}
 
 async function loadTeams(eid) {
   const tid = state.currentTournament.id;
@@ -809,13 +993,33 @@ async function loadTeams(eid) {
     const d = await api(`/tournaments/${tid}/events/${eid}/teams`);
     const el = document.getElementById(`teams-${eid}`);
     if (d.teams.length === 0) { el.innerHTML = '<p class="text-sm text-gray-400 py-2">등록된 팀이 없습니다.</p>'; return; }
-    el.innerHTML = `<div class="space-y-1">${d.teams.map((t, i) => `
-      <div class="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50">
-        <div class="flex items-center gap-2"><span class="text-xs text-gray-400 w-5">${i+1}</span><span class="font-medium text-sm">${t.team_name}</span>
-          <span class="badge ${LEVEL_COLORS[t.p1_level]||''} text-xs">${LEVELS[t.p1_level]||''}</span><span class="badge ${LEVEL_COLORS[t.p2_level]||''} text-xs">${LEVELS[t.p2_level]||''}</span></div>
-        ${isAdmin ? `<button onclick="deleteTeam(${eid},${t.id})" class="text-red-400 hover:text-red-600 text-xs"><i class="fas fa-times"></i></button>` : ''}
-      </div>
-    `).join('')}</div>`;
+
+    // 조별 그룹핑
+    const byGroup = {};
+    d.teams.forEach(t => {
+      const g = t.group_num || 0;
+      if (!byGroup[g]) byGroup[g] = [];
+      byGroup[g].push(t);
+    });
+
+    let html = '';
+    for (const [groupNum, teams] of Object.entries(byGroup)) {
+      if (groupNum !== '0') html += `<div class="text-xs font-bold text-indigo-600 mt-2 mb-1"><i class="fas fa-th-large mr-1"></i>${groupNum}조</div>`;
+      html += `<div class="space-y-0.5">${teams.map((t, i) => `
+        <div class="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50">
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-400 w-5">${i+1}</span>
+            <span class="font-medium text-sm">${t.team_name}</span>
+            <span class="badge ${LEVEL_COLORS[t.p1_level]||''} text-xs">${LEVELS[t.p1_level]||''}</span>
+            <span class="badge ${LEVEL_COLORS[t.p2_level]||''} text-xs">${LEVELS[t.p2_level]||''}</span>
+            ${t.p1_club ? `<span class="text-xs text-teal-600">${t.p1_club}</span>` : ''}
+            ${t.p2_club && t.p2_club !== t.p1_club ? `<span class="text-xs text-teal-600">/ ${t.p2_club}</span>` : ''}
+          </div>
+          ${isAdmin ? `<button onclick="deleteTeam(${eid},${t.id})" class="text-red-400 hover:text-red-600 text-xs"><i class="fas fa-times"></i></button>` : ''}
+        </div>
+      `).join('')}</div>`;
+    }
+    el.innerHTML = html;
   } catch(e){}
 }
 
@@ -829,22 +1033,19 @@ function showTeamModal(eid, category) {
   let filtered1 = state.participants, filtered2 = state.participants;
   if (category === 'md') { filtered1 = state.participants.filter(p => p.gender === 'm'); filtered2 = filtered1; }
   else if (category === 'wd') { filtered1 = state.participants.filter(p => p.gender === 'f'); filtered2 = filtered1; }
-  else { filtered1 = state.participants; filtered2 = state.participants; }
-
   const modal = document.createElement('div');
   modal.id = 'team-modal';
   modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-overlay';
   modal.innerHTML = `<div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
     <h3 class="text-lg font-bold mb-4"><i class="fas fa-user-plus mr-2 text-shuttle-500"></i>팀 등록 - ${CATEGORIES[category]}</h3>
-    ${category === 'xd' ? '<p class="text-xs text-gray-500 mb-3">혼합복식: 남녀 한 명씩 선택</p>' : ''}
     <div class="space-y-3">
       <div><label class="block text-sm font-semibold text-gray-700 mb-1">${category==='xd'?'남자':'선수'} 1</label>
         <select id="team-p1" class="w-full px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500">
-          ${(category==='xd'?state.participants.filter(p=>p.gender==='m'):filtered1).map(p => `<option value="${p.id}">${p.name} (${LEVELS[p.level]}급${p.birth_year?' · '+p.birth_year:''})</option>`).join('')}
+          ${(category==='xd'?state.participants.filter(p=>p.gender==='m'):filtered1).map(p => `<option value="${p.id}">${p.name} (${LEVELS[p.level]}급${p.club?' · '+p.club:''})</option>`).join('')}
         </select></div>
       <div><label class="block text-sm font-semibold text-gray-700 mb-1">${category==='xd'?'여자':'선수'} 2</label>
         <select id="team-p2" class="w-full px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-shuttle-500">
-          ${(category==='xd'?state.participants.filter(p=>p.gender==='f'):filtered2).map(p => `<option value="${p.id}">${p.name} (${LEVELS[p.level]}급${p.birth_year?' · '+p.birth_year:''})</option>`).join('')}
+          ${(category==='xd'?state.participants.filter(p=>p.gender==='f'):filtered2).map(p => `<option value="${p.id}">${p.name} (${LEVELS[p.level]}급${p.club?' · '+p.club:''})</option>`).join('')}
         </select></div>
     </div>
     <div class="flex gap-2 mt-5"><button onclick="document.getElementById('team-modal').remove()" class="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium">취소</button>
@@ -864,7 +1065,7 @@ async function submitTeam(eid) {
   } catch(e){}
 }
 
-// Merge check
+// Merge
 async function checkMerge() {
   const tid = state.currentTournament.id;
   try {
@@ -887,52 +1088,33 @@ async function executeMerge(eventIds) {
   try { await api(`/tournaments/${tid}/events/execute-merge`, { method: 'POST', body: JSON.stringify({ event_ids: eventIds }) }); showToast('급수합병 완료!', 'success'); await loadEvents(tid); render(); } catch(e){}
 }
 
-// Generate brackets
-async function generateAllBrackets() {
-  if (!confirm('전체 종목의 대진표를 생성합니다. 기존 경기가 초기화됩니다.')) return;
-  const tid = state.currentTournament.id;
-  try {
-    const res = await api(`/tournaments/${tid}/brackets/generate`, { method: 'POST', body: '{}' });
-    showToast(`대진표 생성! (${res.matchCount}경기)`, 'success');
-    await loadMatches(tid); const tData = await api(`/tournaments/${tid}`); state.currentTournament = tData.tournament;
-    switchTab('matches');
-  } catch(e){}
-}
-
 // Match actions
 async function startMatch(mid) { const tid = state.currentTournament.id; try { await api(`/tournaments/${tid}/matches/${mid}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'playing' }) }); showToast('경기 시작!', 'success'); await loadMatches(tid); switchTab('matches'); } catch(e){} }
 
 function showScoreModal(mid) {
   const m = state.matches.find(x => x.id === mid); if (!m) return;
   const target = state.targetScore;
-  const formatLabel = state.format === 'tournament' ? '본선(토너먼트)' : '예선';
   const modal = document.createElement('div'); modal.id = 'score-modal';
   modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-overlay';
   modal.innerHTML = `<div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
     <h3 class="text-lg font-bold mb-2"><i class="fas fa-edit mr-2 text-shuttle-500"></i>점수 입력</h3>
-    <div class="text-center mb-1"><span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${state.format === 'tournament' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">
-      <i class="fas fa-bullseye"></i>${target}점 선취제 · 1세트 단판 (${formatLabel})
-    </span></div>
     <div class="text-center mb-4"><span class="font-semibold text-shuttle-700">${m.team1_name||'팀1'}</span><span class="mx-2 text-gray-400">vs</span><span class="font-semibold text-red-600">${m.team2_name||'팀2'}</span></div>
-    <div class="space-y-3">
-      <div class="flex items-center gap-3">
-        <div class="flex-1 text-center">
-          <label class="block text-sm font-medium text-shuttle-700 mb-2">${m.team1_name||'팀1'}</label>
-          <input id="t1s1" type="number" min="0" max="${target+10}" value="${m.team1_set1||0}" class="w-full px-3 py-4 border-2 rounded-xl text-center text-3xl font-black outline-none focus:ring-2 focus:ring-shuttle-500 focus:border-shuttle-500">
-        </div>
-        <span class="text-3xl text-gray-300 font-bold mt-6">:</span>
-        <div class="flex-1 text-center">
-          <label class="block text-sm font-medium text-red-600 mb-2">${m.team2_name||'팀2'}</label>
-          <input id="t2s1" type="number" min="0" max="${target+10}" value="${m.team2_set1||0}" class="w-full px-3 py-4 border-2 rounded-xl text-center text-3xl font-black outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500">
-        </div>
+    <div class="flex items-center gap-3">
+      <div class="flex-1 text-center">
+        <label class="block text-sm font-medium text-shuttle-700 mb-2">${m.team1_name||'팀1'}</label>
+        <input id="t1s1" type="number" min="0" max="${target+10}" value="${m.team1_set1||0}" class="w-full px-3 py-4 border-2 rounded-xl text-center text-3xl font-black outline-none focus:ring-2 focus:ring-shuttle-500">
+      </div>
+      <span class="text-3xl text-gray-300 font-bold mt-6">:</span>
+      <div class="flex-1 text-center">
+        <label class="block text-sm font-medium text-red-600 mb-2">${m.team2_name||'팀2'}</label>
+        <input id="t2s1" type="number" min="0" max="${target+10}" value="${m.team2_set1||0}" class="w-full px-3 py-4 border-2 rounded-xl text-center text-3xl font-black outline-none focus:ring-2 focus:ring-red-500">
       </div>
     </div>
     <div class="mt-4"><label class="block text-sm font-semibold text-gray-700 mb-2">승자</label>
       <div class="flex gap-2">
         <button onclick="document.getElementById('winner-val').value=1;this.classList.add('ring-2','ring-shuttle-500');this.nextElementSibling.classList.remove('ring-2','ring-shuttle-500')" class="flex-1 py-2 bg-shuttle-50 text-shuttle-700 rounded-lg text-sm font-medium ${m.winner_team===1?'ring-2 ring-shuttle-500':''}">${m.team1_name||'팀1'}</button>
         <button onclick="document.getElementById('winner-val').value=2;this.classList.add('ring-2','ring-shuttle-500');this.previousElementSibling.classList.remove('ring-2','ring-shuttle-500')" class="flex-1 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-medium ${m.winner_team===2?'ring-2 ring-shuttle-500':''}">${m.team2_name||'팀2'}</button>
-      </div><input type="hidden" id="winner-val" value="${m.winner_team||''}">
-      <p class="text-xs text-gray-400 mt-2 text-center"><i class="fas fa-info-circle mr-1"></i>${target}점 선취 시 승리 (1세트 단판)</p></div>
+      </div><input type="hidden" id="winner-val" value="${m.winner_team||''}"></div>
     <div class="flex gap-2 mt-5"><button onclick="document.getElementById('score-modal').remove()" class="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium">취소</button><button onclick="submitScore(${mid})" class="flex-1 py-2.5 bg-shuttle-600 text-white rounded-xl font-medium">저장</button></div>
   </div>`;
   document.body.appendChild(modal);
