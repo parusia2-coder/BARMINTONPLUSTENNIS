@@ -60,35 +60,63 @@
   - 🎯 **KDK**: 팀당 N회 랜덤 매칭 (대규모 대회 적합)
   - 📋 **풀리그**: 모든 팀 1:1 라운드 로빈
   - 🥊 **싱글 엘리미네이션**: 토너먼트 방식
-- **추가 옵션**:
-  - 같은 클럽 대전 회피 (대진 순서 최적화)
-  - 팀당 경기수 설정 (KDK 모드)
-  - 코트 배분 자동화
 
-#### 6. 경기 운영
-- 실시간 점수 입력 (3세트제, 세트별 점수)
+#### 6. 결선 토너먼트 🆕
+- **조별 리그 상위팀 → 결선 싱글 엘리미네이션** 자동 생성
+- 조별 순위 미리보기 (승점, 득실차 기반)
+- **상위 N팀 선택** (1/2/3팀 진출)
+- 같은 클럽 회피 시드 배정
+- 결선은 **21점 선취제** (조별 리그는 25점)
+- 경기 탭에서 결선/예선 경기 분리 표시
+
+#### 7. 경기 운영
+- 1세트 단판제 (예선 25점 / 본선 21점 선취)
+- 중간 교체 (예선 13점 / 본선 11점 도달 시 코트 교체)
 - 승자 자동/수동 판정
 - 코트별 경기 배정 및 진행
 - 경기 상태 관리: 대기(pending) → 진행(playing) → 완료(completed)
 - 경기 결과 서명 확인 (승/패팀 서명 캔버스)
 
-#### 7. 코트 전용 점수판 (`/court`)
-- 전체화면 스코어보드 UI (코트 옆 모니터/태블릿용)
-- 터치 기반 점수 입력 (좌우 터치 영역)
-- 사이드 체인지 기능
-- 코트별 실시간 상태 표시
-- 모바일/태블릿 최적화
+#### 8. 코트 전용 점수판 (`/court`)
+- 전체화면 좌/우 터치 점수판 (태블릿/모니터용)
+- 사이드 선택 → 점수 입력 → 교체 감지 → 종료 → 서명 흐름
+- URL 파라미터: `tid`, `court`, `locked`, `mode=view`, `autonext`
+- QR 코드 생성 (코트별 URL)
+- 읽기전용 모드 (관람 모니터용, 3초 자동 새로고침)
+- 자동 다음 경기 로드
+- 코트 잠금 모드
 
-#### 8. 순위 및 결과
+#### 9. 통계 대시보드 (`/dashboard`) 🆕
+- **대회 진행률** (전체/진행중/대기/완료 경기 수)
+- **참가자 현황** (성별, 참가비 납부율, 체크인율)
+- **급수 분포** 바 차트
+- **종목별 경기 현황** 테이블 (진행률 포함)
+- **코트별 실시간 상태** (진행중/대기/완료)
+- **클럽별 성적** (승률 순위, 승/패/승률)
+- 30초 자동 새로고침
+- SPA 내장 + 독립 URL 모두 지원
+
+#### 10. 참가자 페이지 (`/my`) 🆕
+- **이름/연락처로 본인 경기 검색**
+- 프로필 정보 (이름, 성별, 급수, 소속, 참가비, 체크인)
+- **전적 요약** (승/패/득실차)
+- 소속 팀 목록 (종목, 조 번호)
+- **예정/진행중 경기** (코트 번호 포함)
+- **완료된 경기 결과** (승패, 점수)
+- SPA 내장 + 독립 URL 모두 지원
+
+#### 11. 순위 및 결과
 - 자동 순위 계산 (승점 → 득실차 → 득점)
 - 조별/종목별 순위표
+- 시상대 UI (🥇🥈🥉)
 - 결과 PDF 출력 (html2canvas + jsPDF)
 - 감사 로그 (점수 수정 이력 추적)
 
-#### 9. 기타
+#### 12. 기타
 - 오프라인 감지 및 경고
 - 반응형 모바일 UI
 - 코트 수 기반 라운드 자동 배분
+- 홈페이지에서 코트점수판/통계/내경기 바로가기
 
 ---
 
@@ -133,15 +161,15 @@
 ```
 webapp/
 ├── src/
-│   ├── index.tsx                  # 메인 Hono 앱 & HTML 페이지 (SPA + 코트 점수판)
+│   ├── index.tsx                  # 메인 Hono 앱 & HTML 페이지 (SPA + 코트 + 통계 + 참가자)
 │   └── routes/
 │       ├── tournaments.ts         # 대회 CRUD, 인증, 통계
 │       ├── participants.ts        # 참가자 관리, 일괄등록
 │       ├── events.ts              # 종목, 팀 편성, 조 배정, 합병
-│       ├── matches.ts             # 경기, 점수, 순위, 코트, 서명
-│       └── brackets.ts            # 대진표 생성 (조별리그/KDK/풀리그/토너먼트)
+│       ├── matches.ts             # 경기, 점수, 순위, 코트, 서명, 통계 대시보드, 참가자 조회
+│       └── brackets.ts            # 대진표 생성 (조별리그/KDK/풀리그/토너먼트/결선)
 ├── public/static/
-│   ├── app.js                     # 메인 프론트엔드 (SPA 전체 UI)
+│   ├── app.js                     # 메인 프론트엔드 (SPA 전체 UI + 통계 + 참가자 + 결선)
 │   ├── court.js                   # 코트 전용 점수판 프론트엔드
 │   ├── style.css                  # 커스텀 스타일
 │   └── test_participants_100.txt  # 테스트용 참가자 붙여넣기 데이터
@@ -161,85 +189,19 @@ webapp/
 
 ---
 
-## 데이터 모델 (D1 SQLite)
+## 페이지 및 URL
 
-### tournaments (대회)
-| 컬럼 | 타입 | 설명 |
+| 경로 | 설명 | 용도 |
 |------|------|------|
-| id | INTEGER PK | 대회 ID |
-| name | TEXT | 대회명 |
-| description | TEXT | 설명 |
-| status | TEXT | draft / open / in_progress / completed / cancelled |
-| format | TEXT | kdk / league / tournament |
-| games_per_player | INTEGER | 팀당 기본 경기수 (기본 4) |
-| courts | INTEGER | 코트 수 (기본 2) |
-| merge_threshold | INTEGER | 합병 기준 팀 수 (기본 4) |
-| admin_password | TEXT | 관리자 비밀번호 |
-
-### events (종목)
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| id | INTEGER PK | 종목 ID |
-| tournament_id | INTEGER FK | 대회 |
-| category | TEXT | md(남복) / wd(여복) / xd(혼복) |
-| age_group | TEXT | 연령대 (기본 open) |
-| level_group | TEXT | 급수 (s/a/b/c/d/e/all/merged) |
-| name | TEXT | 표시 이름 |
-| status | TEXT | pending / in_progress / completed |
-| merged_from | TEXT | 합병 원본 종목 ID (JSON) |
-
-### participants (참가자)
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| id | INTEGER PK | 참가자 ID |
-| tournament_id | INTEGER FK | 대회 |
-| name | TEXT | 이름 |
-| phone | TEXT | 전화번호 |
-| gender | TEXT | m(남) / f(여) |
-| birth_year | INTEGER | 출생년도 |
-| level | TEXT | s / a / b / c / d / e |
-| paid | INTEGER | 참가비 납부 (0/1) |
-| checked_in | INTEGER | 체크인 (0/1) |
-| mixed_doubles | INTEGER | 혼복 참가 희망 (0/1) |
-| club | TEXT | 소속 클럽(동호회) |
-
-### teams (팀)
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| id | INTEGER PK | 팀 ID |
-| event_id | INTEGER FK | 종목 |
-| tournament_id | INTEGER FK | 대회 |
-| player1_id | INTEGER FK | 선수1 |
-| player2_id | INTEGER FK | 선수2 |
-| team_name | TEXT | 표시 이름 ("선수1 · 선수2") |
-| group_num | INTEGER | 조 번호 (NULL=미배정) |
-
-### matches (경기)
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| id | INTEGER PK | 경기 ID |
-| tournament_id | INTEGER FK | 대회 |
-| event_id | INTEGER FK | 종목 |
-| round | INTEGER | 라운드 |
-| match_order | INTEGER | 경기 순서 |
-| court_number | INTEGER | 코트 번호 |
-| team1_id / team2_id | INTEGER FK | 대전 팀 |
-| team1_set1~3 / team2_set1~3 | INTEGER | 세트별 점수 |
-| status | TEXT | pending / playing / completed / cancelled |
-| winner_team | INTEGER | 승리팀 (1 또는 2) |
-| group_num | INTEGER | 조 번호 |
-| winner_signature / loser_signature | TEXT | 서명 데이터 |
-
-### standings (순위)
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| team_id | INTEGER FK | 팀 |
-| event_id | INTEGER FK | 종목 |
-| wins / losses | INTEGER | 승/패 수 |
-| points | INTEGER | 승점 |
-| score_for / score_against | INTEGER | 득점/실점 |
-| goal_difference | INTEGER | 득실차 |
-| rank | INTEGER | 순위 |
+| `/` | 메인 SPA (대회 관리 전체 UI) | 관리자/운영자 |
+| `/court` | 코트 전용 점수판 (전체화면, 터치 UI) | 코트 태블릿 |
+| `/court?tid=1&court=1&locked=1` | 1코트 잠금 모드 점수판 | 코트 전용 태블릿 |
+| `/court?tid=1&court=1&mode=view` | 1코트 관람 전용 모드 | 관중 모니터 |
+| `/dashboard` | 통계 대시보드 (대회 선택) | 운영자/관리자 |
+| `/dashboard?tid=1` | 대회별 통계 대시보드 | 전광판/모니터 |
+| `/my` | 참가자 경기 조회 (대회 선택) | 참가자 모바일 |
+| `/my?tid=1` | 대회별 참가자 경기 조회 | 참가자 QR 접근 |
+| `/api/health` | 헬스 체크 | 모니터링 |
 
 ---
 
@@ -276,49 +238,42 @@ webapp/
 | POST | `/api/tournaments/:tid/events` | 종목 생성 |
 | DELETE | `/api/tournaments/:tid/events/:eid` | 종목 삭제 |
 | POST | `/api/tournaments/:tid/events/:eid/teams` | 팀 수동 등록 |
-| GET | `/api/tournaments/:tid/events/:eid/teams` | 팀 목록 (클럽/조 정보 포함) |
+| GET | `/api/tournaments/:tid/events/:eid/teams` | 팀 목록 |
 | DELETE | `/api/tournaments/:tid/events/:eid/teams/:teamId` | 팀 삭제 |
 
-### 조편성 옵션
-| Method | Path | 파라미터 | 설명 |
-|--------|------|----------|------|
-| POST | `/:tid/events/:eid/auto-assign` | `team_mode` | 단일 종목 팀 편성 |
-| POST | `/:tid/events/auto-assign-all` | `team_mode` | 전체 종목 팀 편성 |
-| POST | `/:tid/events/:eid/assign-groups` | `group_size`, `avoid_same_club` | 단일 종목 조 배정 |
-| POST | `/:tid/events/assign-groups-all` | `group_size`, `avoid_same_club` | 전체 종목 조 배정 |
-| POST | `/:tid/events/preview-assignment` | `team_mode`, `group_size`, `avoid_same_club` | 시뮬레이션 프리뷰 |
-| POST | `/:tid/events/check-merge` | - | 급수 합병 체크 |
-| POST | `/:tid/events/execute-merge` | `event_ids[]` | 급수 합병 실행 |
-
-**team_mode 옵션**: `club_priority` (같은 클럽 우선) | `level_match` (급수 매칭) | `random` (랜덤)
+### 조편성
+| Method | Path | 설명 |
+|--------|------|------|
+| POST | `/:tid/events/auto-assign-all` | 전체 종목 팀 편성 |
+| POST | `/:tid/events/assign-groups-all` | 전체 종목 조 배정 |
+| POST | `/:tid/events/preview-assignment` | 시뮬레이션 프리뷰 |
+| POST | `/:tid/events/check-merge` | 급수 합병 체크 |
+| POST | `/:tid/events/execute-merge` | 급수 합병 실행 |
 
 ### 대진표 생성
-| Method | Path | 파라미터 | 설명 |
-|--------|------|----------|------|
-| POST | `/:tid/brackets/generate` | `format`, `avoid_same_club`, `games_per_team`, `group_size`, `event_id` | 대진표 생성 |
-
-**format 옵션**: `auto` | `group_league` | `kdk` | `league` | `tournament`
+| Method | Path | 설명 |
+|--------|------|------|
+| POST | `/:tid/brackets/generate` | 대진표 생성 |
+| POST | `/:tid/brackets/generate-finals` | 결선 토너먼트 생성 |
+| GET | `/:tid/brackets/finals-preview` | 결선 진출 미리보기 |
 
 ### 경기 및 점수
 | Method | Path | 설명 |
 |--------|------|------|
-| GET | `/api/tournaments/:tid/matches` | 경기 목록 (`?event_id=` 필터) |
-| PUT | `/api/tournaments/:tid/matches/:mid/score` | 점수 입력 |
-| PATCH | `/api/tournaments/:tid/matches/:mid/status` | 경기 상태 변경 |
-| GET | `/api/tournaments/:tid/standings` | 순위표 (`?event_id=` 필터) |
-| GET | `/api/tournaments/:tid/court/:courtNum` | 코트 현재 경기 |
-| POST | `/api/tournaments/:tid/court/:courtNum/next` | 코트 다음 경기 |
-| GET | `/api/tournaments/:tid/courts/overview` | 전체 코트 현황 |
-| PUT | `/api/tournaments/:tid/matches/:mid/signature` | 서명 저장 |
-| GET | `/api/tournaments/:tid/matches/:mid/signature` | 서명 조회 |
-| GET | `/api/tournaments/:tid/audit-logs` | 감사 로그 |
+| GET | `/:tid/matches` | 경기 목록 |
+| PUT | `/:tid/matches/:mid/score` | 점수 입력 |
+| PATCH | `/:tid/matches/:mid/status` | 경기 상태 변경 |
+| GET | `/:tid/standings` | 순위표 |
+| GET | `/:tid/court/:courtNum` | 코트 현재 경기 |
+| POST | `/:tid/court/:courtNum/next` | 코트 다음 경기 시작 |
+| GET | `/:tid/courts/overview` | 전체 코트 현황 |
+| PUT | `/:tid/matches/:mid/signature` | 서명 저장 |
 
-### 페이지
-| 경로 | 설명 |
-|------|------|
-| `/` | 메인 SPA (대회 관리 전체 UI) |
-| `/court` | 코트 전용 점수판 (전체화면, 터치 UI) |
-| `/api/health` | 헬스 체크 |
+### 통계 및 참가자 조회 🆕
+| Method | Path | 설명 |
+|--------|------|------|
+| GET | `/:tid/dashboard` | 통계 대시보드 데이터 |
+| GET | `/:tid/my-matches?name=&phone=` | 참가자 본인 경기 조회 |
 
 ---
 
@@ -326,42 +281,39 @@ webapp/
 
 ### 1. 대회 생성
 1. 메인 페이지에서 **"새 대회 만들기"** 클릭
-2. 대회명, 설명, 포맷(KDK/리그/토너먼트), 코트 수, 관리자 비밀번호 설정
-3. 대회 생성 완료 → 상태: "초안"
+2. 대회명, 설명, 포맷, 코트 수, 관리자 비밀번호 설정
 
 ### 2. 참가자 등록
 1. 대회 상세 → **참가자** 탭
 2. 개별 등록 또는 **일괄 등록** (CSV/텍스트 붙여넣기)
-   - 형식: `이름, 성별(남/여), 출생년도, 급수(S~E), 전화번호, 혼복(O/X), 소속`
-3. 참가비 납부/체크인/혼복참가 토글 관리
 
-### 3. 종목 생성
+### 3. 종목 생성 및 조편성
 1. **종목** 탭에서 종목 추가
-2. 유형(남복/여복/혼복) + 연령대 + 급수 선택
-3. 예: "남자복식 오픈 A급", "여자복식 오픈 전체"
+2. **"조편성 옵션"** → 팀 편성 방식 + 조 배정 옵션 설정
+3. **미리보기** 확인 후 실행
 
-### 4. 조편성 (팀 + 조 배정)
-1. **"팀 자동 편성"** 버튼 클릭 → 옵션 모달
-   - 편성 방식: 같은 클럽 우선 / 급수 매칭 / 랜덤
-2. **"조 배정"** 버튼 클릭 → 옵션 모달
-   - 조당 팀 수 (3~8), 같은 클럽 회피 여부
-3. **"미리보기"** 로 시뮬레이션 확인 후 최종 적용
+### 4. 대진표 생성
+1. **"대진표 옵션"** → 포맷 선택 → 생성
+2. 경기 탭에서 경기 목록 확인
 
-### 5. 대진표 생성
-1. **경기** 탭에서 **"대진표 생성"** 클릭 → 옵션 모달
-2. 포맷 선택: 자동(추천) / 조별리그 / KDK / 풀리그 / 토너먼트
-3. 같은 클럽 대전 회피, 팀당 경기수 설정
-4. 생성 후 경기 목록 확인
+### 5. 경기 진행
+1. 경기 목록에서 **"시작"** 클릭
+2. 코트 점수판(`/court`)에서 실시간 점수 입력
+3. 경기 종료 → 서명 → 다음 경기 자동 로드
 
-### 6. 경기 진행
-1. 경기 목록에서 **"시작"** 클릭 → 상태: playing
-2. 점수 입력 (세트별) → 승자 자동 판정
-3. 코트 전용 점수판: `/court?tid=1&court=1` 로 접속
-4. 경기 완료 시 자동 순위 업데이트
+### 6. 결선 토너먼트 (조별 리그 완료 후)
+1. 경기 탭에서 **"결선 토너먼트 생성"** 클릭
+2. 조별 순위 미리보기 확인
+3. 상위 진출 팀 수(1/2/3) 선택 후 생성
+4. 결선 경기 (21점 선취제)로 자동 생성
 
-### 7. 결과 확인
-1. **순위표** 에서 종목별 최종 순위 확인
-2. **PDF 출력** 으로 결과표 저장/인쇄
+### 7. 통계 확인
+1. 대회 상세 → **"통계"** 버튼 또는 `/dashboard?tid=ID`
+2. 진행률, 종목별 현황, 코트 상태, 클럽 성적 확인
+
+### 8. 참가자 경기 조회
+1. 대회 상세 → **"내 경기"** 버튼 또는 `/my?tid=ID`
+2. 이름 검색 → 소속 팀, 예정 경기, 결과 확인
 
 ---
 
@@ -384,7 +336,7 @@ rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local && npm run db:seed
 npm run build
 
 # 로컬 개발 서버
-pm2 start ecosystem.config.cjs    # 또는 npm run dev:sandbox
+pm2 start ecosystem.config.cjs
 
 # 서비스 확인
 curl http://localhost:3000/api/health
@@ -397,13 +349,11 @@ npm run deploy
 ---
 
 ## 미구현 / 향후 개발 계획
-- 📋 결선 토너먼트 (조별리그 상위팀 → 결선 자동 진행)
-- 📊 대회 통계 대시보드 (실시간 진행률, 코트 가동률)
-- 📱 참가자 전용 페이지 (본인 경기 일정/결과 조회)
 - 🔔 경기 호출 알림 (웹 푸시 또는 카카오톡 연동)
 - 📋 복수 대회 동시 운영
 - 🗄️ 시즌 데이터 누적 관리 (선수별 전적/랭킹)
 - 🔐 역할 기반 권한 (대회장/진행요원/참가자)
+- 📱 PWA 지원 (오프라인 점수 입력)
 
 ---
 
