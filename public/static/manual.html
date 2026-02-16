@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏸 배드민턴 대회 운영 매뉴얼</title>
+<style>
+  /* ===== A4 인쇄 기본 설정 ===== */
+  @page {
+    size: A4;
+    margin: 15mm 18mm 15mm 18mm;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Malgun Gothic', '맑은 고딕', 'Apple SD Gothic Neo', sans-serif;
+    font-size: 10pt;
+    line-height: 1.55;
+    color: #1a1a1a;
+    background: #f0f0f0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ===== 컨테이너 (화면에서 A4 미리보기) ===== */
+  .page-container {
+    width: 210mm;
+    margin: 10mm auto;
+    background: #fff;
+    padding: 15mm 18mm;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+  }
+  @media print {
+    body { background: #fff; }
+    .page-container { width: auto; margin: 0; padding: 0; box-shadow: none; }
+    .no-print { display: none !important; }
+  }
+
+  /* ===== 페이지 나누기 ===== */
+  .page-break { page-break-before: always; break-before: page; margin-top: 0; }
+
+  /* ===== 표지 ===== */
+  .cover { text-align: center; padding: 40mm 0 20mm 0; page-break-after: always; }
+  .cover-icon { font-size: 56pt; margin-bottom: 8mm; }
+  .cover h1 { font-size: 24pt; font-weight: 800; color: #1e3a5f; margin-bottom: 4mm; letter-spacing: -0.5px; }
+  .cover .subtitle { font-size: 13pt; color: #555; margin-bottom: 15mm; }
+  .cover-info { display: inline-block; text-align: left; border: 1.5px solid #ddd; border-radius: 6px; padding: 5mm 8mm; font-size: 10pt; color: #444; background: #fafbfc; }
+  .cover-info div { margin: 1.5mm 0; }
+  .cover-info strong { color: #1e3a5f; min-width: 60px; display: inline-block; }
+
+  /* ===== 헤더 / 제목 ===== */
+  h2 { font-size: 15pt; font-weight: 800; color: #1e3a5f; border-bottom: 2.5px solid #2563eb; padding-bottom: 2mm; margin: 7mm 0 4mm 0; }
+  h3 { font-size: 11.5pt; font-weight: 700; color: #1e3a5f; margin: 5mm 0 2.5mm 0; }
+  h4 { font-size: 10.5pt; font-weight: 700; color: #334155; margin: 3mm 0 2mm 0; }
+
+  /* ===== 테이블 ===== */
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm 0; font-size: 9pt; }
+  th { background: #1e3a5f; color: #fff; font-weight: 700; text-align: left; padding: 2.2mm 3mm; }
+  td { padding: 2mm 3mm; border-bottom: 0.5px solid #ddd; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8f9fc; }
+  .tbl-alt th { background: #0e7c4a; }
+  .tbl-warn th { background: #b45309; }
+  .tbl-blue th { background: #2563eb; }
+
+  /* ===== 코드 / 명령어 ===== */
+  code, .code { font-family: 'D2Coding', 'Consolas', monospace; background: #f1f5f9; padding: 0.5mm 1.5mm; border-radius: 2px; font-size: 8.5pt; color: #334155; }
+  .code-block { background: #1e293b; color: #e2e8f0; padding: 3mm 4mm; border-radius: 4px; font-family: 'D2Coding', monospace; font-size: 8.5pt; line-height: 1.6; margin: 2mm 0 4mm 0; white-space: pre-wrap; word-break: break-all; }
+
+  /* ===== 박스 ===== */
+  .box { border: 1px solid #ddd; border-radius: 5px; padding: 3mm 4mm; margin: 2mm 0 4mm 0; }
+  .box-blue { border-color: #93c5fd; background: #eff6ff; }
+  .box-green { border-color: #86efac; background: #f0fdf4; }
+  .box-yellow { border-color: #fcd34d; background: #fefce8; }
+  .box-red { border-color: #fca5a5; background: #fef2f2; }
+  .box-title { font-weight: 700; margin-bottom: 1.5mm; }
+
+  /* ===== 리스트 ===== */
+  ul, ol { padding-left: 5mm; margin: 1mm 0 3mm 0; }
+  li { margin: 0.8mm 0; }
+
+  /* ===== 뱃지 ===== */
+  .badge { display: inline-block; padding: 0.5mm 2mm; border-radius: 3px; font-size: 8pt; font-weight: 700; color: #fff; }
+  .badge-blue { background: #2563eb; }
+  .badge-green { background: #16a34a; }
+  .badge-orange { background: #ea580c; }
+  .badge-red { background: #dc2626; }
+  .badge-gray { background: #6b7280; }
+
+  /* ===== 다이어그램 ===== */
+  .diagram { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 4mm; margin: 2mm 0 4mm 0; font-family: 'D2Coding', monospace; font-size: 8.5pt; line-height: 1.7; white-space: pre; overflow-x: auto; }
+
+  /* ===== 체크리스트 ===== */
+  .checklist { list-style: none; padding-left: 0; }
+  .checklist li { padding: 1.2mm 0 1.2mm 6mm; position: relative; }
+  .checklist li::before { content: '☐'; position: absolute; left: 0; font-size: 10pt; }
+
+  /* ===== 2컬럼 ===== */
+  .cols-2 { display: flex; gap: 4mm; }
+  .cols-2 > div { flex: 1; }
+
+  /* ===== 구분선 ===== */
+  hr { border: none; border-top: 1px solid #e2e8f0; margin: 4mm 0; }
+
+  /* ===== 플로트 버튼 (화면용) ===== */
+  .fab { position: fixed; bottom: 20px; right: 20px; display: flex; gap: 10px; z-index: 999; }
+  .fab button { padding: 12px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: transform 0.15s; }
+  .fab button:hover { transform: translateY(-2px); }
+  .btn-print { background: #2563eb; color: #fff; }
+  .btn-back { background: #fff; color: #333; border: 1px solid #ddd !important; }
+
+  /* ===== 푸터 ===== */
+  .footer { text-align: center; font-size: 8pt; color: #999; margin-top: 8mm; padding-top: 3mm; border-top: 1px solid #eee; }
+
+  /* 강조 텍스트 */
+  .hl { color: #2563eb; font-weight: 700; }
+  .hl-red { color: #dc2626; font-weight: 700; }
+  .hl-green { color: #16a34a; font-weight: 700; }
+  .small { font-size: 8.5pt; color: #666; }
+</style>
+</head>
+<body>
+
+<!-- ===== 화면용 액션 버튼 ===== -->
+<div class="fab no-print">
+  <button class="btn-back" onclick="history.back()">← 돌아가기</button>
+  <button class="btn-print" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>
+</div>
+
+<div class="page-container">
+
+<!-- ========================================== -->
+<!--                   표지                      -->
+<!-- ========================================== -->
+<div class="cover">
+  <div class="cover-icon">🏸</div>
+  <h1>배드민턴 대회 운영 매뉴얼</h1>
+  <div class="subtitle">현장 장비 셋팅 & 시스템 운영 가이드</div>
+  <div class="cover-info">
+    <div><strong>시스템</strong> 배드민턴 대회 운영 시스템 v1.0</div>
+    <div><strong>대상</strong> 200명 이하 동호회/클럽 대회</div>
+    <div><strong>기준</strong> 6코트 / 177명 / 214경기 (안양시장배 장년부)</div>
+    <div><strong>작성일</strong> 2026-02-16</div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!--              1. 시스템 개요                   -->
+<!-- ========================================== -->
+<h2>1. 시스템 개요</h2>
+
+<p>웹 기반 배드민턴 대회 운영 시스템입니다. 인터넷 브라우저만 있으면 별도 앱 설치 없이 모든 장비에서 사용할 수 있습니다.</p>
+
+<h3>주요 화면 4가지</h3>
+<table>
+  <tr><th style="width:25%">화면</th><th style="width:30%">URL</th><th style="width:20%">대상</th><th>용도</th></tr>
+  <tr>
+    <td><span class="badge badge-blue">관리</span> 메인 관리</td>
+    <td><code>/</code></td>
+    <td>운영 본부</td>
+    <td>대회 관리 전체 (참가자, 종목, 경기, 결과)</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-green">코트</span> 점수판</td>
+    <td><code>/court?tid=1&court=번호</code></td>
+    <td>코트 태블릿</td>
+    <td>전체화면 터치 점수 입력</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-orange">통계</span> 대시보드</td>
+    <td><code>/dashboard?tid=1</code></td>
+    <td>전광판 / 모니터</td>
+    <td>전체 현황 실시간 표시 (30초 자동갱신)</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-gray">참가자</span> 내 경기</td>
+    <td><code>/my?tid=1</code></td>
+    <td>참가자 스마트폰</td>
+    <td>본인 경기 일정/결과 조회</td>
+  </tr>
+</table>
+
+<h3>전체 운영 흐름</h3>
+<div class="diagram">전날 준비                           당일 진행                              마무리
+─────────                     ──────────                         ────────
+참가자 등록(엑셀)               체크인 처리                          결선 토너먼트
+    ↓                              ↓                                  ↓
+종목 생성                       경기 시작 (본부)                     결선 경기
+    ↓                              ↓                                  ↓
+팀 편성 + 조 배정               코트 점수 입력 (태블릿)             결과 PDF 출력
+    ↓                              ↓                                  ↓
+대진표 생성                     서명 → 자동 다음경기               시상식
+    ↓                              ↓
+장비 충전                       대시보드 실시간 모니터링</div>
+
+<!-- ========================================== -->
+<!--              2. 필요 장비                    -->
+<!-- ========================================== -->
+<div class="page-break"></div>
+<h2>2. 필요 장비 목록</h2>
+
+<table>
+  <tr><th>장비</th><th>수량</th><th>용도</th><th>최소 사양</th><th>비고</th></tr>
+  <tr>
+    <td><strong>코트용 태블릿</strong></td>
+    <td class="hl">코트 수 (6대)</td>
+    <td>점수 입력 전용</td>
+    <td>10인치 이상, Wi-Fi</td>
+    <td>iPad / Galaxy Tab 권장</td>
+  </tr>
+  <tr>
+    <td><strong>본부 노트북</strong></td>
+    <td class="hl">1~2대</td>
+    <td>대회 운영 관리</td>
+    <td>크롬 브라우저</td>
+    <td>메인 관리 화면</td>
+  </tr>
+  <tr>
+    <td><strong>관중 모니터/TV</strong></td>
+    <td>1~2대</td>
+    <td>전체 현황 표시</td>
+    <td>HDMI 입력 또는 Wi-Fi</td>
+    <td>대시보드 표시용</td>
+  </tr>
+  <tr>
+    <td><strong>Wi-Fi 공유기</strong></td>
+    <td class="hl">1~2대</td>
+    <td>전 장비 인터넷</td>
+    <td>5GHz 지원, 동시 20대+</td>
+    <td>체육관 넓으면 2대</td>
+  </tr>
+  <tr>
+    <td><strong>QR코드 인쇄물</strong></td>
+    <td>3~5장 (A3)</td>
+    <td>참가자 경기 조회</td>
+    <td>-</td>
+    <td>접수처, 대기석 부착</td>
+  </tr>
+  <tr>
+    <td><strong>보조배터리/멀티탭</strong></td>
+    <td>여유분</td>
+    <td>태블릿 충전</td>
+    <td>대용량 보조배터리</td>
+    <td>8시간 운영 대비</td>
+  </tr>
+</table>
+
+<h3>규모별 장비 구성</h3>
+<table class="tbl-alt">
+  <tr><th>항목</th><th>최소 (3코트, ~80명)</th><th>권장 (6코트, ~180명)</th><th>대규모 (10코트, 300명+)</th></tr>
+  <tr><td>코트 태블릿</td><td>3대</td><td class="hl">6대</td><td>10대</td></tr>
+  <tr><td>본부 노트북</td><td>1대</td><td class="hl">2대</td><td>2~3대</td></tr>
+  <tr><td>관중 모니터</td><td>0~1대</td><td>1~2대</td><td>2~3대</td></tr>
+  <tr><td>Wi-Fi 공유기</td><td>1대</td><td>1~2대</td><td>2~3대 (메시)</td></tr>
+  <tr><td>운영 인력</td><td>4명</td><td class="hl">8~9명</td><td>12~15명</td></tr>
+  <tr><td>예상 소요시간</td><td>3~4시간</td><td>5~6시간</td><td>7~8시간</td></tr>
+</table>
+
+<!-- ========================================== -->
+<!--              3. 네트워크                     -->
+<!-- ========================================== -->
+<h2>3. 네트워크 구성</h2>
+
+<div class="diagram">                    [인터넷 회선]
+                         │
+               ┌─────────┴─────────┐
+               │  Wi-Fi 공유기      │  ← 5GHz 듀얼밴드 권장
+               │  (코트 중앙 설치)   │
+               └─────────┬─────────┘
+          ┌──────┬───────┼───────┬───────┬──────┐
+        코트1  코트2   코트3   코트4   코트5  코트6
+       태블릿  태블릿  태블릿  태블릿  태블릿  태블릿
+                         │
+                    ┌────┼────┐
+                  본부   관중   참가자
+                 노트북  모니터  스마트폰</div>
+
+<div class="box box-yellow">
+  <div class="box-title">⚠️ 네트워크 주의사항</div>
+  <ul>
+    <li>체육관은 Wi-Fi 사각지대가 많음 → <strong>5GHz 듀얼밴드 공유기</strong> 사용</li>
+    <li>코트 태블릿은 5GHz, 참가자 스마트폰은 2.4GHz로 대역 분리 권장</li>
+    <li>체육관이 넓으면 공유기 <strong>2대</strong> (본부 + 코트 중앙)</li>
+    <li><strong>핫스팟 백업</strong>: 공유기 장애 대비 스마트폰 테더링 준비</li>
+  </ul>
+</div>
+
+<!-- ========================================== -->
+<!--             4. 장비별 셋팅                   -->
+<!-- ========================================== -->
+<div class="page-break"></div>
+<h2>4. 장비별 상세 셋팅</h2>
+
+<h3>4-1. 코트 태블릿 (코트당 1대) <span class="badge badge-green">점수 입력</span></h3>
+
+<div class="box box-blue">
+  <div class="box-title">접속 URL (코트별로 다르게 설정)</div>
+  <div class="code-block">코트1:  /court?tid=1&court=1&locked=1
+코트2:  /court?tid=1&court=2&locked=1
+코트3:  /court?tid=1&court=3&locked=1
+코트4:  /court?tid=1&court=4&locked=1
+코트5:  /court?tid=1&court=5&locked=1
+코트6:  /court?tid=1&court=6&locked=1</div>
+</div>
+
+<table>
+  <tr><th style="width:30%">설정 항목</th><th style="width:20%">값</th><th>이유</th></tr>
+  <tr><td><code>locked=1</code></td><td class="hl-red">필수</td><td>다른 코트로 실수 이동 방지</td></tr>
+  <tr><td><code>autonext=true</code></td><td class="hl-green">권장</td><td>경기 완료 후 다음 경기 자동 로드</td></tr>
+  <tr><td>화면 방향</td><td>가로 모드</td><td>좌/우 점수 입력 UI에 최적</td></tr>
+  <tr><td>자동 잠금(화면 꺼짐)</td><td class="hl-red">끄기</td><td>경기 중 화면 꺼짐 방지</td></tr>
+  <tr><td>화면 밝기</td><td>최대</td><td>체육관 조명 환경</td></tr>
+  <tr><td>브라우저</td><td>전체화면</td><td>상태바/주소창 숨김</td></tr>
+</table>
+
+<div class="cols-2">
+  <div class="box">
+    <div class="box-title">📱 iPad 전체화면 설정</div>
+    <ol>
+      <li>Safari에서 URL 접속</li>
+      <li>공유 버튼 (□↑) 탭</li>
+      <li>"홈 화면에 추가" 선택</li>
+      <li>홈 화면 아이콘으로 실행 → 전체화면</li>
+    </ol>
+  </div>
+  <div class="box">
+    <div class="box-title">📱 안드로이드 전체화면 설정</div>
+    <ol>
+      <li>크롬에서 URL 접속</li>
+      <li>메뉴(⋮) → "홈 화면에 추가"</li>
+      <li>홈 화면 아이콘으로 실행 → 전체화면</li>
+    </ol>
+  </div>
+</div>
+
+<h4>코트 태블릿 배치 위치</h4>
+<div class="diagram">              [네  트]
+     ┌──────────────────────────┐
+     │                          │
+     │      코트 경기장          │
+     │                          │
+     │   (선수)       (선수)     │
+     │                          │
+     └──────────────────────────┘
+               📱 태블릿
+          (심판석 또는 기록석)
+     ← 선수가 점수를 확인할 수 있는 위치 →</div>
+
+<h3>4-2. 본부 노트북 (1~2대) <span class="badge badge-blue">운영 관리</span></h3>
+<div class="box box-blue">
+  <div class="box-title">접속 URL</div>
+  <div class="code-block">메인 관리:  / (사이트 루트)</div>
+</div>
+
+<table>
+  <tr><th>용도</th><th>화면</th><th>담당자</th></tr>
+  <tr><td><strong>운영 총괄 (메인)</strong></td><td>메인 SPA → 대회 상세</td><td>대회 운영 총괄자</td></tr>
+  <tr><td><strong>보조 관리</strong></td><td>경기 탭 + 참가자 탭</td><td>진행 요원</td></tr>
+</table>
+
+<p><strong>본부에서 수행하는 작업:</strong></p>
+<ul>
+  <li>경기 <strong>"시작"</strong> 버튼 클릭 (코트에 경기 배정)</li>
+  <li>점수 수정 (오입력 정정)</li>
+  <li>결선 토너먼트 생성</li>
+  <li>참가자 추가 등록 / 체크인 처리</li>
+  <li>긴급 대응 (경기 취소, 순서 변경 등)</li>
+</ul>
+
+<h3>4-3. 관중 모니터 (1~2대) <span class="badge badge-orange">현황 표시</span></h3>
+
+<div class="box box-blue">
+  <div class="box-title">접속 URL</div>
+  <div class="code-block">통계 대시보드:  /dashboard?tid=1    (30초 자동 갱신, 터치 불필요)
+참가자 안내:   /my?tid=1           (입구/대기석용)</div>
+</div>
+
+<table>
+  <tr><th>모니터</th><th>표시 화면</th><th>설치 위치</th></tr>
+  <tr><td><strong>메인 전광판</strong></td><td><code>/dashboard?tid=1</code></td><td>본부석 뒤 또는 관중석 정면</td></tr>
+  <tr><td><strong>참가자 안내</strong></td><td><code>/my?tid=1</code></td><td>입구 또는 대기석</td></tr>
+</table>
+
+<p><strong>연결 방법:</strong> 노트북 + HDMI 케이블 → TV 미러링 / Chromecast 무선 미러링 / 크롬 <code>F11</code> 전체화면</p>
+
+<h3>4-4. 참가자 스마트폰 <span class="badge badge-gray">경기 조회</span></h3>
+
+<div class="box box-green">
+  <div class="box-title">QR 코드 배포 방법 (택 1 이상)</div>
+  <ul>
+    <li>📌 대회 접수처에 <strong>QR 포스터 A3 인쇄</strong> 부착</li>
+    <li>📌 명찰/배번에 QR 스티커 부착</li>
+    <li>📌 카카오톡 단톡방에 URL 공유</li>
+    <li>📌 코트 점수판에서 QR 버튼 → 코트별 QR 자동 생성</li>
+  </ul>
+</div>
+
+<p>참가자는: QR 스캔 → 이름 입력 → <strong>본인 경기 일정/결과 확인</strong></p>
+
+<!-- ========================================== -->
+<!--             5. 인력 배치                     -->
+<!-- ========================================== -->
+<div class="page-break"></div>
+<h2>5. 운영 인력 배치</h2>
+
+<table class="tbl-alt">
+  <tr><th>역할</th><th>인원</th><th>담당 업무</th><th>사용 장비</th></tr>
+  <tr>
+    <td><strong>🎯 대회 총괄</strong></td>
+    <td>1명</td>
+    <td>전체 진행 관리, 결선 생성, 긴급 대응</td>
+    <td>본부 노트북 (메인)</td>
+  </tr>
+  <tr>
+    <td><strong>📋 기록 보조</strong></td>
+    <td>1명</td>
+    <td>경기 시작 클릭, 점수 수정, 참가자 관리</td>
+    <td>본부 노트북 (보조)</td>
+  </tr>
+  <tr>
+    <td><strong>🏸 코트 기록원</strong></td>
+    <td>코트당 1명 (6명)</td>
+    <td>태블릿 점수 입력, 서명 확인</td>
+    <td>코트 태블릿</td>
+  </tr>
+  <tr>
+    <td><strong>🎤 접수/안내</strong></td>
+    <td>1~2명</td>
+    <td>체크인, QR 안내, 경기 호출 방송</td>
+    <td>스마트폰/태블릿</td>
+  </tr>
+</table>
+
+<div class="box box-yellow">
+  <div class="box-title">💡 인력 절감 팁</div>
+  <ul>
+    <li><strong>최소 인원:</strong> 총괄 1명 + 코트 기록 6명 = <strong class="hl">7명</strong></li>
+    <li>코트 기록 인력 부족 시 → <strong>선수 자체 기록</strong> 방식 가능 (서명으로 검증)</li>
+    <li><code>autonext=true</code> 설정하면 코트가 자율 순환 → 본부 개입 최소화</li>
+  </ul>
+</div>
+
+<!-- ========================================== -->
+<!--             6. 당일 타임라인                  -->
+<!-- ========================================== -->
+<h2>6. 대회 당일 타임라인</h2>
+
+<h3>🌙 D-1 (전날 준비)</h3>
+<table>
+  <tr><th style="width:15%">시점</th><th style="width:35%">작업</th><th>상세 내용</th></tr>
+  <tr><td>전날</td><td>대회 생성 & 참가자 등록</td><td>엑셀 일괄 등록, 참가비 확인, 소속 클럽 확인</td></tr>
+  <tr><td>전날</td><td>종목 생성 & 조편성</td><td>팀 편성 방식 선택 → 조 배정 → 미리보기 확인</td></tr>
+  <tr><td>전날</td><td>대진표 생성</td><td>전체 종목 대진표 생성 & 경기 수 확인</td></tr>
+  <tr><td>전날</td><td>장비 충전</td><td>태블릿 완충, 보조배터리 준비, HDMI 케이블 확인</td></tr>
+</table>
+
+<h3>🌅 당일 아침 (대회 2시간 전)</h3>
+<table class="tbl-blue">
+  <tr><th style="width:15%">시점</th><th style="width:35%">작업</th><th>확인사항</th></tr>
+  <tr><td>-2시간</td><td class="hl">Wi-Fi 공유기 설치 & 테스트</td><td>코트 끝에서 속도 측정 (5Mbps 이상)</td></tr>
+  <tr><td>-2시간</td><td class="hl">코트 태블릿 셋팅</td><td>각 코트 URL 접속, 전체화면, 잠금 해제 끔</td></tr>
+  <tr><td>-1.5시간</td><td>관중 모니터 연결</td><td>대시보드 화면 표시 확인</td></tr>
+  <tr><td>-1.5시간</td><td>본부 노트북 셋팅</td><td>관리 페이지 접속, 경기 목록 확인</td></tr>
+  <tr><td>-1시간</td><td>QR 코드 포스터 부착</td><td>접수처, 대기석, 화장실 입구</td></tr>
+  <tr><td>-1시간</td><td class="hl-red">★ 전체 통신 테스트</td><td>각 태블릿 테스트 점수 입력 → 대시보드 반영 확인</td></tr>
+</table>
+
+<h3>🏸 대회 진행</h3>
+<table class="tbl-alt">
+  <tr><th style="width:15%">시점</th><th style="width:35%">작업</th><th>상세</th></tr>
+  <tr><td>시작</td><td>체크인 처리</td><td>참가자 도착 시 체크인 토글</td></tr>
+  <tr><td>시작</td><td class="hl">1라운드 경기 시작</td><td>본부에서 6개 코트 경기 일괄 "시작" 클릭</td></tr>
+  <tr><td>진행중</td><td>코트 점수 입력</td><td>각 코트 태블릿에서 좌/우 터치 입력</td></tr>
+  <tr><td>진행중</td><td>경기 완료 → 서명 → 다음 경기</td><td>autonext로 자동 순환</td></tr>
+  <tr><td>진행중</td><td>본부 모니터링</td><td>대시보드로 진행률/지연 코트 확인</td></tr>
+  <tr><td>예선 종료</td><td class="hl-red">결선 토너먼트 생성</td><td>경기탭 → "결선 토너먼트 생성" 클릭</td></tr>
+  <tr><td>결선</td><td>결선 경기 운영</td><td>21점 선취제, 동일 흐름</td></tr>
+  <tr><td>종료</td><td>결과 PDF 출력</td><td>결과탭 → PDF 다운로드 → 인쇄/배포</td></tr>
+</table>
+
+<!-- ========================================== -->
+<!--             7. 코트 점수판 사용법             -->
+<!-- ========================================== -->
+<div class="page-break"></div>
+<h2>7. 코트 점수판 사용법</h2>
+
+<h3>점수 입력 흐름</h3>
+<div class="diagram">① 대기 화면              ② 사이드 선택           ③ 점수 입력
+┌─────────────┐      ┌──────────────┐     ┌──────────────┐
+│  다음 경기    │  →   │ 좌측: A팀     │  →  │ 12    :   8  │
+│  대기중...    │      │ 우측: B팀     │     │ [좌터치] [우터치]│
+└─────────────┘      └──────────────┘     └──────────────┘
+                                                  │
+         ⑥ 대기 → 다음경기    ⑤ 서명 캡처          ④ 교체 알림 (13점)
+         ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+         │  5초 후        │ ← │ 승팀 서명     │ ← │ 🔄 코트 교체!│
+         │  다음 경기 로드  │   │ 패팀 서명     │   │ (사이드 스왑) │
+         └──────────────┘   └──────────────┘   └──────────────┘</div>
+
+<h3>점수 규칙</h3>
+<table>
+  <tr><th>구분</th><th>목표 점수</th><th>교체 포인트</th><th>경기 방식</th></tr>
+  <tr><td><strong>예선 (조별리그)</strong></td><td class="hl">25점</td><td>13점 도달 시</td><td>1세트 단판</td></tr>
+  <tr><td><strong>결선 (토너먼트)</strong></td><td class="hl">21점</td><td>11점 도달 시</td><td>1세트 단판</td></tr>
+</table>
+
+<h3>주요 버튼</h3>
+<table>
+  <tr><th>버튼</th><th>기능</th><th>사용 시점</th></tr>
+  <tr><td><strong>좌/우 화면 터치</strong></td><td>해당 팀 +1점</td><td>경기 중 점수 입력</td></tr>
+  <tr><td><strong>↩ 되돌리기 (Undo)</strong></td><td>마지막 점수 취소</td><td>오입력 시</td></tr>
+  <tr><td><strong>🔄 교체</strong></td><td>코트 사이드 교체</td><td>자동 감지 (수동도 가능)</td></tr>
+  <tr><td><strong>QR 코드</strong></td><td>현재 코트 관람용 URL 생성</td><td>관중 안내 시</td></tr>
+  <tr><td><strong>나가기</strong></td><td>코트 선택 화면으로</td><td>코트 변경 시 (locked=0일 때)</td></tr>
+</table>
+
+<!-- ========================================== -->
+<!--             8. 트러블슈팅                    -->
+<!-- ========================================== -->
+<h2>8. 현장 트러블슈팅</h2>
+
+<table class="tbl-warn">
+  <tr><th style="width:22%">문제 상황</th><th style="width:22%">원인</th><th>해결 방법</th></tr>
+  <tr>
+    <td>태블릿 화면 먹통</td>
+    <td>브라우저 캐시/메모리</td>
+    <td>브라우저 새로고침 (당겨서 새로고침 또는 새로고침 버튼)</td>
+  </tr>
+  <tr>
+    <td>점수가 반영 안 됨</td>
+    <td>Wi-Fi 끊김</td>
+    <td>오프라인 경고 확인 → Wi-Fi 재연결 → 새로고침</td>
+  </tr>
+  <tr>
+    <td>잘못된 점수 입력</td>
+    <td>오입력</td>
+    <td>코트 점수판 <strong>Undo(되돌리기)</strong> 또는 본부에서 점수 수정</td>
+  </tr>
+  <tr>
+    <td>경기 순서 변경 필요</td>
+    <td>선수 부재 등</td>
+    <td>본부에서 해당 경기 → pending으로 되돌리고 다른 경기 시작</td>
+  </tr>
+  <tr>
+    <td>태블릿 배터리 방전</td>
+    <td>장시간 사용</td>
+    <td>보조배터리 연결 또는 예비 태블릿에 같은 URL 접속</td>
+  </tr>
+  <tr>
+    <td class="hl-red">인터넷 전체 끊김</td>
+    <td>공유기 장애</td>
+    <td><strong>스마트폰 핫스팟</strong>으로 임시 전환 (모든 장비 재연결)</td>
+  </tr>
+  <tr>
+    <td>서명 화면 안 나옴</td>
+    <td>경기 미완료 상태</td>
+    <td>점수 목표점 도달 확인 → 경기 종료 흐름 재진행</td>
+  </tr>
+  <tr>
+    <td>대시보드 갱신 안 됨</td>
+    <td>브라우저 탭 비활성</td>
+    <td>탭 클릭하여 활성화 또는 새로고침</td>
+  </tr>
+</table>
+
+<!-- ========================================== -->
+<!--             9. 효율적 운영 팁                -->
+<!-- ========================================== -->
+<h2>9. 효율적 운영 팁</h2>
+
+<div class="cols-2">
+  <div>
+    <div class="box box-green">
+      <div class="box-title">✅ 코트 자율 운영</div>
+      <p><code>locked=1&autonext=true</code> 설정하면 코트 기록원만 있으면 본부 개입 없이 경기가 자동 순환됩니다.</p>
+    </div>
+    <div class="box box-green">
+      <div class="box-title">✅ 경기 호출 타이밍</div>
+      <p>대시보드의 코트 현황에서 빈 코트가 보이면 즉시 다음 경기 팀을 방송 호출합니다.</p>
+    </div>
+    <div class="box box-green">
+      <div class="box-title">✅ 결선 타이밍</div>
+      <p>모든 종목 예선 80%+ 완료 시점부터 완료된 종목부터 순차 결선 생성이 가능합니다.</p>
+    </div>
+  </div>
+  <div>
+    <div class="box box-green">
+      <div class="box-title">✅ 관중 실시간 관람</div>
+      <p>코트 태블릿의 QR 버튼으로 관중이 스마트폰에서 해당 코트 실시간 점수를 볼 수 있습니다 (<code>mode=view</code>).</p>
+    </div>
+    <div class="box box-green">
+      <div class="box-title">✅ 중간 점검</div>
+      <p>50% 진행률 시점에서 종목별 진행 상황을 확인하고 지연 종목을 우선 배정합니다.</p>
+    </div>
+    <div class="box box-green">
+      <div class="box-title">✅ 분쟁 대비</div>
+      <p>모든 경기는 승/패팀 서명으로 확인됩니다. 중요 경기는 서명 화면 캡처를 권장합니다.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!--            10. 셋팅 체크리스트               -->
+<!-- ========================================== -->
+<div class="page-break"></div>
+<h2>10. 셋팅 체크리스트 (인쇄용)</h2>
+<p class="small">대회 당일 아침에 이 체크리스트를 출력하여 하나씩 확인하세요.</p>
+
+<h3>📡 네트워크</h3>
+<ul class="checklist">
+  <li>Wi-Fi 공유기 설치 완료 (5GHz)</li>
+  <li>코트 끝에서 인터넷 속도 테스트 (5Mbps 이상)</li>
+  <li>핫스팟 백업용 스마트폰 준비</li>
+</ul>
+
+<h3>📱 코트 태블릿 (코트별 반복)</h3>
+<ul class="checklist">
+  <li>코트 1 태블릿: URL 접속 확인, 전체화면, 자동잠금 끔, 밝기 최대</li>
+  <li>코트 2 태블릿: URL 접속 확인, 전체화면, 자동잠금 끔, 밝기 최대</li>
+  <li>코트 3 태블릿: URL 접속 확인, 전체화면, 자동잠금 끔, 밝기 최대</li>
+  <li>코트 4 태블릿: URL 접속 확인, 전체화면, 자동잠금 끔, 밝기 최대</li>
+  <li>코트 5 태블릿: URL 접속 확인, 전체화면, 자동잠금 끔, 밝기 최대</li>
+  <li>코트 6 태블릿: URL 접속 확인, 전체화면, 자동잠금 끔, 밝기 최대</li>
+  <li>보조배터리/충전기 연결 확인</li>
+</ul>
+
+<h3>💻 본부 노트북</h3>
+<ul class="checklist">
+  <li>메인 관리 페이지 접속 확인 ( / )</li>
+  <li>대회 데이터 확인 (참가자 수, 종목 수, 경기 수)</li>
+  <li>관리자 비밀번호 확인</li>
+</ul>
+
+<h3>📺 관중 모니터</h3>
+<ul class="checklist">
+  <li>HDMI/무선 연결 확인</li>
+  <li>대시보드 페이지 표시 확인 ( /dashboard?tid=1 )</li>
+  <li>전체화면 모드 (F11)</li>
+</ul>
+
+<h3>📋 기타</h3>
+<ul class="checklist">
+  <li>QR 코드 포스터 부착 (접수처, 대기석)</li>
+  <li>카카오톡 단톡방에 참가자 조회 URL 공유</li>
+  <li>테스트 점수 입력 → 대시보드 반영 확인 → 테스트 데이터 원복</li>
+  <li>운영 인력 역할 확인 및 브리핑 완료</li>
+  <li>마이크/방송 장비 확인 (경기 호출용)</li>
+</ul>
+
+<hr>
+
+<h3>📝 메모란</h3>
+<div style="border: 1px solid #ccc; border-radius: 4px; height: 40mm; padding: 3mm; margin-top: 2mm;">
+  <p class="small">Wi-Fi 비밀번호: ___________________________&nbsp;&nbsp;&nbsp;&nbsp;사이트 주소: ___________________________</p>
+  <p class="small">관리자 비밀번호: ___________________________&nbsp;&nbsp;&nbsp;&nbsp;긴급 연락처: ___________________________</p>
+</div>
+
+<div class="footer">
+  🏸 배드민턴 대회 운영 매뉴얼 | Badminton Tournament Management System v1.0 | 2026-02-16
+</div>
+
+</div><!-- /page-container -->
+</body>
+</html>
