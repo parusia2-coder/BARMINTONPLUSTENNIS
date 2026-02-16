@@ -1,6 +1,6 @@
 // ==========================================
 // 코트 전용 점수판 - Court Scoreboard
-// 좌우 레이아웃 + 터치 점수 입력 + 전후반 교체
+// 좌우 레이아웃 + 터치 점수 입력 + 자동 코트 교체
 // 1세트 단판 경기 전용
 // ==========================================
 const API = '/api';
@@ -12,18 +12,23 @@ const courtState = {
   nextMatches: [],
   recentMatches: [],
   tournament: null,
-  page: 'select', // select | court
+  page: 'select', // select | side-select | court
   courts: [],
   stats: null,
   autoRefreshTimer: null,
   score: { left: 0, right: 0 },
-  // left/right → 실제 team 매핑 (교체 가능)
-  leftTeam: 1,   // 1=team1, 2=team2
+  leftTeam: 1,
   rightTeam: 2,
-  swapped: false, // 전후반 교체 여부
+  swapped: false,
+  swapDone: false, // 이번 경기에서 중간 교체 완료 여부
   targetScore: 25,
   format: 'kdk'
 };
+
+// 중간 교체 점수 계산
+function getSwapScore() {
+  return courtState.targetScore === 21 ? 11 : 13;
+}
 
 // 실제 팀 점수 ↔ left/right 매핑
 function getTeam1Score() { return courtState.leftTeam === 1 ? courtState.score.left : courtState.score.right; }
@@ -76,6 +81,7 @@ function renderCourt() {
   const app = document.getElementById('app');
   switch (courtState.page) {
     case 'select': app.innerHTML = renderCourtSelect(); break;
+    case 'side-select': app.innerHTML = renderSideSelect(); break;
     case 'court': app.innerHTML = renderCourtScoreboard(); bindScoreboardEvents(); break;
     default: app.innerHTML = renderCourtSelect();
   }
@@ -134,6 +140,110 @@ function renderCourtPicker() {
 }
 
 // ==========================================
+// 사이드 선택 화면 (경기 시작 전)
+// ==========================================
+function renderSideSelect() {
+  const m = courtState.currentMatch;
+  if (!m) { courtState.page = 'court'; renderCourt(); return ''; }
+
+  const team1Name = m.team1_name || '팀1';
+  const team2Name = m.team2_name || '팀2';
+  const target = courtState.targetScore;
+  const swapPt = getSwapScore();
+
+  return `<div class="h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col select-none" style="touch-action:manipulation;overflow:hidden;">
+    <!-- 상단 바 -->
+    <div class="flex items-center justify-between px-4 py-3 bg-black/30 border-b border-white/10 shrink-0">
+      <div class="flex items-center gap-2">
+        <span class="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">${courtState.courtNumber}코트</span>
+        <span class="text-xs text-gray-400">#${m.match_order} ${m.event_name || ''}</span>
+      </div>
+      <button onclick="exitCourt()" class="text-gray-500 hover:text-white text-sm"><i class="fas fa-times mr-1"></i>나가기</button>
+    </div>
+
+    <!-- 메인 -->
+    <div class="flex-1 flex flex-col items-center justify-center px-6">
+      <div class="text-center mb-6">
+        <div class="w-20 h-20 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto mb-4">
+          <i class="fas fa-arrows-alt-h text-4xl text-blue-400"></i>
+        </div>
+        <h2 class="text-2xl sm:text-3xl font-extrabold mb-2">코트 사이드 선택</h2>
+        <p class="text-gray-400 text-sm sm:text-base">각 팀이 시작할 코트 위치를 선택하세요</p>
+        <div class="mt-3 flex flex-wrap justify-center gap-2">
+          <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold ${target === 21 ? 'bg-red-500/20 text-red-300' : 'bg-yellow-500/20 text-yellow-300'}">
+            <i class="fas fa-bullseye"></i>${target}점 선취 · ${courtState.format === 'tournament' ? '본선' : '예선'}
+          </span>
+          <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300">
+            <i class="fas fa-exchange-alt"></i>${swapPt}점 도달 시 코트 교체
+          </span>
+        </div>
+      </div>
+
+      <!-- 미리보기: 현재 배치 -->
+      <div class="w-full max-w-lg mb-6">
+        <div class="bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
+          <!-- 코트 시각화 -->
+          <div class="flex">
+            <!-- 왼쪽 -->
+            <div class="flex-1 p-5 sm:p-8 text-center border-r border-white/10 bg-blue-500/5">
+              <p class="text-xs text-gray-500 mb-2 uppercase tracking-wider">왼쪽 코트</p>
+              <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-blue-500/20 border-2 border-blue-500/40 flex items-center justify-center mx-auto mb-2">
+                <i class="fas fa-user-friends text-xl sm:text-2xl text-blue-400"></i>
+              </div>
+              <p class="text-lg sm:text-xl font-bold text-blue-400" id="side-left-name">${courtState.leftTeam === 1 ? team1Name : team2Name}</p>
+            </div>
+            <!-- 네트 -->
+            <div class="flex items-center">
+              <div class="w-1 bg-white/20 h-full"></div>
+            </div>
+            <!-- 오른쪽 -->
+            <div class="flex-1 p-5 sm:p-8 text-center bg-orange-500/5">
+              <p class="text-xs text-gray-500 mb-2 uppercase tracking-wider">오른쪽 코트</p>
+              <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-orange-500/20 border-2 border-orange-500/40 flex items-center justify-center mx-auto mb-2">
+                <i class="fas fa-user-friends text-xl sm:text-2xl text-orange-400"></i>
+              </div>
+              <p class="text-lg sm:text-xl font-bold text-orange-400" id="side-right-name">${courtState.rightTeam === 1 ? team1Name : team2Name}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 교체 버튼 -->
+      <button onclick="toggleSidePreview()" 
+        class="mb-6 px-6 py-3 bg-white/10 hover:bg-white/20 rounded-2xl text-base font-bold border border-white/10 active:scale-95 transition flex items-center gap-3">
+        <i class="fas fa-exchange-alt text-yellow-400"></i>
+        <span>좌우 바꾸기</span>
+      </button>
+
+      <!-- 확인 / 시작 -->
+      <button onclick="confirmSideAndStart()" 
+        class="w-full max-w-lg py-4 bg-gradient-to-r from-green-600 to-green-500 rounded-2xl text-xl font-bold shadow-xl hover:shadow-green-500/30 active:scale-95 transition">
+        <i class="fas fa-play mr-2"></i>이 배치로 경기 시작
+      </button>
+    </div>
+  </div>`;
+}
+
+// 사이드 선택 화면에서 좌우 바꾸기
+function toggleSidePreview() {
+  const tmp = courtState.leftTeam;
+  courtState.leftTeam = courtState.rightTeam;
+  courtState.rightTeam = tmp;
+  renderCourt();
+}
+
+// 사이드 확인 후 점수판으로
+function confirmSideAndStart() {
+  courtState.swapped = false;
+  courtState.swapDone = false;
+  courtState.score = { left: 0, right: 0 };
+  actionHistory = [];
+  courtState.page = 'court';
+  renderCourt();
+  showCourtToast('경기 시작! 화면을 터치하여 점수를 올리세요', 'success');
+}
+
+// ==========================================
 // 메인 점수판 - 좌우 레이아웃 + 터치 영역
 // ==========================================
 function renderCourtScoreboard() {
@@ -143,12 +253,15 @@ function renderCourtScoreboard() {
   const sL = courtState.score.left;
   const sR = courtState.score.right;
   const target = courtState.targetScore;
+  const swapPt = getSwapScore();
   const maxScore = Math.max(sL, sR);
-  const isNearEnd = maxScore >= target - 3 && maxScore < target;
-  const isGamePoint = maxScore === target - 1;
 
   const leftName = getLeftName();
   const rightName = getRightName();
+
+  // 교체 진행 표시
+  const halfLabel = courtState.swapDone ? '후반' : '전반';
+  const swapInfo = courtState.swapDone ? '교체완료' : `${swapPt}점 교체`;
 
   return `<div class="h-screen bg-gray-900 text-white flex flex-col select-none" style="touch-action:manipulation;overflow:hidden;">
     <!-- 상단 정보 바 -->
@@ -161,6 +274,9 @@ function renderCourtScoreboard() {
       <div class="flex items-center gap-1.5">
         <span class="px-2 py-0.5 rounded-full text-xs font-bold ${target === 21 ? 'bg-red-500/30 text-red-300' : 'bg-yellow-500/30 text-yellow-300'}">
           ${target}점 ${courtState.format === 'tournament' ? '본선' : '예선'}
+        </span>
+        <span class="px-2 py-0.5 rounded-full text-xs font-bold ${courtState.swapDone ? 'bg-green-500/30 text-green-300' : 'bg-purple-500/30 text-purple-300'}">
+          <i class="fas fa-exchange-alt mr-0.5"></i>${swapInfo}
         </span>
         <span class="text-xs px-2 py-0.5 rounded-full font-bold ${getProgressClass()}">${getProgressLabel()}</span>
         <button onclick="exitCourt()" class="text-gray-500 hover:text-white text-sm px-1.5 ml-1"><i class="fas fa-times"></i></button>
@@ -176,24 +292,19 @@ function renderCourtScoreboard() {
         ${sL >= target ? 'winner-glow-left' : ''}"
         style="border-right: 3px solid rgba(255,255,255,0.1);">
         
-        <!-- 팀 이름 -->
         <div class="absolute top-3 left-0 right-0 text-center">
           <p class="text-lg sm:text-xl font-bold text-blue-400 truncate px-4">${leftName}</p>
-          ${courtState.swapped ? '<span class="text-xs text-yellow-400/70"><i class="fas fa-exchange-alt mr-1"></i>교체됨</span>' : ''}
         </div>
 
-        <!-- 점수 -->
         <div class="text-center" id="left-score-display">
           <div class="score-num font-black tabular-nums leading-none text-white ${sL >= target ? 'text-yellow-400' : ''}" 
                id="score-left">${sL}</div>
         </div>
 
-        <!-- 터치 안내 (작은 텍스트) -->
         <div class="absolute bottom-14 left-0 right-0 text-center">
-          <span class="text-xs text-white/20"><i class="fas fa-hand-pointer mr-1"></i>터치하여 +1</span>
+          <span class="text-xs text-white/20"><i class="fas fa-hand-pointer mr-1"></i>터치 +1</span>
         </div>
 
-        <!-- -1 버튼 (하단) -->
         <button onclick="event.stopPropagation();changeScore('left',-1)" 
           class="absolute bottom-2 left-1/2 -translate-x-1/2 w-14 h-10 rounded-xl bg-red-600/60 hover:bg-red-500 text-xl font-bold shadow-lg active:scale-90 transition z-10">
           −1
@@ -202,14 +313,13 @@ function renderCourtScoreboard() {
 
       <!-- 중앙 컨트롤 -->
       <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-2">
-        <!-- 교체 버튼 -->
-        <button onclick="swapSides()" id="swap-btn"
+        <button onclick="manualSwapSides()" id="swap-btn"
           class="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 border-2 border-white/20 
                  flex items-center justify-center text-white shadow-xl active:scale-90 transition backdrop-blur-sm"
-          title="좌우 교체 (전후반)">
+          title="수동 좌우 교체">
           <i class="fas fa-exchange-alt text-xl"></i>
         </button>
-        <span class="text-xs text-white/40 font-bold">${courtState.swapped ? '후반' : '전반'}</span>
+        <span class="text-xs text-white/40 font-bold">${halfLabel}</span>
       </div>
 
       <!-- 오른쪽 팀 (터치 영역) -->
@@ -217,24 +327,19 @@ function renderCourtScoreboard() {
         ${sR > sL ? 'bg-gradient-to-l from-orange-900/30 to-transparent' : ''}
         ${sR >= target ? 'winner-glow-right' : ''}">
 
-        <!-- 팀 이름 -->
         <div class="absolute top-3 left-0 right-0 text-center">
           <p class="text-lg sm:text-xl font-bold text-orange-400 truncate px-4">${rightName}</p>
-          ${courtState.swapped ? '<span class="text-xs text-yellow-400/70"><i class="fas fa-exchange-alt mr-1"></i>교체됨</span>' : ''}
         </div>
 
-        <!-- 점수 -->
         <div class="text-center" id="right-score-display">
           <div class="score-num font-black tabular-nums leading-none text-white ${sR >= target ? 'text-yellow-400' : ''}" 
                id="score-right">${sR}</div>
         </div>
 
-        <!-- 터치 안내 -->
         <div class="absolute bottom-14 left-0 right-0 text-center">
-          <span class="text-xs text-white/20"><i class="fas fa-hand-pointer mr-1"></i>터치하여 +1</span>
+          <span class="text-xs text-white/20"><i class="fas fa-hand-pointer mr-1"></i>터치 +1</span>
         </div>
 
-        <!-- -1 버튼 -->
         <button onclick="event.stopPropagation();changeScore('right',-1)" 
           class="absolute bottom-2 left-1/2 -translate-x-1/2 w-14 h-10 rounded-xl bg-red-600/60 hover:bg-red-500 text-xl font-bold shadow-lg active:scale-90 transition z-10">
           −1
@@ -246,7 +351,7 @@ function renderCourtScoreboard() {
     <div class="bg-black/50 border-t border-white/10 px-3 py-2 shrink-0" style="min-height:52px;">
       <div class="flex gap-2">
         <button onclick="undoLastAction()" class="flex-1 py-2.5 bg-white/10 rounded-xl text-xs sm:text-sm font-medium hover:bg-white/20 active:scale-95 transition">
-          <i class="fas fa-undo mr-1"></i>실행취소
+          <i class="fas fa-undo mr-1"></i>취소
         </button>
         <button onclick="saveCurrentScore()" class="flex-1 py-2.5 bg-blue-600 rounded-xl text-xs sm:text-sm font-bold hover:bg-blue-500 shadow-lg active:scale-95 transition">
           <i class="fas fa-save mr-1"></i>저장
@@ -260,11 +365,80 @@ function renderCourtScoreboard() {
     <!-- 경기종료 모달 -->
     ${renderFinishModal()}
 
-    <!-- 터치 피드백 오버레이 -->
+    <!-- 코트 교체 모달 -->
+    ${renderSwapModal()}
+
+    <!-- 터치 피드백 -->
     <div id="touch-feedback" class="fixed pointer-events-none z-[100]" style="display:none;">
       <div class="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-3xl font-black text-white animate-ping">+1</div>
     </div>
   </div>`;
+}
+
+// ==========================================
+// 코트 교체 모달 (중간 교체)
+// ==========================================
+function renderSwapModal() {
+  const swapPt = getSwapScore();
+  const leftName = getLeftName();
+  const rightName = getRightName();
+  return `<div id="swap-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md">
+    <div class="bg-gray-800 rounded-3xl shadow-2xl w-full max-w-md mx-4 p-6 border-2 border-purple-500/50 swap-modal-pulse">
+      <div class="text-center mb-5">
+        <div class="w-24 h-24 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
+          <i class="fas fa-exchange-alt text-5xl text-purple-400 animate-pulse"></i>
+        </div>
+        <h3 class="text-3xl font-extrabold text-purple-300">코트 교체!</h3>
+        <p class="text-gray-400 mt-2 text-base">${swapPt}점 도달 — 후반전을 위해 코트를 교체합니다</p>
+      </div>
+      <div class="bg-white/5 rounded-2xl p-5 mb-5">
+        <div class="flex items-center justify-center gap-5">
+          <div class="text-center flex-1">
+            <p class="text-sm text-blue-400 font-bold mb-1">${leftName}</p>
+            <p class="text-3xl font-black">${courtState.score.left}</p>
+            <p class="text-xs text-gray-500 mt-1">→ 오른쪽으로</p>
+          </div>
+          <div class="flex flex-col items-center">
+            <i class="fas fa-arrows-alt-h text-3xl text-purple-400 animate-pulse"></i>
+          </div>
+          <div class="text-center flex-1">
+            <p class="text-sm text-orange-400 font-bold mb-1">${rightName}</p>
+            <p class="text-3xl font-black">${courtState.score.right}</p>
+            <p class="text-xs text-gray-500 mt-1">← 왼쪽으로</p>
+          </div>
+        </div>
+      </div>
+      <button onclick="executeAutoSwap()" 
+        class="w-full py-5 bg-gradient-to-r from-purple-600 to-purple-500 rounded-2xl text-xl font-bold shadow-xl active:scale-95 transition hover:from-purple-500 hover:to-purple-400">
+        <i class="fas fa-exchange-alt mr-2"></i>코트 교체 확인
+      </button>
+    </div>
+  </div>`;
+}
+
+function showSwapModal() {
+  const modal = document.getElementById('swap-modal');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function executeAutoSwap() {
+  const modal = document.getElementById('swap-modal');
+  if (modal) modal.classList.add('hidden');
+  
+  // 점수도 같이 교체
+  const tmpScore = courtState.score.left;
+  courtState.score.left = courtState.score.right;
+  courtState.score.right = tmpScore;
+
+  const tmpTeam = courtState.leftTeam;
+  courtState.leftTeam = courtState.rightTeam;
+  courtState.rightTeam = tmpTeam;
+
+  courtState.swapped = !courtState.swapped;
+  courtState.swapDone = true;
+
+  renderCourt();
+  showCourtToast('🔄 코트 교체 완료!', 'success');
 }
 
 function renderFinishModal() {
@@ -320,6 +494,7 @@ function renderFinishModal() {
 function renderWaitingScreen() {
   const next = courtState.nextMatches;
   const recent = courtState.recentMatches;
+  const swapPt = getSwapScore();
   return `<div class="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col select-none">
     <div class="flex items-center justify-between px-4 py-3 bg-black/30 border-b border-white/10">
       <div class="flex items-center gap-2">
@@ -338,9 +513,13 @@ function renderWaitingScreen() {
         </div>
         <h2 class="text-3xl font-extrabold mb-2">경기 대기중</h2>
         <p class="text-gray-400">다음 경기를 시작해주세요</p>
-        <div class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl ${courtState.targetScore === 21 ? 'bg-red-500/20 text-red-300' : 'bg-yellow-500/20 text-yellow-300'}">
-          <i class="fas fa-info-circle"></i>
-          <span class="text-sm font-bold">${courtState.targetScore}점 선취제 · 1세트 단판 ${courtState.format === 'tournament' ? '(본선)' : '(예선)'}</span>
+        <div class="mt-3 flex flex-wrap justify-center gap-2">
+          <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold ${courtState.targetScore === 21 ? 'bg-red-500/20 text-red-300' : 'bg-yellow-500/20 text-yellow-300'}">
+            <i class="fas fa-bullseye"></i>${courtState.targetScore}점 선취제 · 1세트 단판
+          </span>
+          <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300">
+            <i class="fas fa-exchange-alt"></i>${swapPt}점 코트 교체
+          </span>
         </div>
       </div>
       ${next.length > 0 ? `
@@ -398,13 +577,11 @@ function bindScoreboardEvents() {
 
   if (leftZone) {
     leftZone.addEventListener('click', (e) => {
-      // -1 버튼은 stopPropagation으로 처리됨
       if (e.target.closest('button')) return;
       showTouchFeedback(e, 'left');
       changeScore('left', 1);
     });
   }
-
   if (rightZone) {
     rightZone.addEventListener('click', (e) => {
       if (e.target.closest('button')) return;
@@ -417,22 +594,15 @@ function bindScoreboardEvents() {
 function showTouchFeedback(e, side) {
   const fb = document.getElementById('touch-feedback');
   if (!fb) return;
-  
   const rect = e.currentTarget.getBoundingClientRect();
-  const x = e.clientX || (e.touches && e.touches[0].clientX) || rect.left + rect.width / 2;
-  const y = e.clientY || (e.touches && e.touches[0].clientY) || rect.top + rect.height / 2;
-  
+  const x = e.clientX || rect.left + rect.width / 2;
+  const y = e.clientY || rect.top + rect.height / 2;
   fb.style.left = (x - 40) + 'px';
   fb.style.top = (y - 40) + 'px';
   fb.style.display = 'block';
   
-  // 터치한 영역에 플래시 효과
   const zone = document.getElementById(side + '-zone');
-  if (zone) {
-    zone.classList.add('touch-flash');
-    setTimeout(() => zone.classList.remove('touch-flash'), 200);
-  }
-
+  if (zone) { zone.classList.add('touch-flash'); setTimeout(() => zone.classList.remove('touch-flash'), 200); }
   setTimeout(() => { fb.style.display = 'none'; }, 400);
 }
 
@@ -447,7 +617,7 @@ function getProgressLabel() {
 
   if (sL >= target && sL > sR) return '경기 종료!';
   if (sR >= target && sR > sL) return '경기 종료!';
-  if (maxScore === target - 1) return '게임 포인트!';
+  if (maxScore === target - 1) return '매치포인트!';
   if (maxScore >= target - 3) return `${target - maxScore}점 남음`;
   return `${sL} : ${sR}`;
 }
@@ -466,22 +636,20 @@ function getProgressClass() {
 }
 
 // ==========================================
-// 좌우 교체 (전후반)
+// 수동 좌우 교체
 // ==========================================
-function swapSides() {
-  // 점수도 같이 교체
+function manualSwapSides() {
   const tmpScore = courtState.score.left;
   courtState.score.left = courtState.score.right;
   courtState.score.right = tmpScore;
 
-  // 팀 매핑 교체
   const tmpTeam = courtState.leftTeam;
   courtState.leftTeam = courtState.rightTeam;
   courtState.rightTeam = tmpTeam;
 
   courtState.swapped = !courtState.swapped;
 
-  showCourtToast(`🔄 좌우 교체! (${courtState.swapped ? '후반' : '전반'})`, 'info');
+  showCourtToast('🔄 좌우 교체!', 'info');
   renderCourt();
 }
 
@@ -497,10 +665,9 @@ function changeScore(side, delta) {
   
   if (oldVal === newVal) return;
   
-  actionHistory.push({ side, oldVal, newVal });
+  actionHistory.push({ side, oldVal, newVal, swapDone: courtState.swapDone, swapPending: courtState.swapPending });
   courtState.score[side] = newVal;
 
-  // DOM 직접 업데이트 (빠른 반응)
   const el = document.getElementById(`score-${side}`);
   if (el) {
     el.textContent = newVal;
@@ -508,11 +675,36 @@ function changeScore(side, delta) {
     setTimeout(() => el.classList.remove('score-flash'), 300);
   }
 
+  // 중간 교체 점수 체크 (아직 교체 안 했을 때만, 모달 미표시 중일 때만)
+  if (!courtState.swapDone && !courtState.swapPending) {
+    if (checkAutoSwap()) {
+      // 교체 모달이 표시되므로 renderCourt 스킵 (모달 안에서 처리)
+      return;
+    }
+  }
+
   // 목표 점수 도달 체크
   checkGameEnd();
 
-  // 전체 리렌더 (상태 바 등 업데이트)
   renderCourt();
+}
+
+// 중간 교체 체크: 어느 한 팀이 교체 점수에 도달하면
+// returns true if swap modal is triggered
+function checkAutoSwap() {
+  const swapPt = getSwapScore();
+  const sL = courtState.score.left;
+  const sR = courtState.score.right;
+  
+  // 어느 한쪽이 교체 점수에 최초 도달하면 (정확히 교체 점수일 때)
+  if (sL === swapPt || sR === swapPt) {
+    courtState.swapPending = true;
+    // 점수 표시 업데이트 후 모달
+    renderCourt();
+    setTimeout(() => showSwapModal(), 300);
+    return true;
+  }
+  return false;
 }
 
 function checkGameEnd() {
@@ -538,6 +730,9 @@ function undoLastAction() {
   if (actionHistory.length === 0) { showCourtToast('실행취소할 항목이 없습니다.', 'warning'); return; }
   const last = actionHistory.pop();
   courtState.score[last.side] = last.oldVal;
+  // undo 시 swapDone, swapPending도 복원
+  courtState.swapDone = last.swapDone;
+  if (last.swapPending !== undefined) courtState.swapPending = last.swapPending;
   renderCourt();
   showCourtToast('실행취소 완료', 'info');
 }
@@ -606,7 +801,6 @@ async function confirmFinish() {
   if (!selectedWinnerSide || !courtState.currentMatch) return;
   
   const m = courtState.currentMatch;
-  // side → 실제 team 번호로 변환
   const winnerTeam = selectedWinnerSide === 'left' ? courtState.leftTeam : courtState.rightTeam;
 
   const data = {
@@ -630,6 +824,8 @@ async function confirmFinish() {
     courtState.leftTeam = 1;
     courtState.rightTeam = 2;
     courtState.swapped = false;
+    courtState.swapDone = false;
+    courtState.swapPending = false;
     actionHistory = [];
     selectedWinnerSide = null;
     
@@ -638,15 +834,34 @@ async function confirmFinish() {
 }
 
 // ==========================================
-// 다음 경기 시작
+// 다음 경기 시작 → 사이드 선택으로
 // ==========================================
 async function startNextMatch() {
   try {
     await courtApi(`/tournaments/${courtState.tournamentId}/court/${courtState.courtNumber}/next`, {
       method: 'POST', body: '{}'
     });
-    showCourtToast('경기 시작!', 'success');
-    await refreshCourtData();
+    // 경기 데이터 로드
+    const data = await courtApi(`/tournaments/${courtState.tournamentId}/court/${courtState.courtNumber}`);
+    courtState.tournament = data.tournament;
+    courtState.currentMatch = data.current_match;
+    courtState.nextMatches = data.next_matches;
+    courtState.recentMatches = data.recent_matches;
+    courtState.targetScore = data.target_score || 25;
+    courtState.format = data.tournament?.format || 'kdk';
+
+    // 초기화
+    courtState.score = { left: 0, right: 0 };
+    courtState.leftTeam = 1;
+    courtState.rightTeam = 2;
+    courtState.swapped = false;
+    courtState.swapDone = false;
+    courtState.swapPending = false;
+    actionHistory = [];
+
+    // 사이드 선택 화면으로
+    courtState.page = 'side-select';
+    renderCourt();
   } catch(e) {}
 }
 
@@ -667,18 +882,32 @@ async function refreshCourtData() {
     
     if (data.current_match) {
       const m = data.current_match;
-      // 현재 교체 상태에 맞게 점수 복원
-      if (courtState.leftTeam === 1) {
-        courtState.score = { left: m.team1_set1 || 0, right: m.team2_set1 || 0 };
+      // 진행중인 경기가 있는데 점수가 0:0이면 → 사이드 선택으로
+      const t1s = m.team1_set1 || 0;
+      const t2s = m.team2_set1 || 0;
+      if (t1s === 0 && t2s === 0 && courtState.page !== 'court') {
+        courtState.score = { left: 0, right: 0 };
+        courtState.leftTeam = 1;
+        courtState.rightTeam = 2;
+        courtState.swapped = false;
+        courtState.swapDone = false;
+        courtState.swapPending = false;
+        courtState.page = 'side-select';
       } else {
-        courtState.score = { left: m.team2_set1 || 0, right: m.team1_set1 || 0 };
+        // 이미 점수가 있으면 바로 점수판
+        if (courtState.leftTeam === 1) {
+          courtState.score = { left: t1s, right: t2s };
+        } else {
+          courtState.score = { left: t2s, right: t1s };
+        }
+        courtState.page = 'court';
       }
-      courtState.page = 'court';
     } else {
-      // 새 경기면 교체 상태 리셋
       courtState.leftTeam = 1;
       courtState.rightTeam = 2;
       courtState.swapped = false;
+      courtState.swapDone = false;
+      courtState.swapPending = false;
       courtState.page = 'court';
     }
     
@@ -759,7 +988,7 @@ function selectCourtNumber(num) {
 }
 
 function exitCourt() {
-  if (courtState.currentMatch) {
+  if (courtState.currentMatch && courtState.page === 'court') {
     if (!confirm('진행중인 경기가 있습니다. 나가시겠습니까? (점수는 저장됩니다)')) return;
     saveCurrentScore();
   }
@@ -769,6 +998,8 @@ function exitCourt() {
   courtState.leftTeam = 1;
   courtState.rightTeam = 2;
   courtState.swapped = false;
+  courtState.swapDone = false;
+  courtState.swapPending = false;
   courtState.page = 'select';
   actionHistory = [];
   

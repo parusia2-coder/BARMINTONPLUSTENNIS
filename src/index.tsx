@@ -86,6 +86,39 @@ function getCourtHtml(): string {
     .winner-glow-left { box-shadow: inset 0 0 80px rgba(59,130,246,0.15); }
     .winner-glow-right { box-shadow: inset 0 0 80px rgba(249,115,22,0.15); }
 
+    /* 사이드 선택 화면 애니메이션 */
+    .swap-animate-left {
+      animation: swapLeft 0.3s ease-in-out;
+    }
+    .swap-animate-right {
+      animation: swapRight 0.3s ease-in-out;
+    }
+    @keyframes swapLeft {
+      0% { transform: translateX(0); opacity: 1; }
+      50% { transform: translateX(30px); opacity: 0.3; }
+      100% { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes swapRight {
+      0% { transform: translateX(0); opacity: 1; }
+      50% { transform: translateX(-30px); opacity: 0.3; }
+      100% { transform: translateX(0); opacity: 1; }
+    }
+    .swap-icon-spin {
+      transition: transform 0.3s ease;
+    }
+    .swap-icon-spin:hover, button:active .swap-icon-spin {
+      transform: rotate(180deg);
+    }
+
+    /* 코트 교체 모달 오버레이 펄스 */
+    .swap-modal-pulse {
+      animation: swapPulse 1.5s ease-in-out infinite;
+    }
+    @keyframes swapPulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(168,85,247,0.4); }
+      50% { box-shadow: 0 0 0 20px rgba(168,85,247,0); }
+    }
+
     /* 전체화면용 */
     html, body { height: 100%; overflow: hidden; }
     #app { height: 100%; overflow-y: auto; }
