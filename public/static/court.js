@@ -28,7 +28,11 @@ const courtState = {
   finishedMatch: null,
   finishedScore: null,
   finishedWinner: null,
-  finishedNames: null
+  finishedNames: null,
+  // 코트 고정 모드
+  locked: false,      // 코트 잠금 (나가기 비활성화)
+  readOnly: false,     // 읽기 전용 (관람용)
+  autoNext: true       // 경기 종료 후 자동으로 다음 경기 로딩
 };
 
 // 중간 교체 점수 계산
@@ -78,6 +82,10 @@ function parseUrlParams() {
   const params = new URLSearchParams(window.location.search);
   courtState.tournamentId = params.get('tid');
   courtState.courtNumber = params.get('court');
+  // 코트 고정 모드 파라미터
+  if (params.get('locked') === '1' || params.get('lock') === '1') courtState.locked = true;
+  if (params.get('mode') === 'view' || params.get('readonly') === '1') courtState.readOnly = true;
+  if (params.get('autonext') === '0') courtState.autoNext = false;
 }
 
 // ==========================================
@@ -114,6 +122,9 @@ function renderCourtSelect() {
           </div>
           <h2 class="text-3xl font-extrabold mb-2">코트 점수판</h2>
           <p class="text-gray-400">코트에 배치할 태블릿에서 사용하세요</p>
+          <div class="mt-3 flex flex-wrap justify-center gap-2">
+            <span class="text-xs text-gray-500">고정 URL: /court?tid=대회ID&court=코트번호&locked=1</span>
+          </div>
         </div>
         ${courtState.tournamentId ? renderCourtPicker() : renderTournamentPicker()}
       </div>
@@ -135,7 +146,13 @@ function renderCourtPicker() {
     <h3 class="text-lg font-semibold mb-2 text-center text-green-400">
       <i class="fas fa-trophy mr-2"></i>${courtState.tournament?.name || '대회'}
     </h3>
-    <p class="text-center text-gray-400 mb-6">코트를 선택하세요</p>
+    <p class="text-center text-gray-400 mb-4">코트를 선택하세요</p>
+    <!-- QR 코드 생성 버튼 -->
+    <div class="text-center mb-4">
+      <button onclick="showQRModal()" class="px-4 py-2 bg-purple-500/20 text-purple-300 rounded-lg text-sm hover:bg-purple-500/30">
+        <i class="fas fa-qrcode mr-1"></i>코트별 QR 코드 생성
+      </button>
+    </div>
     <div id="court-grid" class="grid grid-cols-2 gap-4">
       <div class="col-span-2 text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin text-2xl"></i></div>
     </div>
@@ -165,7 +182,7 @@ function renderSideSelect() {
         <span class="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">${courtState.courtNumber}코트</span>
         <span class="text-xs text-gray-400">#${m.match_order} ${m.event_name || ''}</span>
       </div>
-      <button onclick="exitCourt()" class="text-gray-500 hover:text-white text-sm"><i class="fas fa-times mr-1"></i>나가기</button>
+      ${courtState.locked ? '' : '<button onclick="exitCourt()" class="text-gray-500 hover:text-white text-sm"><i class="fas fa-times mr-1"></i>나가기</button>'}
     </div>
 
     <!-- 메인 -->
@@ -286,7 +303,7 @@ function renderCourtScoreboard() {
           <i class="fas fa-exchange-alt mr-0.5"></i>${swapInfo}
         </span>
         <span class="text-xs px-2 py-0.5 rounded-full font-bold ${getProgressClass()}">${getProgressLabel()}</span>
-        <button onclick="exitCourt()" class="text-gray-500 hover:text-white text-sm px-1.5 ml-1"><i class="fas fa-times"></i></button>
+        ${courtState.locked ? '<span class="text-xs text-yellow-500"><i class="fas fa-lock"></i></span>' : '<button onclick="exitCourt()" class="text-gray-500 hover:text-white text-sm px-1.5 ml-1"><i class="fas fa-times"></i></button>'}
       </div>
     </div>
 
@@ -355,6 +372,13 @@ function renderCourtScoreboard() {
     </div>
 
     <!-- 하단 컨트롤 바 -->
+    ${courtState.readOnly ? `
+    <div class="bg-black/50 border-t border-white/10 px-3 py-2 shrink-0" style="min-height:52px;">
+      <div class="flex items-center justify-center gap-3">
+        <span class="text-xs text-gray-500"><i class="fas fa-eye mr-1"></i>관람 전용 모드</span>
+        ${!courtState.locked ? '<button onclick="exitCourt()" class="px-4 py-2 bg-white/10 rounded-xl text-xs text-gray-400 hover:bg-white/20"><i class="fas fa-sign-out-alt mr-1"></i>나가기</button>' : ''}
+      </div>
+    </div>` : `
     <div class="bg-black/50 border-t border-white/10 px-3 py-2 shrink-0" style="min-height:52px;">
       <div class="flex gap-2">
         <button onclick="undoLastAction()" class="flex-1 py-2.5 bg-white/10 rounded-xl text-xs sm:text-sm font-medium hover:bg-white/20 active:scale-95 transition">
@@ -367,7 +391,7 @@ function renderCourtScoreboard() {
           <i class="fas fa-flag-checkered mr-1"></i>종료
         </button>
       </div>
-    </div>
+    </div>`}
 
     <!-- 경기종료 모달 -->
     ${renderFinishModal()}
@@ -510,7 +534,7 @@ function renderWaitingScreen() {
       </div>
       <div class="flex items-center gap-2">
         <button onclick="refreshCourtData()" class="px-3 py-1.5 bg-white/10 rounded-lg text-sm hover:bg-white/20"><i class="fas fa-sync-alt mr-1"></i>새로고침</button>
-        <button onclick="exitCourt()" class="px-3 py-1.5 bg-white/10 rounded-lg text-sm hover:bg-white/20"><i class="fas fa-sign-out-alt"></i></button>
+        ${courtState.locked ? '' : '<button onclick="exitCourt()" class="px-3 py-1.5 bg-white/10 rounded-lg text-sm hover:bg-white/20"><i class="fas fa-sign-out-alt"></i></button>'}
       </div>
     </div>
     <div class="flex-1 flex flex-col items-center justify-center px-6">
@@ -579,6 +603,9 @@ function renderWaitingScreen() {
 // 터치 이벤트 바인딩
 // ==========================================
 function bindScoreboardEvents() {
+  // 읽기 전용 모드에서는 터치 이벤트 비활성화
+  if (courtState.readOnly) return;
+
   const leftZone = document.getElementById('left-zone');
   const rightZone = document.getElementById('right-zone');
 
@@ -1130,8 +1157,25 @@ function finishSignatureProcess() {
   signaturePads = { winner: null, loser: null };
   signatureStep = 'winner';
   
-  // 코트 데이터 새로고침
-  refreshCourtData();
+  // 자동 다음 경기 모드
+  if (courtState.autoNext) {
+    showCourtToast('3초 후 다음 경기를 자동 로드합니다...', 'info');
+    setTimeout(async () => {
+      try {
+        const data = await courtApi(`/tournaments/${courtState.tournamentId}/court/${courtState.courtNumber}`);
+        courtState.nextMatches = data.next_matches || [];
+        if (data.next_matches && data.next_matches.length > 0) {
+          await startNextMatch();
+        } else {
+          refreshCourtData();
+        }
+      } catch(e) {
+        refreshCourtData();
+      }
+    }, 3000);
+  } else {
+    refreshCourtData();
+  }
 }
 
 // ==========================================
@@ -1288,7 +1332,73 @@ function selectCourtNumber(num) {
   refreshCourtData();
 }
 
+// QR 코드 모달
+function showQRModal() {
+  const t = courtState.tournament;
+  if (!t) return;
+  const baseUrl = window.location.origin + '/court';
+  const numCourts = t.courts || 6;
+  const modal = document.createElement('div');
+  modal.id = 'qr-modal';
+  modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md';
+  modal.innerHTML = `<div class="bg-gray-800 rounded-3xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
+    <div class="p-4 border-b border-white/10 flex items-center justify-between">
+      <h3 class="text-lg font-bold text-white"><i class="fas fa-qrcode mr-2 text-purple-400"></i>코트별 QR 코드</h3>
+      <button onclick="document.getElementById('qr-modal').remove()" class="text-gray-400 hover:text-white"><i class="fas fa-times text-lg"></i></button>
+    </div>
+    <div class="p-4 overflow-y-auto flex-1">
+      <p class="text-sm text-gray-400 mb-4">각 코트에 배치할 태블릿에서 아래 QR코드를 스캔하면 해당 코트 점수판으로 바로 이동합니다.</p>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        ${Array.from({length: numCourts}, (_, i) => {
+          const courtUrl = `${baseUrl}?tid=${courtState.tournamentId}&court=${i+1}&locked=1`;
+          return `<div class="bg-white rounded-xl p-3 text-center">
+            <div class="font-bold text-gray-900 mb-2">${i+1}코트</div>
+            <div id="qr-court-${i+1}" class="flex items-center justify-center" style="min-height:120px;"></div>
+            <p class="text-xs text-gray-500 mt-2 break-all">${courtUrl}</p>
+            <button onclick="copyToClipboard('${courtUrl}')" class="mt-1 text-xs text-blue-600 hover:text-blue-800">
+              <i class="fas fa-copy mr-1"></i>URL 복사
+            </button>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="mt-4 p-3 bg-white/5 rounded-xl text-xs text-gray-400">
+        <p><i class="fas fa-info-circle mr-1 text-blue-400"></i><b>URL 파라미터 설명:</b></p>
+        <p class="mt-1"><code>locked=1</code> : 코트 고정 (나가기 버튼 숨김)</p>
+        <p><code>mode=view</code> : 읽기 전용 (관중 모니터용, 터치 비활성화)</p>
+        <p><code>autonext=0</code> : 자동 다음 경기 비활성화</p>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  // QR 코드 생성 (간단한 QR 라이브러리 대용 - 텍스트로 표시)
+  for (let i = 1; i <= numCourts; i++) {
+    const el = document.getElementById(`qr-court-${i}`);
+    if (el) {
+      const url = `${baseUrl}?tid=${courtState.tournamentId}&court=${i}&locked=1`;
+      el.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(url)}" 
+        alt="QR ${i}코트" class="w-[120px] h-[120px]" loading="lazy">`;
+    }
+  }
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    showCourtToast('URL이 복사되었습니다!', 'success');
+  }).catch(() => {
+    // 폴백
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    showCourtToast('URL이 복사되었습니다!', 'success');
+  });
+}
+
 function exitCourt() {
+  // 잠금 모드에서는 나가기 불가
+  if (courtState.locked) {
+    showCourtToast('이 코트는 잠금 모드입니다. URL 파라미터에서 locked=1을 제거하세요.', 'warning');
+    return;
+  }
   if (courtState.currentMatch && courtState.page === 'court') {
     if (!confirm('진행중인 경기가 있습니다. 나가시겠습니까? (점수는 저장됩니다)')) return;
     saveCurrentScore();
@@ -1317,10 +1427,29 @@ function exitCourt() {
 function startAutoRefresh() {
   if (courtState.autoRefreshTimer) clearInterval(courtState.autoRefreshTimer);
   courtState.autoRefreshTimer = setInterval(async () => {
+    // 대기 화면에서 자동 새로고침
     if (courtState.page === 'court' && !courtState.currentMatch) {
       await refreshCourtData();
     }
-  }, 10000);
+    // 읽기 전용 모드에서는 진행중 경기도 자동 새로고침 (점수 표시 업데이트)
+    if (courtState.readOnly && courtState.page === 'court' && courtState.currentMatch) {
+      try {
+        const data = await courtApi(`/tournaments/${courtState.tournamentId}/court/${courtState.courtNumber}`);
+        if (data.current_match) {
+          const m = data.current_match;
+          courtState.currentMatch = m;
+          courtState.score = { left: m.team1_set1 || 0, right: m.team2_set1 || 0 };
+          renderCourt();
+        } else {
+          courtState.currentMatch = null;
+          courtState.nextMatches = data.next_matches;
+          courtState.recentMatches = data.recent_matches;
+          courtState.page = 'court';
+          renderCourt();
+        }
+      } catch(e) {}
+    }
+  }, courtState.readOnly ? 3000 : 10000);
 }
 
 // ==========================================

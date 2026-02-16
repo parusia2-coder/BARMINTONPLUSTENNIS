@@ -375,6 +375,289 @@ function generateTournament(teams: any[], courts: number, avoidSameClub: boolean
   return matches
 }
 
+// =============================================
+// ★ 결선 토너먼트 생성 ★
+// =============================================
+bracketRoutes.post('/:tid/brackets/generate-finals', async (c) => {
+  const tid = c.req.param('tid')
+  const db = c.env.DB
+  const body = await c.req.json().catch(() => ({}))
+
+  const eventId = body.event_id || null
+  const topN: number = body.top_n || 2  // 조별 상위 N팀
+  const avoidSameClub: boolean = body.avoid_same_club !== false
+
+  const tournament = await db.prepare(
+    `SELECT * FROM tournaments WHERE id=? AND deleted=0`
+  ).bind(tid).first() as any
+  if (!tournament) return c.json({ error: '대회를 찾을 수 없습니다.' }, 404)
+
+  const courts = tournament.courts || 2
+
+  let eventIds: number[] = []
+  if (eventId) {
+    eventIds = [eventId]
+  } else {
+    const { results } = await db.prepare(`SELECT id FROM events WHERE tournament_id=?`).bind(tid).all()
+    eventIds = (results || []).map((e: any) => e.id)
+  }
+
+  if (eventIds.length === 0) return c.json({ error: '종목이 없습니다.' }, 400)
+
+  let totalMatches = 0
+  const eventResults: any[] = []
+
+  for (const eid of eventIds) {
+    // 해당 종목의 조별 순위 재계산
+    const { results: teams } = await db.prepare(
+      `SELECT DISTINCT t.id, t.team_name, t.group_num, t.player1_id, t.player2_id,
+              p1.club as p1_club, p2.club as p2_club
+       FROM teams t
+       JOIN participants p1 ON t.player1_id = p1.id
+       JOIN participants p2 ON t.player2_id = p2.id
+       WHERE t.event_id=? AND t.group_num IS NOT NULL
+       ORDER BY t.group_num ASC`
+    ).bind(eid).all()
+
+    if (!teams || teams.length === 0) continue
+
+    // 조별 완료된 경기 기반 순위 계산
+    const { results: completedMatches } = await db.prepare(
+      `SELECT * FROM matches WHERE event_id=? AND status='completed' AND group_num IS NOT NULL`
+    ).bind(eid).all()
+
+    // 팀별 성적 계산
+    const teamStats: Record<number, { id: number, name: string, group: number, wins: number, losses: number, scoreFor: number, scoreAgainst: number, points: number }> = {}
+    for (const t of teams) {
+      teamStats[t.id as number] = {
+        id: t.id as number,
+        name: t.team_name as string,
+        group: t.group_num as number,
+        wins: 0, losses: 0, scoreFor: 0, scoreAgainst: 0, points: 0
+      }
+    }
+
+    for (const m of (completedMatches || [])) {
+      const match = m as any
+      if (match.team1_id && teamStats[match.team1_id]) {
+        teamStats[match.team1_id].scoreFor += match.team1_set1 || 0
+        teamStats[match.team1_id].scoreAgainst += match.team2_set1 || 0
+        if (match.winner_team === 1) { teamStats[match.team1_id].wins++; teamStats[match.team1_id].points += 3 }
+        else if (match.winner_team === 2) teamStats[match.team1_id].losses++
+      }
+      if (match.team2_id && teamStats[match.team2_id]) {
+        teamStats[match.team2_id].scoreFor += match.team2_set1 || 0
+        teamStats[match.team2_id].scoreAgainst += match.team1_set1 || 0
+        if (match.winner_team === 2) { teamStats[match.team2_id].wins++; teamStats[match.team2_id].points += 3 }
+        else if (match.winner_team === 1) teamStats[match.team2_id].losses++
+      }
+    }
+
+    // 조별 상위 N팀 추출
+    const byGroup: Record<number, any[]> = {}
+    for (const s of Object.values(teamStats)) {
+      if (!byGroup[s.group]) byGroup[s.group] = []
+      byGroup[s.group].push(s)
+    }
+
+    const qualifiedTeams: any[] = []
+    for (const [groupNum, groupTeams] of Object.entries(byGroup)) {
+      groupTeams.sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points
+        const diffA = a.scoreFor - a.scoreAgainst
+        const diffB = b.scoreFor - b.scoreAgainst
+        if (diffB !== diffA) return diffB - diffA
+        return b.scoreFor - a.scoreFor
+      })
+      const topTeams = groupTeams.slice(0, topN)
+      topTeams.forEach((t, rank) => {
+        qualifiedTeams.push({ ...t, groupRank: rank + 1, fromGroup: parseInt(groupNum as string) })
+      })
+    }
+
+    if (qualifiedTeams.length < 2) continue
+
+    // 기존 결선 경기 삭제 (group_num이 NULL인 경기만 = 결선 경기)
+    await db.prepare(
+      `DELETE FROM matches WHERE event_id=? AND group_num IS NULL`
+    ).bind(eid).run()
+
+    // 결선 토너먼트 생성 (싱글 엘리미네이션)
+    // 시드 배정: 같은 조 팀이 최대한 반대편에 배치
+    let seeded: any[] = []
+    const numGroups = Object.keys(byGroup).length
+
+    if (numGroups >= 2 && topN >= 2) {
+      // 각 조 1위를 다른 반대편에 배치
+      const rank1 = qualifiedTeams.filter(t => t.groupRank === 1)
+      const rank2 = qualifiedTeams.filter(t => t.groupRank === 2)
+      const others = qualifiedTeams.filter(t => t.groupRank > 2)
+      seeded = [...shuffle(rank1), ...shuffle(others), ...shuffle(rank2)]
+    } else {
+      seeded = shuffle(qualifiedTeams)
+    }
+
+    // 브래킷 사이즈
+    let bracketSize = 1
+    while (bracketSize < seeded.length) bracketSize *= 2
+
+    const teamIds: (number | null)[] = seeded.map(t => t.id)
+    while (teamIds.length < bracketSize) teamIds.push(null)
+
+    const matches: any[] = []
+    let order = 0
+    // 최대 라운드 번호 (기존 조별 라운드 뒤에 추가)
+    const maxRound = await db.prepare(
+      `SELECT MAX(round) as mr FROM matches WHERE event_id=?`
+    ).bind(eid).first() as any
+    const baseRound = (maxRound?.mr || 0) + 1
+
+    for (let i = 0; i < teamIds.length; i += 2) {
+      order++
+      if (teamIds[i] && teamIds[i + 1]) {
+        matches.push({
+          round: baseRound,
+          match_order: order,
+          court_number: ((order - 1) % courts) + 1,
+          team1_id: teamIds[i],
+          team2_id: teamIds[i + 1],
+          group_num: null
+        })
+      } else if (teamIds[i]) {
+        // BYE 처리
+        matches.push({
+          round: baseRound,
+          match_order: order,
+          court_number: ((order - 1) % courts) + 1,
+          team1_id: teamIds[i],
+          team2_id: null,
+          group_num: null
+        })
+      }
+    }
+
+    for (const m of matches) {
+      await db.prepare(
+        `INSERT INTO matches (tournament_id, event_id, round, match_order, court_number, team1_id, team2_id, group_num, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`
+      ).bind(tid, eid, m.round, m.match_order, m.court_number, m.team1_id, m.team2_id || null, null).run()
+    }
+
+    totalMatches += matches.length
+    const eventInfo = await db.prepare(`SELECT name FROM events WHERE id=?`).bind(eid).first() as any
+    eventResults.push({
+      event_id: eid,
+      event_name: eventInfo?.name || '',
+      qualified_teams: qualifiedTeams.length,
+      finals_matches: matches.length,
+      top_n: topN,
+      groups: numGroups,
+      qualified: qualifiedTeams.map(t => ({
+        team_name: t.name,
+        group: t.fromGroup,
+        rank: t.groupRank,
+        wins: t.wins,
+        points: t.points
+      }))
+    })
+  }
+
+  await db.prepare(
+    `INSERT INTO audit_logs (tournament_id, action, new_value, updated_by)
+     VALUES (?, 'GENERATE_FINALS', ?, 'admin')`
+  ).bind(tid, JSON.stringify({ top_n: topN, events: eventResults, totalMatches })).run()
+
+  return c.json({
+    message: `결선 토너먼트가 생성되었습니다. (${totalMatches}경기)`,
+    total_matches: totalMatches,
+    events: eventResults
+  })
+})
+
+// 결선 진출 자격 미리보기
+bracketRoutes.get('/:tid/brackets/finals-preview', async (c) => {
+  const tid = c.req.param('tid')
+  const topN = parseInt(c.req.query('top_n') || '2')
+  const db = c.env.DB
+
+  const { results: events } = await db.prepare(`SELECT * FROM events WHERE tournament_id=?`).bind(tid).all()
+  if (!events || events.length === 0) return c.json({ events: [] })
+
+  const preview: any[] = []
+
+  for (const ev of events) {
+    const event = ev as any
+    const { results: teams } = await db.prepare(
+      `SELECT t.id, t.team_name, t.group_num FROM teams t WHERE t.event_id=? AND t.group_num IS NOT NULL ORDER BY t.group_num`
+    ).bind(event.id).all()
+
+    if (!teams || teams.length === 0) continue
+
+    const { results: completedMatches } = await db.prepare(
+      `SELECT * FROM matches WHERE event_id=? AND status='completed' AND group_num IS NOT NULL`
+    ).bind(event.id).all()
+
+    const stats: Record<number, any> = {}
+    for (const t of teams) {
+      stats[t.id as number] = { id: t.id, name: t.team_name, group: t.group_num, wins: 0, losses: 0, points: 0, scoreFor: 0, scoreAgainst: 0 }
+    }
+
+    for (const m of (completedMatches || [])) {
+      const match = m as any
+      if (match.team1_id && stats[match.team1_id]) {
+        stats[match.team1_id].scoreFor += match.team1_set1 || 0
+        stats[match.team1_id].scoreAgainst += match.team2_set1 || 0
+        if (match.winner_team === 1) { stats[match.team1_id].wins++; stats[match.team1_id].points += 3 }
+        else if (match.winner_team === 2) stats[match.team1_id].losses++
+      }
+      if (match.team2_id && stats[match.team2_id]) {
+        stats[match.team2_id].scoreFor += match.team2_set1 || 0
+        stats[match.team2_id].scoreAgainst += match.team1_set1 || 0
+        if (match.winner_team === 2) { stats[match.team2_id].wins++; stats[match.team2_id].points += 3 }
+        else if (match.winner_team === 1) stats[match.team2_id].losses++
+      }
+    }
+
+    const byGroup: Record<number, any[]> = {}
+    for (const s of Object.values(stats)) {
+      if (!byGroup[s.group]) byGroup[s.group] = []
+      byGroup[s.group].push(s)
+    }
+
+    const groups: any[] = []
+    let qualifiedCount = 0
+    for (const [groupNum, groupTeams] of Object.entries(byGroup)) {
+      groupTeams.sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points
+        return (b.scoreFor - b.scoreAgainst) - (a.scoreFor - a.scoreAgainst)
+      })
+      const grp = groupTeams.map((t, i) => ({
+        ...t,
+        rank: i + 1,
+        qualified: i < topN,
+        goal_diff: t.scoreFor - t.scoreAgainst
+      }))
+      qualifiedCount += grp.filter(t => t.qualified).length
+      groups.push({ group_num: parseInt(groupNum as string), standings: grp })
+    }
+
+    const totalMatches = await db.prepare(`SELECT COUNT(*) as c FROM matches WHERE event_id=? AND group_num IS NOT NULL`).bind(event.id).first() as any
+    const completedCount = await db.prepare(`SELECT COUNT(*) as c FROM matches WHERE event_id=? AND group_num IS NOT NULL AND status='completed'`).bind(event.id).first() as any
+
+    preview.push({
+      event_id: event.id,
+      event_name: event.name,
+      groups,
+      qualified_count: qualifiedCount,
+      total_matches: totalMatches?.c || 0,
+      completed_matches: completedCount?.c || 0,
+      progress: totalMatches?.c > 0 ? Math.round((completedCount?.c || 0) / totalMatches.c * 100) : 0
+    })
+  }
+
+  return c.json({ events: preview, top_n: topN })
+})
+
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {

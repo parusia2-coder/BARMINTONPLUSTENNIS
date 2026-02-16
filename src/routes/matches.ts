@@ -303,6 +303,235 @@ matchRoutes.get('/:tid/audit-logs', async (c) => {
   return c.json({ logs: results })
 })
 
+// =============================================
+// ★ 통계 대시보드 API ★
+// =============================================
+matchRoutes.get('/:tid/dashboard', async (c) => {
+  const tid = c.req.param('tid')
+  const db = c.env.DB
+
+  const tournament = await db.prepare(
+    `SELECT * FROM tournaments WHERE id=? AND deleted=0`
+  ).bind(tid).first() as any
+  if (!tournament) return c.json({ error: '대회를 찾을 수 없습니다.' }, 404)
+
+  // 전체 경기 통계
+  const matchStats = await db.prepare(`
+    SELECT 
+      COUNT(*) as total,
+      COUNT(CASE WHEN status='completed' THEN 1 END) as completed,
+      COUNT(CASE WHEN status='playing' THEN 1 END) as playing,
+      COUNT(CASE WHEN status='pending' THEN 1 END) as pending
+    FROM matches WHERE tournament_id=?
+  `).bind(tid).first() as any
+
+  // 종목별 통계
+  const { results: eventStats } = await db.prepare(`
+    SELECT e.id, e.name, e.category, e.level_group,
+      COUNT(m.id) as total_matches,
+      COUNT(CASE WHEN m.status='completed' THEN 1 END) as completed_matches,
+      COUNT(CASE WHEN m.status='playing' THEN 1 END) as playing_matches,
+      (SELECT COUNT(*) FROM teams WHERE event_id=e.id) as team_count
+    FROM events e
+    LEFT JOIN matches m ON e.id = m.event_id
+    WHERE e.tournament_id=?
+    GROUP BY e.id
+    ORDER BY e.category, e.level_group
+  `).bind(tid).all()
+
+  // 코트별 현황
+  const courtStats: any[] = []
+  for (let i = 1; i <= (tournament.courts || 6); i++) {
+    const stats = await db.prepare(`
+      SELECT 
+        COUNT(CASE WHEN status='completed' THEN 1 END) as completed,
+        COUNT(CASE WHEN status='playing' THEN 1 END) as playing,
+        COUNT(CASE WHEN status='pending' THEN 1 END) as pending
+      FROM matches WHERE tournament_id=? AND court_number=?
+    `).bind(tid, i).first() as any
+    courtStats.push({ court_number: i, ...stats })
+  }
+
+  // 클럽별 성적 (완료된 경기 기반)
+  const { results: clubResults } = await db.prepare(`
+    SELECT p.club, 
+      COUNT(DISTINCT p.id) as player_count,
+      COUNT(DISTINCT t.id) as team_count
+    FROM participants p
+    LEFT JOIN teams t ON (t.player1_id = p.id OR t.player2_id = p.id)
+    WHERE p.tournament_id=? AND p.deleted=0 AND p.club != ''
+    GROUP BY p.club
+    ORDER BY player_count DESC
+  `).bind(tid).all()
+
+  // 클럽별 승패 계산
+  const clubWinLoss: Record<string, { wins: number, losses: number }> = {}
+  if (clubResults) {
+    for (const cr of clubResults) {
+      clubWinLoss[cr.club as string] = { wins: 0, losses: 0 }
+    }
+  }
+
+  const { results: completedMatches } = await db.prepare(`
+    SELECT m.winner_team, m.team1_id, m.team2_id,
+      t1p1.club as t1p1_club, t1p2.club as t1p2_club,
+      t2p1.club as t2p1_club, t2p2.club as t2p2_club
+    FROM matches m
+    JOIN teams t1 ON m.team1_id = t1.id
+    JOIN teams t2 ON m.team2_id = t2.id
+    JOIN participants t1p1 ON t1.player1_id = t1p1.id
+    JOIN participants t1p2 ON t1.player2_id = t1p2.id
+    JOIN participants t2p1 ON t2.player1_id = t2p1.id
+    JOIN participants t2p2 ON t2.player2_id = t2p2.id
+    WHERE m.tournament_id=? AND m.status='completed' AND m.winner_team IS NOT NULL
+  `).bind(tid).all()
+
+  for (const m of (completedMatches || [])) {
+    const match = m as any
+    const t1Clubs = new Set<string>()
+    if (match.t1p1_club) t1Clubs.add(match.t1p1_club)
+    if (match.t1p2_club) t1Clubs.add(match.t1p2_club)
+    const t2Clubs = new Set<string>()
+    if (match.t2p1_club) t2Clubs.add(match.t2p1_club)
+    if (match.t2p2_club) t2Clubs.add(match.t2p2_club)
+
+    if (match.winner_team === 1) {
+      for (const c of t1Clubs) { if (clubWinLoss[c]) clubWinLoss[c].wins++ }
+      for (const c of t2Clubs) { if (clubWinLoss[c]) clubWinLoss[c].losses++ }
+    } else if (match.winner_team === 2) {
+      for (const c of t2Clubs) { if (clubWinLoss[c]) clubWinLoss[c].wins++ }
+      for (const c of t1Clubs) { if (clubWinLoss[c]) clubWinLoss[c].losses++ }
+    }
+  }
+
+  const clubStatsArr = (clubResults || []).map((cr: any) => ({
+    club: cr.club,
+    player_count: cr.player_count,
+    team_count: cr.team_count,
+    wins: clubWinLoss[cr.club]?.wins || 0,
+    losses: clubWinLoss[cr.club]?.losses || 0,
+    win_rate: (clubWinLoss[cr.club]?.wins || 0) + (clubWinLoss[cr.club]?.losses || 0) > 0
+      ? Math.round((clubWinLoss[cr.club]?.wins || 0) / ((clubWinLoss[cr.club]?.wins || 0) + (clubWinLoss[cr.club]?.losses || 0)) * 100)
+      : 0
+  }))
+
+  // 참가자 통계
+  const pStats = await db.prepare(`
+    SELECT 
+      COUNT(*) as total,
+      COUNT(CASE WHEN gender='m' THEN 1 END) as male,
+      COUNT(CASE WHEN gender='f' THEN 1 END) as female,
+      COUNT(CASE WHEN paid=1 THEN 1 END) as paid,
+      COUNT(CASE WHEN checked_in=1 THEN 1 END) as checked_in,
+      COUNT(CASE WHEN mixed_doubles=1 THEN 1 END) as mixed_doubles
+    FROM participants WHERE tournament_id=? AND deleted=0
+  `).bind(tid).first()
+
+  // 급수 분포
+  const { results: levelDist } = await db.prepare(`
+    SELECT level, COUNT(*) as count FROM participants 
+    WHERE tournament_id=? AND deleted=0 GROUP BY level ORDER BY level
+  `).bind(tid).all()
+
+  return c.json({
+    tournament: { id: tournament.id, name: tournament.name, format: tournament.format, courts: tournament.courts, status: tournament.status },
+    match_stats: matchStats,
+    event_stats: eventStats || [],
+    court_stats: courtStats,
+    club_stats: clubStatsArr,
+    participant_stats: pStats,
+    level_distribution: levelDist || [],
+    progress: matchStats?.total > 0 ? Math.round((matchStats.completed || 0) / matchStats.total * 100) : 0
+  })
+})
+
+// =============================================
+// ★ 참가자 페이지 API ★
+// =============================================
+// 참가자 본인 경기 조회 (이름+연락처로 조회)
+matchRoutes.get('/:tid/my-matches', async (c) => {
+  const tid = c.req.param('tid')
+  const name = c.req.query('name') || ''
+  const phone = c.req.query('phone') || ''
+  const db = c.env.DB
+
+  if (!name) return c.json({ error: '이름을 입력해주세요.' }, 400)
+
+  // 참가자 검색
+  let participant: any
+  if (phone) {
+    participant = await db.prepare(
+      `SELECT * FROM participants WHERE tournament_id=? AND name=? AND phone=? AND deleted=0`
+    ).bind(tid, name, phone).first()
+  }
+  if (!participant) {
+    participant = await db.prepare(
+      `SELECT * FROM participants WHERE tournament_id=? AND name=? AND deleted=0`
+    ).bind(tid, name).first()
+  }
+  if (!participant) return c.json({ error: '참가자를 찾을 수 없습니다.' }, 404)
+
+  // 참가자가 속한 팀 조회
+  const { results: teams } = await db.prepare(`
+    SELECT t.*, e.name as event_name, e.category, e.level_group, t.group_num,
+      p1.name as p1_name, p2.name as p2_name
+    FROM teams t
+    JOIN events e ON t.event_id = e.id
+    JOIN participants p1 ON t.player1_id = p1.id
+    JOIN participants p2 ON t.player2_id = p2.id
+    WHERE (t.player1_id=? OR t.player2_id=?) AND t.tournament_id=?
+  `).bind(participant.id, participant.id, tid).all()
+
+  // 참가자가 속한 팀의 경기 조회
+  const teamIds = (teams || []).map((t: any) => t.id)
+  let matches: any[] = []
+  if (teamIds.length > 0) {
+    const placeholders = teamIds.map(() => '?').join(',')
+    const { results } = await db.prepare(`
+      SELECT m.*, e.name as event_name,
+        t1.team_name as team1_name, t2.team_name as team2_name
+      FROM matches m
+      JOIN events e ON m.event_id = e.id
+      LEFT JOIN teams t1 ON m.team1_id = t1.id
+      LEFT JOIN teams t2 ON m.team2_id = t2.id
+      WHERE (m.team1_id IN (${placeholders}) OR m.team2_id IN (${placeholders}))
+      ORDER BY m.event_id, m.round, m.match_order
+    `).bind(...teamIds, ...teamIds).all()
+    matches = results || []
+  }
+
+  // 전적 계산
+  let wins = 0, losses = 0, totalScore = 0, totalLost = 0
+  for (const m of matches) {
+    const match = m as any
+    if (match.status !== 'completed') continue
+    const isTeam1 = teamIds.includes(match.team1_id)
+    if ((isTeam1 && match.winner_team === 1) || (!isTeam1 && match.winner_team === 2)) wins++
+    else losses++
+    totalScore += isTeam1 ? (match.team1_set1 || 0) : (match.team2_set1 || 0)
+    totalLost += isTeam1 ? (match.team2_set1 || 0) : (match.team1_set1 || 0)
+  }
+
+  return c.json({
+    participant: {
+      id: participant.id,
+      name: participant.name,
+      gender: participant.gender,
+      level: participant.level,
+      club: participant.club,
+      birth_year: participant.birth_year,
+      paid: participant.paid,
+      checked_in: participant.checked_in
+    },
+    teams: teams || [],
+    matches,
+    record: { wins, losses, total_score: totalScore, total_lost: totalLost },
+    total_matches: matches.length,
+    completed_matches: matches.filter((m: any) => m.status === 'completed').length,
+    upcoming_matches: matches.filter((m: any) => m.status === 'pending' || m.status === 'playing')
+  })
+})
+
 // 경기 서명 저장
 matchRoutes.put('/:tid/matches/:mid/signature', async (c) => {
   const tid = c.req.param('tid')

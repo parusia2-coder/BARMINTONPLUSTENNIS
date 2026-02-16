@@ -29,6 +29,16 @@ app.get('/court', (c) => {
   return c.html(getCourtHtml())
 })
 
+// 참가자 전용 페이지 (직접 URL 접근)
+app.get('/my', (c) => {
+  return c.html(getMyPageHtml())
+})
+
+// 통계 대시보드 (직접 URL 접근)
+app.get('/dashboard', (c) => {
+  return c.html(getDashboardHtml())
+})
+
 // SPA - serve index.html for all non-API routes
 app.get('*', (c) => {
   return c.html(getIndexHtml())
@@ -188,3 +198,202 @@ function getIndexHtml(): string {
 }
 
 export default app
+
+function getMyPageHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏸 내 경기 조회</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: {
+        shuttle: { 50:'#f0fdf4',100:'#dcfce7',200:'#bbf7d0',300:'#86efac',400:'#4ade80',500:'#22c55e',600:'#16a34a',700:'#15803d',800:'#166534',900:'#14532d' }
+      }}}
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap');
+    body { font-family: 'Noto Sans KR', sans-serif; }
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .pulse-live { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div id="app"></div>
+  <script>
+    const API = '/api';
+    const LEVELS = { s: 'S', a: 'A', b: 'B', c: 'C', d: 'D', e: 'E' };
+    const LEVEL_COLORS = { s: 'bg-red-100 text-red-700', a: 'bg-orange-100 text-orange-700', b: 'bg-yellow-100 text-yellow-700', c: 'bg-green-100 text-green-700', d: 'bg-blue-100 text-blue-700', e: 'bg-gray-100 text-gray-600' };
+
+    const params = new URLSearchParams(window.location.search);
+    const tid = params.get('tid');
+    let tournament = null;
+
+    function showToast(msg, type='info') {
+      const t = document.createElement('div');
+      const c = { info: 'bg-blue-500', success: 'bg-green-500', error: 'bg-red-500', warning: 'bg-yellow-500 text-gray-900' };
+      t.className = 'fixed top-4 right-4 z-[9999] px-5 py-3 rounded-lg text-white shadow-lg '+c[type]+' fade-in max-w-md';
+      t.textContent = msg; document.body.appendChild(t);
+      setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity 0.3s'; setTimeout(() => t.remove(), 300); }, 3000);
+    }
+
+    async function init() {
+      const app = document.getElementById('app');
+      if (!tid) {
+        // 대회 선택 화면
+        try {
+          const res = await fetch(API+'/tournaments'); const d = await res.json();
+          app.innerHTML = '<div class="max-w-lg mx-auto px-4 py-8 fade-in"><div class="text-center mb-8"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-400 to-indigo-600 mb-3"><i class="fas fa-user text-2xl text-white"></i></div><h1 class="text-2xl font-extrabold text-gray-900">내 경기 조회</h1><p class="text-gray-500 mt-1">대회를 선택하세요</p></div><div class="space-y-3">'+
+            d.tournaments.map(t => '<a href="/my?tid='+t.id+'" class="block bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition"><h3 class="font-bold text-gray-900">'+t.name+'</h3><p class="text-sm text-gray-500">'+t.courts+'코트</p></a>').join('')+
+            '</div><a href="/" class="block text-center mt-6 text-sm text-gray-500 hover:text-gray-700"><i class="fas fa-home mr-1"></i>메인으로</a></div>';
+        } catch(e) { app.innerHTML = '<div class="text-center py-20 text-gray-400">로딩 실패</div>'; }
+        return;
+      }
+      // 대회 정보 + 검색 폼
+      try {
+        const res = await fetch(API+'/tournaments/'+tid); const d = await res.json();
+        tournament = d.tournament;
+      } catch(e) {}
+      renderSearchPage();
+    }
+
+    function renderSearchPage() {
+      const app = document.getElementById('app');
+      app.innerHTML = '<div class="max-w-2xl mx-auto px-4 py-8 fade-in"><div class="flex items-center justify-between mb-6"><a href="/my" class="text-gray-500 hover:text-gray-700 text-sm"><i class="fas fa-arrow-left mr-1"></i>대회 선택</a><a href="/" class="text-gray-500 hover:text-gray-700 text-sm"><i class="fas fa-home mr-1"></i>메인</a></div><div class="text-center mb-6"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-400 to-indigo-600 mb-3"><i class="fas fa-user text-2xl text-white"></i></div><h1 class="text-2xl font-extrabold text-gray-900">내 경기 조회</h1><p class="text-gray-500 mt-1">'+(tournament?.name||'')+'</p></div><div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6"><form id="search-form" class="flex flex-wrap gap-3 items-end"><div class="flex-1 min-w-[150px]"><label class="block text-xs font-semibold text-gray-500 mb-1">이름 <span class="text-red-500">*</span></label><input id="s-name" required placeholder="이름 입력" class="w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"></div><div class="flex-1 min-w-[150px]"><label class="block text-xs font-semibold text-gray-500 mb-1">연락처 (선택)</label><input id="s-phone" placeholder="010-xxxx-xxxx" class="w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"></div><button type="submit" class="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700"><i class="fas fa-search mr-1"></i>조회</button></form></div><div id="result"></div></div>';
+      document.getElementById('search-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('s-name').value.trim();
+        const phone = document.getElementById('s-phone').value.trim();
+        if (!name) { showToast('이름을 입력해주세요', 'warning'); return; }
+        const el = document.getElementById('result');
+        el.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i></div>';
+        try {
+          const res = await fetch(API+'/tournaments/'+tid+'/my-matches?name='+encodeURIComponent(name)+(phone?'&phone='+encodeURIComponent(phone):''));
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+          el.innerHTML = renderResult(data);
+        } catch(e) {
+          el.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-user-slash text-3xl mb-2"></i><p>참가자를 찾을 수 없습니다.</p></div>';
+        }
+      });
+    }
+
+    function renderResult(data) {
+      const p = data.participant; const teams = data.teams||[]; const matches = data.matches||[];
+      const rec = data.record||{}; const upcoming = data.upcoming_matches||[];
+      const completed = matches.filter(m => m.status==='completed');
+      return '<div class="fade-in">'+
+        '<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6"><div class="flex items-center gap-4"><div class="w-14 h-14 rounded-2xl bg-gradient-to-br '+(p.gender==='m'?'from-blue-400 to-blue-600':'from-pink-400 to-pink-600')+' flex items-center justify-center"><i class="fas fa-user text-xl text-white"></i></div><div><h2 class="text-xl font-extrabold">'+p.name+'</h2><div class="flex items-center gap-2 mt-1"><span class="badge '+(p.gender==='m'?'bg-blue-100 text-blue-700':'bg-pink-100 text-pink-700')+'">'+(p.gender==='m'?'남':'여')+'</span><span class="badge '+(LEVEL_COLORS[p.level]||'bg-gray-100 text-gray-600')+'">'+(LEVELS[p.level]||'C')+'급</span>'+(p.club?'<span class="badge bg-teal-50 text-teal-700">'+p.club+'</span>':'')+'</div></div></div></div>'+
+        '<div class="grid grid-cols-4 gap-3 mb-6"><div class="bg-white rounded-xl border p-3 text-center"><div class="text-xl font-extrabold">'+data.total_matches+'</div><div class="text-xs text-gray-500">총</div></div><div class="bg-green-50 rounded-xl border border-green-200 p-3 text-center"><div class="text-xl font-extrabold text-green-600">'+(rec.wins||0)+'</div><div class="text-xs text-gray-500">승</div></div><div class="bg-red-50 rounded-xl border border-red-200 p-3 text-center"><div class="text-xl font-extrabold text-red-500">'+(rec.losses||0)+'</div><div class="text-xs text-gray-500">패</div></div><div class="bg-blue-50 rounded-xl border border-blue-200 p-3 text-center"><div class="text-xl font-extrabold text-blue-600">'+(rec.total_score-rec.total_lost>0?'+':'')+(rec.total_score-rec.total_lost)+'</div><div class="text-xs text-gray-500">득실</div></div></div>'+
+        (teams.length>0?'<div class="bg-white rounded-2xl shadow-sm border p-5 mb-6"><h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-users mr-2 text-shuttle-500"></i>소속 팀</h3><div class="space-y-2">'+teams.map(t => '<div class="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3"><div><span class="font-bold">'+t.team_name+'</span><span class="ml-2 text-xs text-gray-500">'+t.event_name+'</span>'+(t.group_num?'<span class="badge bg-indigo-50 text-indigo-600 text-xs ml-1">'+t.group_num+'조</span>':'')+'</div><span class="text-sm text-gray-600">'+t.p1_name+' · '+t.p2_name+'</span></div>').join('')+'</div></div>':'')+
+        (upcoming.length>0?'<div class="bg-white rounded-2xl shadow-sm border-2 border-green-200 p-5 mb-6"><h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-clock mr-2 text-green-500"></i>예정/진행중 ('+upcoming.length+')</h3><div class="space-y-2">'+upcoming.map(m => {
+          const isT1 = teams.some(t=>t.id===m.team1_id);
+          const my = isT1?m.team1_name:m.team2_name;
+          const opp = isT1?m.team2_name:m.team1_name;
+          return '<div class="flex items-center justify-between rounded-xl px-4 py-3 '+(m.status==='playing'?'bg-green-50 border-2 border-green-300':'bg-gray-50')+'"><div><span class="font-bold">'+my+'</span> <span class="text-gray-400">vs</span> <span>'+(opp||'BYE')+'</span><p class="text-xs text-gray-500 mt-0.5">'+(m.event_name||'')+' #'+m.match_order+'</p></div><div>'+(m.court_number?'<span class="badge bg-yellow-100 text-yellow-700">'+m.court_number+'코트</span>':'')+(m.status==='playing'?'<span class="badge bg-green-100 text-green-700 ml-1">진행중</span>':'<span class="badge bg-gray-100 text-gray-600 ml-1">대기</span>')+'</div></div>';
+        }).join('')+'</div></div>':'')+
+        (completed.length>0?'<div class="bg-white rounded-2xl shadow-sm border p-5"><h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-history mr-2 text-blue-500"></i>경기 결과 ('+completed.length+')</h3><div class="space-y-2">'+completed.map(m => {
+          const isT1=teams.some(t=>t.id===m.team1_id);
+          const isW=(isT1&&m.winner_team===1)||(!isT1&&m.winner_team===2);
+          const myS=isT1?(m.team1_set1||0):(m.team2_set1||0);
+          const opS=isT1?(m.team2_set1||0):(m.team1_set1||0);
+          const my=isT1?m.team1_name:m.team2_name;
+          const opp=isT1?m.team2_name:m.team1_name;
+          return '<div class="flex items-center justify-between rounded-xl px-4 py-3 '+(isW?'bg-green-50':'bg-red-50')+'"><div><span class="font-bold '+(isW?'text-green-700':'text-red-600')+'">'+(isW?'🏆':'💔')+' '+my+'</span> <span class="text-gray-400">vs</span> <span>'+opp+'</span><p class="text-xs text-gray-500 mt-0.5">'+(m.event_name||'')+(m.court_number?' '+m.court_number+'코트':'')+'</p></div><div class="text-right"><span class="text-xl font-extrabold '+(isW?'text-green-600':'text-red-500')+'">'+myS+' : '+opS+'</span><span class="badge '+(isW?'bg-green-100 text-green-700':'bg-red-100 text-red-600')+' block mt-1 text-center">'+(isW?'승리':'패배')+'</span></div></div>';
+        }).join('')+'</div></div>':'<div class="text-center py-8 text-gray-400"><p>완료된 경기가 없습니다.</p></div>')+
+      '</div>';
+    }
+
+    init();
+  </script>
+</body>
+</html>`
+}
+
+function getDashboardHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏸 통계 대시보드</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: {
+        shuttle: { 50:'#f0fdf4',100:'#dcfce7',200:'#bbf7d0',300:'#86efac',400:'#4ade80',500:'#22c55e',600:'#16a34a',700:'#15803d',800:'#166534',900:'#14532d' }
+      }}}
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap');
+    body { font-family: 'Noto Sans KR', sans-serif; }
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .pulse-live { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div id="app"><div class="flex items-center justify-center h-96"><i class="fas fa-spinner fa-spin text-4xl text-gray-400"></i></div></div>
+  <script>
+    const API = '/api';
+    const params = new URLSearchParams(window.location.search);
+    const tid = params.get('tid');
+
+    async function load() {
+      const app = document.getElementById('app');
+      if (!tid) {
+        try {
+          const res = await fetch(API+'/tournaments'); const d = await res.json();
+          app.innerHTML = '<div class="max-w-lg mx-auto px-4 py-8 fade-in"><div class="text-center mb-8"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 mb-3"><i class="fas fa-chart-bar text-2xl text-white"></i></div><h1 class="text-2xl font-extrabold text-gray-900">통계 대시보드</h1><p class="text-gray-500 mt-1">대회를 선택하세요</p></div><div class="space-y-3">'+
+            d.tournaments.map(t => '<a href="/dashboard?tid='+t.id+'" class="block bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition"><h3 class="font-bold text-gray-900">'+t.name+'</h3><p class="text-sm text-gray-500">'+t.courts+'코트</p></a>').join('')+
+            '</div><a href="/" class="block text-center mt-6 text-sm text-gray-500 hover:text-gray-700"><i class="fas fa-home mr-1"></i>메인으로</a></div>';
+        } catch(e) { app.innerHTML = '<div class="text-center py-20 text-gray-400">로딩 실패</div>'; }
+        return;
+      }
+      try {
+        const res = await fetch(API+'/tournaments/'+tid+'/dashboard');
+        const d = await res.json();
+        renderDashboard(d);
+      } catch(e) { app.innerHTML = '<div class="text-center py-20 text-gray-400">로딩 실패</div>'; }
+    }
+
+    function renderDashboard(d) {
+      const ms = d.match_stats||{}; const ps = d.participant_stats||{}; const progress = d.progress||0;
+      const lvColors = { s:'bg-red-500', a:'bg-orange-500', b:'bg-yellow-500', c:'bg-green-500', d:'bg-blue-500', e:'bg-gray-400' };
+      const lvLabels = { s:'S급', a:'A급', b:'B급', c:'C급', d:'D급', e:'E급' };
+      const app = document.getElementById('app');
+      app.innerHTML = '<div class="max-w-6xl mx-auto px-4 py-6 fade-in">'+
+        '<div class="flex items-center justify-between mb-6"><div class="flex items-center gap-3"><a href="/" class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200"><i class="fas fa-home text-gray-600"></i></a><h1 class="text-2xl font-bold text-gray-900"><i class="fas fa-chart-bar mr-2 text-orange-500"></i>'+(d.tournament?.name||'')+' - 통계</h1></div><button onclick="location.reload()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"><i class="fas fa-sync-alt mr-1"></i>새로고침</button></div>'+
+        // 진행률
+        '<div class="bg-white rounded-2xl border p-6 mb-6"><div class="flex items-center justify-between mb-3"><h3 class="text-lg font-bold text-gray-800"><i class="fas fa-tasks mr-2 text-shuttle-500"></i>대회 진행률</h3><span class="text-3xl font-extrabold '+(progress>=100?'text-green-600':progress>=50?'text-blue-600':'text-yellow-600')+'">'+progress+'%</span></div><div class="w-full bg-gray-200 rounded-full h-4 mb-3"><div class="h-4 rounded-full transition-all '+(progress>=100?'bg-green-500':progress>=50?'bg-blue-500':'bg-yellow-500')+'" style="width:'+progress+'%"></div></div><div class="grid grid-cols-2 sm:grid-cols-4 gap-4"><div class="bg-gray-50 rounded-xl p-4 text-center"><div class="text-2xl font-extrabold">'+(ms.total||0)+'</div><div class="text-xs text-gray-500">전체 경기</div></div><div class="bg-green-50 rounded-xl p-4 text-center"><div class="text-2xl font-extrabold text-green-600">'+(ms.playing||0)+'</div><div class="text-xs text-gray-500">진행중</div></div><div class="bg-yellow-50 rounded-xl p-4 text-center"><div class="text-2xl font-extrabold text-yellow-600">'+(ms.pending||0)+'</div><div class="text-xs text-gray-500">대기중</div></div><div class="bg-blue-50 rounded-xl p-4 text-center"><div class="text-2xl font-extrabold text-blue-600">'+(ms.completed||0)+'</div><div class="text-xs text-gray-500">완료</div></div></div></div>'+
+        // 참가자 + 급수
+        '<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">'+
+        '<div class="bg-white rounded-2xl border p-6"><h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-users mr-2 text-indigo-500"></i>참가자 현황</h3><div class="grid grid-cols-3 gap-3 mb-4"><div class="text-center bg-gray-50 rounded-xl p-3"><div class="text-xl font-bold">'+(ps.total||0)+'</div><div class="text-xs text-gray-500">총</div></div><div class="text-center bg-blue-50 rounded-xl p-3"><div class="text-xl font-bold text-blue-600">'+(ps.male||0)+'</div><div class="text-xs text-gray-500">남</div></div><div class="text-center bg-pink-50 rounded-xl p-3"><div class="text-xl font-bold text-pink-600">'+(ps.female||0)+'</div><div class="text-xs text-gray-500">여</div></div></div><div class="space-y-2"><div class="flex items-center justify-between text-sm"><span class="text-gray-600"><i class="fas fa-won-sign mr-1 text-green-500"></i>참가비</span><span class="font-bold">'+(ps.paid||0)+'/'+(ps.total||0)+'</span></div><div class="flex items-center justify-between text-sm"><span class="text-gray-600"><i class="fas fa-check-circle mr-1 text-blue-500"></i>체크인</span><span class="font-bold">'+(ps.checked_in||0)+'/'+(ps.total||0)+'</span></div></div></div>'+
+        '<div class="bg-white rounded-2xl border p-6"><h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-signal mr-2 text-orange-500"></i>급수 분포</h3><div class="space-y-2">'+(d.level_distribution||[]).map(l => '<div class="flex items-center gap-3"><span class="w-8 text-sm font-bold">'+(lvLabels[l.level]||l.level)+'</span><div class="flex-1 bg-gray-100 rounded-full h-5"><div class="'+(lvColors[l.level]||'bg-gray-400')+' h-5 rounded-full flex items-center justify-end pr-2" style="width:'+Math.max(ps.total?Math.round(l.count/ps.total*100):0,8)+'%"><span class="text-white text-xs font-bold">'+l.count+'</span></div></div><span class="text-xs text-gray-500 w-10 text-right">'+(ps.total?Math.round(l.count/ps.total*100):0)+'%</span></div>').join('')+'</div></div></div>'+
+        // 종목별
+        '<div class="bg-white rounded-2xl border p-6 mb-6"><h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-layer-group mr-2 text-shuttle-500"></i>종목별 현황</h3><div class="overflow-x-auto"><table class="w-full"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left text-sm font-semibold text-gray-600">종목</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">팀</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">전체</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">진행</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">완료</th><th class="px-3 py-2 text-left text-sm font-semibold text-gray-600">진행률</th></tr></thead><tbody class="divide-y divide-gray-100">'+(d.event_stats||[]).map(ev => { const pct=ev.total_matches>0?Math.round(ev.completed_matches/ev.total_matches*100):0; return '<tr class="hover:bg-gray-50"><td class="px-3 py-2 font-medium">'+ev.name+'</td><td class="px-3 py-2 text-center font-bold">'+ev.team_count+'</td><td class="px-3 py-2 text-center">'+ev.total_matches+'</td><td class="px-3 py-2 text-center text-green-600 font-bold">'+ev.playing_matches+'</td><td class="px-3 py-2 text-center text-blue-600">'+ev.completed_matches+'</td><td class="px-3 py-2"><div class="flex items-center gap-2"><div class="flex-1 bg-gray-200 rounded-full h-2"><div class="'+(pct>=100?'bg-green-500':'bg-blue-500')+' h-2 rounded-full" style="width:'+pct+'%"></div></div><span class="text-xs font-bold">'+pct+'%</span></div></td></tr>'; }).join('')+'</tbody></table></div></div>'+
+        // 코트별
+        '<div class="bg-white rounded-2xl border p-6 mb-6"><h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-th-large mr-2 text-green-500"></i>코트별 현황</h3><div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">'+(d.court_stats||[]).map(ct => '<div class="rounded-xl border '+(ct.playing>0?'border-green-300 bg-green-50':'border-gray-200 bg-gray-50')+' p-4 text-center"><div class="text-2xl font-extrabold '+(ct.playing>0?'text-green-600':'text-gray-400')+'">'+ct.court_number+'</div><div class="text-xs text-gray-500 mb-1">'+ct.court_number+'코트</div>'+(ct.playing>0?'<span class="badge bg-green-100 text-green-700 text-xs">진행중</span>':'')+'<div class="text-xs text-gray-500 mt-1">대기 '+ct.pending+' · 완료 '+ct.completed+'</div></div>').join('')+'</div></div>'+
+        // 클럽별
+        ((d.club_stats||[]).length>0?'<div class="bg-white rounded-2xl border p-6 mb-6"><h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-building mr-2 text-teal-500"></i>클럽별 성적</h3><div class="overflow-x-auto"><table class="w-full"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left text-sm font-semibold text-gray-600">클럽</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">선수</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">팀</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">승</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">패</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">승률</th></tr></thead><tbody class="divide-y divide-gray-100">'+(d.club_stats||[]).sort((a,b)=>b.win_rate-a.win_rate).map((cl,i) => '<tr class="hover:bg-gray-50"><td class="px-3 py-2 font-medium text-teal-700">'+(i<3?['🥇','🥈','🥉'][i]+' ':'')+cl.club+'</td><td class="px-3 py-2 text-center">'+cl.player_count+'</td><td class="px-3 py-2 text-center">'+cl.team_count+'</td><td class="px-3 py-2 text-center text-green-600 font-bold">'+cl.wins+'</td><td class="px-3 py-2 text-center text-red-500">'+cl.losses+'</td><td class="px-3 py-2 text-center font-bold '+(cl.win_rate>=60?'text-green-600':cl.win_rate>=40?'text-blue-600':'text-gray-600')+'">'+cl.win_rate+'%</td></tr>').join('')+'</tbody></table></div></div>':'')+
+      '</div>';
+    }
+
+    load();
+    // 자동 새로고침 (30초)
+    if (tid) setInterval(load, 30000);
+  </script>
+</body>
+</html>`
+}
