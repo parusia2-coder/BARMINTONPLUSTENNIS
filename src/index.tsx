@@ -70,7 +70,22 @@ function getCourtHtml(): string {
     .tabular-nums { font-variant-numeric: tabular-nums; }
     .score-display { transition: all 0.15s ease; }
     .score-flash { transform: scale(1.15); color: #facc15; }
-    @keyframes scorePop { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+
+    /* 좌우 점수판 터치 영역 */
+    .touch-area { -webkit-tap-highlight-color: transparent; transition: background 0.15s ease; }
+    .touch-flash { background: rgba(255,255,255,0.08) !important; }
+    
+    /* 점수 폰트 크기: 화면 크기에 반응 */
+    .score-num { 
+      font-size: clamp(6rem, 20vw, 14rem); 
+      line-height: 1;
+      text-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    
+    /* 승리 글로우 효과 */
+    .winner-glow-left { box-shadow: inset 0 0 80px rgba(59,130,246,0.15); }
+    .winner-glow-right { box-shadow: inset 0 0 80px rgba(249,115,22,0.15); }
+
     /* 전체화면용 */
     html, body { height: 100%; overflow: hidden; }
     #app { height: 100%; overflow-y: auto; }

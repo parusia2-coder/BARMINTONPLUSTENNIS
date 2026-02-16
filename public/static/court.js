@@ -1,6 +1,6 @@
 // ==========================================
 // 코트 전용 점수판 - Court Scoreboard
-// 태블릿/모바일 최적화 실시간 점수 입력
+// 좌우 레이아웃 + 터치 점수 입력 + 전후반 교체
 // 1세트 단판 경기 전용
 // ==========================================
 const API = '/api';
@@ -16,10 +16,28 @@ const courtState = {
   courts: [],
   stats: null,
   autoRefreshTimer: null,
-  score: { team1: 0, team2: 0 },
-  targetScore: 25, // 기본 25점 (예선), 토너먼트는 21점
+  score: { left: 0, right: 0 },
+  // left/right → 실제 team 매핑 (교체 가능)
+  leftTeam: 1,   // 1=team1, 2=team2
+  rightTeam: 2,
+  swapped: false, // 전후반 교체 여부
+  targetScore: 25,
   format: 'kdk'
 };
+
+// 실제 팀 점수 ↔ left/right 매핑
+function getTeam1Score() { return courtState.leftTeam === 1 ? courtState.score.left : courtState.score.right; }
+function getTeam2Score() { return courtState.leftTeam === 1 ? courtState.score.right : courtState.score.left; }
+function getLeftName() {
+  const m = courtState.currentMatch;
+  if (!m) return '팀';
+  return courtState.leftTeam === 1 ? (m.team1_name || '팀1') : (m.team2_name || '팀2');
+}
+function getRightName() {
+  const m = courtState.currentMatch;
+  if (!m) return '팀';
+  return courtState.rightTeam === 1 ? (m.team1_name || '팀1') : (m.team2_name || '팀2');
+}
 
 // API Helper
 async function courtApi(path, options = {}) {
@@ -44,9 +62,7 @@ function showCourtToast(msg, type = 'info') {
   setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(() => t.remove(), 300); }, 2500);
 }
 
-// ==========================================
-// URL 파라미터 처리
-// ==========================================
+// URL 파라미터
 function parseUrlParams() {
   const params = new URLSearchParams(window.location.search);
   courtState.tournamentId = params.get('tid');
@@ -60,7 +76,7 @@ function renderCourt() {
   const app = document.getElementById('app');
   switch (courtState.page) {
     case 'select': app.innerHTML = renderCourtSelect(); break;
-    case 'court': app.innerHTML = renderCourtScoreboard(); break;
+    case 'court': app.innerHTML = renderCourtScoreboard(); bindScoreboardEvents(); break;
     default: app.innerHTML = renderCourtSelect();
   }
 }
@@ -118,146 +134,193 @@ function renderCourtPicker() {
 }
 
 // ==========================================
-// 코트 점수판 (메인 화면) - 1세트 단판
+// 메인 점수판 - 좌우 레이아웃 + 터치 영역
 // ==========================================
 function renderCourtScoreboard() {
   const m = courtState.currentMatch;
-  const t = courtState.tournament;
+  if (!m) return renderWaitingScreen();
 
-  if (!m) {
-    return renderWaitingScreen();
-  }
-
-  const s1 = courtState.score.team1;
-  const s2 = courtState.score.team2;
+  const sL = courtState.score.left;
+  const sR = courtState.score.right;
   const target = courtState.targetScore;
-  const maxScore = Math.max(s1, s2);
+  const maxScore = Math.max(sL, sR);
   const isNearEnd = maxScore >= target - 3 && maxScore < target;
   const isGamePoint = maxScore === target - 1;
 
-  return `<div class="min-h-screen bg-gray-900 text-white flex flex-col select-none" style="touch-action: manipulation;">
-    <!-- 상단 바 -->
-    <div class="flex items-center justify-between px-4 py-2 bg-black/40 border-b border-white/10">
+  const leftName = getLeftName();
+  const rightName = getRightName();
+
+  return `<div class="h-screen bg-gray-900 text-white flex flex-col select-none" style="touch-action:manipulation;overflow:hidden;">
+    <!-- 상단 정보 바 -->
+    <div class="flex items-center justify-between px-3 py-1.5 bg-black/50 border-b border-white/10 shrink-0" style="min-height:40px;">
       <div class="flex items-center gap-2">
-        <span class="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full pulse-live">${courtState.courtNumber}코트</span>
+        <span class="bg-green-500 text-white text-xs font-bold px-2.5 py-0.5 rounded-full pulse-live">${courtState.courtNumber}코트</span>
         <span class="text-xs text-gray-400">#${m.match_order}</span>
-        <span class="text-xs text-gray-500 ml-2">${m.event_name || ''}</span>
+        <span class="text-xs text-gray-500">${m.event_name || ''}</span>
       </div>
-      <div class="flex items-center gap-2">
-        <span class="px-2 py-0.5 rounded-full text-xs font-bold ${courtState.targetScore === 21 ? 'bg-red-500/30 text-red-300' : 'bg-yellow-500/30 text-yellow-300'}">
-          ${target}점 선취 ${courtState.format === 'tournament' ? '(본선)' : '(예선)'}
+      <div class="flex items-center gap-1.5">
+        <span class="px-2 py-0.5 rounded-full text-xs font-bold ${target === 21 ? 'bg-red-500/30 text-red-300' : 'bg-yellow-500/30 text-yellow-300'}">
+          ${target}점 ${courtState.format === 'tournament' ? '본선' : '예선'}
         </span>
-        <button onclick="exitCourt()" class="text-gray-500 hover:text-white text-sm px-2"><i class="fas fa-times"></i></button>
+        <span class="text-xs px-2 py-0.5 rounded-full font-bold ${getProgressClass()}">${getProgressLabel()}</span>
+        <button onclick="exitCourt()" class="text-gray-500 hover:text-white text-sm px-1.5 ml-1"><i class="fas fa-times"></i></button>
       </div>
     </div>
 
-    <!-- 메인 점수판 -->
-    <div class="flex-1 flex flex-col">
-      <!-- 팀1 (상단) -->
-      <div class="flex-1 flex flex-col items-center justify-center relative 
-        ${s1 > s2 ? 'bg-gradient-to-b from-blue-900/40 to-transparent' : ''}">
-        <div class="text-center mb-3">
-          <p class="text-xl font-bold text-blue-400">${m.team1_name || '팀 1'}</p>
+    <!-- 메인 점수판: 좌우 구조 -->
+    <div class="flex-1 flex flex-row relative" style="min-height:0;">
+      
+      <!-- 왼쪽 팀 (터치 영역) -->
+      <div id="left-zone" class="flex-1 flex flex-col items-center justify-center relative cursor-pointer touch-area
+        ${sL > sR ? 'bg-gradient-to-r from-blue-900/30 to-transparent' : ''}
+        ${sL >= target ? 'winner-glow-left' : ''}"
+        style="border-right: 3px solid rgba(255,255,255,0.1);">
+        
+        <!-- 팀 이름 -->
+        <div class="absolute top-3 left-0 right-0 text-center">
+          <p class="text-lg sm:text-xl font-bold text-blue-400 truncate px-4">${leftName}</p>
+          ${courtState.swapped ? '<span class="text-xs text-yellow-400/70"><i class="fas fa-exchange-alt mr-1"></i>교체됨</span>' : ''}
         </div>
-        <div class="flex items-center gap-8">
-          <button onclick="changeScore(1, -1)" class="score-btn w-20 h-20 rounded-2xl bg-red-600/80 hover:bg-red-500 text-4xl font-bold shadow-lg active:scale-90 transition">−</button>
-          <div class="text-center">
-            <div class="text-9xl font-black tabular-nums leading-none score-display ${s1 >= target ? 'text-yellow-400' : ''}" id="score-team1" style="font-size: 10rem;">${s1}</div>
-          </div>
-          <button onclick="changeScore(1, 1)" class="score-btn w-20 h-20 rounded-2xl bg-blue-600/80 hover:bg-blue-500 text-4xl font-bold shadow-lg active:scale-90 transition">+</button>
+
+        <!-- 점수 -->
+        <div class="text-center" id="left-score-display">
+          <div class="score-num font-black tabular-nums leading-none text-white ${sL >= target ? 'text-yellow-400' : ''}" 
+               id="score-left">${sL}</div>
         </div>
+
+        <!-- 터치 안내 (작은 텍스트) -->
+        <div class="absolute bottom-14 left-0 right-0 text-center">
+          <span class="text-xs text-white/20"><i class="fas fa-hand-pointer mr-1"></i>터치하여 +1</span>
+        </div>
+
+        <!-- -1 버튼 (하단) -->
+        <button onclick="event.stopPropagation();changeScore('left',-1)" 
+          class="absolute bottom-2 left-1/2 -translate-x-1/2 w-14 h-10 rounded-xl bg-red-600/60 hover:bg-red-500 text-xl font-bold shadow-lg active:scale-90 transition z-10">
+          −1
+        </button>
       </div>
 
-      <!-- 중앙 구분선 -->
-      <div class="flex items-center px-6 py-3 bg-black/30 ${isNearEnd ? 'bg-red-900/30' : ''} ${isGamePoint ? 'animate-pulse' : ''}">
-        <div class="flex-1 h-px bg-white/20"></div>
-        <div class="px-6 flex items-center gap-4">
-          <span class="text-3xl font-black text-yellow-400">${s1} : ${s2}</span>
-          <span class="text-sm px-3 py-1 rounded-full font-bold ${getProgressClass()}">${getProgressLabel()}</span>
-        </div>
-        <div class="flex-1 h-px bg-white/20"></div>
+      <!-- 중앙 컨트롤 -->
+      <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-2">
+        <!-- 교체 버튼 -->
+        <button onclick="swapSides()" id="swap-btn"
+          class="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 border-2 border-white/20 
+                 flex items-center justify-center text-white shadow-xl active:scale-90 transition backdrop-blur-sm"
+          title="좌우 교체 (전후반)">
+          <i class="fas fa-exchange-alt text-xl"></i>
+        </button>
+        <span class="text-xs text-white/40 font-bold">${courtState.swapped ? '후반' : '전반'}</span>
       </div>
 
-      <!-- 팀2 (하단) -->
-      <div class="flex-1 flex flex-col items-center justify-center relative
-        ${s2 > s1 ? 'bg-gradient-to-t from-red-900/40 to-transparent' : ''}">
-        <div class="flex items-center gap-8">
-          <button onclick="changeScore(2, -1)" class="score-btn w-20 h-20 rounded-2xl bg-red-600/80 hover:bg-red-500 text-4xl font-bold shadow-lg active:scale-90 transition">−</button>
-          <div class="text-center">
-            <div class="text-9xl font-black tabular-nums leading-none score-display ${s2 >= target ? 'text-yellow-400' : ''}" id="score-team2" style="font-size: 10rem;">${s2}</div>
-          </div>
-          <button onclick="changeScore(2, 1)" class="score-btn w-20 h-20 rounded-2xl bg-orange-600/80 hover:bg-orange-500 text-4xl font-bold shadow-lg active:scale-90 transition">+</button>
+      <!-- 오른쪽 팀 (터치 영역) -->
+      <div id="right-zone" class="flex-1 flex flex-col items-center justify-center relative cursor-pointer touch-area
+        ${sR > sL ? 'bg-gradient-to-l from-orange-900/30 to-transparent' : ''}
+        ${sR >= target ? 'winner-glow-right' : ''}">
+
+        <!-- 팀 이름 -->
+        <div class="absolute top-3 left-0 right-0 text-center">
+          <p class="text-lg sm:text-xl font-bold text-orange-400 truncate px-4">${rightName}</p>
+          ${courtState.swapped ? '<span class="text-xs text-yellow-400/70"><i class="fas fa-exchange-alt mr-1"></i>교체됨</span>' : ''}
         </div>
-        <div class="text-center mt-3">
-          <p class="text-xl font-bold text-orange-400">${m.team2_name || '팀 2'}</p>
+
+        <!-- 점수 -->
+        <div class="text-center" id="right-score-display">
+          <div class="score-num font-black tabular-nums leading-none text-white ${sR >= target ? 'text-yellow-400' : ''}" 
+               id="score-right">${sR}</div>
         </div>
+
+        <!-- 터치 안내 -->
+        <div class="absolute bottom-14 left-0 right-0 text-center">
+          <span class="text-xs text-white/20"><i class="fas fa-hand-pointer mr-1"></i>터치하여 +1</span>
+        </div>
+
+        <!-- -1 버튼 -->
+        <button onclick="event.stopPropagation();changeScore('right',-1)" 
+          class="absolute bottom-2 left-1/2 -translate-x-1/2 w-14 h-10 rounded-xl bg-red-600/60 hover:bg-red-500 text-xl font-bold shadow-lg active:scale-90 transition z-10">
+          −1
+        </button>
       </div>
     </div>
 
-    <!-- 하단 컨트롤 -->
-    <div class="bg-black/40 border-t border-white/10 px-4 py-3">
+    <!-- 하단 컨트롤 바 -->
+    <div class="bg-black/50 border-t border-white/10 px-3 py-2 shrink-0" style="min-height:52px;">
       <div class="flex gap-2">
-        <button onclick="undoLastAction()" class="flex-1 py-3 bg-white/10 rounded-xl text-sm font-medium hover:bg-white/20">
+        <button onclick="undoLastAction()" class="flex-1 py-2.5 bg-white/10 rounded-xl text-xs sm:text-sm font-medium hover:bg-white/20 active:scale-95 transition">
           <i class="fas fa-undo mr-1"></i>실행취소
         </button>
-        <button onclick="saveCurrentScore()" class="flex-1 py-3 bg-blue-600 rounded-xl text-sm font-bold hover:bg-blue-500 shadow-lg">
-          <i class="fas fa-save mr-1"></i>점수 저장
+        <button onclick="saveCurrentScore()" class="flex-1 py-2.5 bg-blue-600 rounded-xl text-xs sm:text-sm font-bold hover:bg-blue-500 shadow-lg active:scale-95 transition">
+          <i class="fas fa-save mr-1"></i>저장
         </button>
-        <button onclick="showFinishModal()" class="flex-1 py-3 bg-green-600 rounded-xl text-sm font-bold hover:bg-green-500 shadow-lg">
-          <i class="fas fa-flag-checkered mr-1"></i>경기 종료
+        <button onclick="showFinishModal()" class="flex-1 py-2.5 bg-green-600 rounded-xl text-xs sm:text-sm font-bold hover:bg-green-500 shadow-lg active:scale-95 transition">
+          <i class="fas fa-flag-checkered mr-1"></i>종료
         </button>
       </div>
     </div>
 
     <!-- 경기종료 모달 -->
-    <div id="finish-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div class="bg-gray-800 rounded-3xl shadow-2xl w-full max-w-md mx-4 p-6 border border-white/10">
-        <h3 class="text-xl font-bold text-center mb-6"><i class="fas fa-flag-checkered mr-2 text-green-400"></i>경기 종료</h3>
-        <div class="mb-6">
-          <div class="flex items-center justify-between bg-white/5 rounded-xl px-6 py-4">
-            <div class="text-center">
-              <p class="text-sm text-blue-400 font-medium mb-1">${m.team1_name || '팀1'}</p>
-              <p class="text-4xl font-black ${s1 > s2 ? 'text-yellow-400' : ''}">${s1}</p>
-            </div>
-            <span class="text-2xl text-gray-600 font-bold">:</span>
-            <div class="text-center">
-              <p class="text-sm text-orange-400 font-medium mb-1">${m.team2_name || '팀2'}</p>
-              <p class="text-4xl font-black ${s2 > s1 ? 'text-yellow-400' : ''}">${s2}</p>
-            </div>
+    ${renderFinishModal()}
+
+    <!-- 터치 피드백 오버레이 -->
+    <div id="touch-feedback" class="fixed pointer-events-none z-[100]" style="display:none;">
+      <div class="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-3xl font-black text-white animate-ping">+1</div>
+    </div>
+  </div>`;
+}
+
+function renderFinishModal() {
+  const m = courtState.currentMatch;
+  if (!m) return '';
+  const sL = courtState.score.left;
+  const sR = courtState.score.right;
+  const leftName = getLeftName();
+  const rightName = getRightName();
+
+  return `<div id="finish-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+    <div class="bg-gray-800 rounded-3xl shadow-2xl w-full max-w-md mx-4 p-6 border border-white/10">
+      <h3 class="text-xl font-bold text-center mb-6"><i class="fas fa-flag-checkered mr-2 text-green-400"></i>경기 종료</h3>
+      <div class="mb-6">
+        <div class="flex items-center justify-between bg-white/5 rounded-xl px-6 py-4">
+          <div class="text-center flex-1">
+            <p class="text-sm text-blue-400 font-medium mb-1">${leftName}</p>
+            <p class="text-4xl font-black ${sL > sR ? 'text-yellow-400' : ''}">${sL}</p>
+          </div>
+          <span class="text-2xl text-gray-600 font-bold mx-4">:</span>
+          <div class="text-center flex-1">
+            <p class="text-sm text-orange-400 font-medium mb-1">${rightName}</p>
+            <p class="text-4xl font-black ${sR > sL ? 'text-yellow-400' : ''}">${sR}</p>
           </div>
         </div>
-        <div class="mb-6">
-          <p class="text-sm text-gray-400 mb-3 text-center">승자를 선택하세요</p>
-          <div class="grid grid-cols-2 gap-3">
-            <button onclick="selectWinner(1)" id="winner-btn-1" class="py-4 bg-blue-600/30 border-2 border-blue-500/30 rounded-2xl text-center hover:bg-blue-600/50 transition">
-              <p class="font-bold text-blue-400">${m.team1_name || '팀1'}</p>
-              <p class="text-3xl font-black mt-1">${s1}</p>
-            </button>
-            <button onclick="selectWinner(2)" id="winner-btn-2" class="py-4 bg-orange-600/30 border-2 border-orange-500/30 rounded-2xl text-center hover:bg-orange-600/50 transition">
-              <p class="font-bold text-orange-400">${m.team2_name || '팀2'}</p>
-              <p class="text-3xl font-black mt-1">${s2}</p>
-            </button>
-          </div>
-        </div>
-        <div class="flex gap-3">
-          <button onclick="closeFinishModal()" class="flex-1 py-3 bg-white/10 rounded-xl font-medium hover:bg-white/20">취소</button>
-          <button onclick="confirmFinish()" id="confirm-finish-btn" class="flex-1 py-3 bg-green-600 rounded-xl font-bold hover:bg-green-500 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-            <i class="fas fa-check mr-1"></i>경기 종료 확인
+      </div>
+      <div class="mb-6">
+        <p class="text-sm text-gray-400 mb-3 text-center">승자를 선택하세요</p>
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="selectWinner('left')" id="winner-btn-left" class="py-4 bg-blue-600/30 border-2 border-blue-500/30 rounded-2xl text-center hover:bg-blue-600/50 transition">
+            <p class="font-bold text-blue-400">${leftName}</p>
+            <p class="text-3xl font-black mt-1">${sL}</p>
+          </button>
+          <button onclick="selectWinner('right')" id="winner-btn-right" class="py-4 bg-orange-600/30 border-2 border-orange-500/30 rounded-2xl text-center hover:bg-orange-600/50 transition">
+            <p class="font-bold text-orange-400">${rightName}</p>
+            <p class="text-3xl font-black mt-1">${sR}</p>
           </button>
         </div>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="closeFinishModal()" class="flex-1 py-3 bg-white/10 rounded-xl font-medium hover:bg-white/20">취소</button>
+        <button onclick="confirmFinish()" id="confirm-finish-btn" class="flex-1 py-3 bg-green-600 rounded-xl font-bold hover:bg-green-500 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+          <i class="fas fa-check mr-1"></i>경기 종료 확인
+        </button>
       </div>
     </div>
   </div>`;
 }
 
 // ==========================================
-// 대기 화면 (경기 없을때)
+// 대기 화면
 // ==========================================
 function renderWaitingScreen() {
   const next = courtState.nextMatches;
   const recent = courtState.recentMatches;
   return `<div class="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col select-none">
-    <!-- 상단 -->
     <div class="flex items-center justify-between px-4 py-3 bg-black/30 border-b border-white/10">
       <div class="flex items-center gap-2">
         <span class="bg-yellow-500 text-black text-sm font-bold px-4 py-1.5 rounded-full">${courtState.courtNumber}코트</span>
@@ -268,8 +331,6 @@ function renderWaitingScreen() {
         <button onclick="exitCourt()" class="px-3 py-1.5 bg-white/10 rounded-lg text-sm hover:bg-white/20"><i class="fas fa-sign-out-alt"></i></button>
       </div>
     </div>
-
-    <!-- 대기 메시지 -->
     <div class="flex-1 flex flex-col items-center justify-center px-6">
       <div class="text-center mb-8">
         <div class="w-24 h-24 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-4">
@@ -282,7 +343,6 @@ function renderWaitingScreen() {
           <span class="text-sm font-bold">${courtState.targetScore}점 선취제 · 1세트 단판 ${courtState.format === 'tournament' ? '(본선)' : '(예선)'}</span>
         </div>
       </div>
-
       ${next.length > 0 ? `
         <button onclick="startNextMatch()" class="w-full max-w-md py-5 bg-gradient-to-r from-green-600 to-green-500 rounded-2xl text-xl font-bold shadow-xl hover:shadow-green-500/30 active:scale-95 transition mb-6">
           <i class="fas fa-play mr-2"></i>다음 경기 시작
@@ -306,7 +366,6 @@ function renderWaitingScreen() {
           <p class="text-gray-500 text-lg">이 코트에 배정된 대기 경기가 없습니다.</p>
         </div>
       `}
-
       ${recent.length > 0 ? `
         <div class="w-full max-w-md mt-6">
           <h3 class="text-sm font-semibold text-gray-400 mb-3"><i class="fas fa-history mr-1"></i>최근 완료</h3>
@@ -331,28 +390,75 @@ function renderWaitingScreen() {
 }
 
 // ==========================================
-// 점수 진행 상태 표시
+// 터치 이벤트 바인딩
+// ==========================================
+function bindScoreboardEvents() {
+  const leftZone = document.getElementById('left-zone');
+  const rightZone = document.getElementById('right-zone');
+
+  if (leftZone) {
+    leftZone.addEventListener('click', (e) => {
+      // -1 버튼은 stopPropagation으로 처리됨
+      if (e.target.closest('button')) return;
+      showTouchFeedback(e, 'left');
+      changeScore('left', 1);
+    });
+  }
+
+  if (rightZone) {
+    rightZone.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      showTouchFeedback(e, 'right');
+      changeScore('right', 1);
+    });
+  }
+}
+
+function showTouchFeedback(e, side) {
+  const fb = document.getElementById('touch-feedback');
+  if (!fb) return;
+  
+  const rect = e.currentTarget.getBoundingClientRect();
+  const x = e.clientX || (e.touches && e.touches[0].clientX) || rect.left + rect.width / 2;
+  const y = e.clientY || (e.touches && e.touches[0].clientY) || rect.top + rect.height / 2;
+  
+  fb.style.left = (x - 40) + 'px';
+  fb.style.top = (y - 40) + 'px';
+  fb.style.display = 'block';
+  
+  // 터치한 영역에 플래시 효과
+  const zone = document.getElementById(side + '-zone');
+  if (zone) {
+    zone.classList.add('touch-flash');
+    setTimeout(() => zone.classList.remove('touch-flash'), 200);
+  }
+
+  setTimeout(() => { fb.style.display = 'none'; }, 400);
+}
+
+// ==========================================
+// 진행 상태 표시
 // ==========================================
 function getProgressLabel() {
   const target = courtState.targetScore;
-  const s1 = courtState.score.team1;
-  const s2 = courtState.score.team2;
-  const maxScore = Math.max(s1, s2);
+  const sL = courtState.score.left;
+  const sR = courtState.score.right;
+  const maxScore = Math.max(sL, sR);
 
-  if (s1 >= target && s1 > s2) return '경기 종료!';
-  if (s2 >= target && s2 > s1) return '경기 종료!';
+  if (sL >= target && sL > sR) return '경기 종료!';
+  if (sR >= target && sR > sL) return '경기 종료!';
   if (maxScore === target - 1) return '게임 포인트!';
-  if (maxScore >= target - 3) return `${target}점까지 ${target - maxScore}점`;
-  return `목표 ${target}점`;
+  if (maxScore >= target - 3) return `${target - maxScore}점 남음`;
+  return `${sL} : ${sR}`;
 }
 
 function getProgressClass() {
   const target = courtState.targetScore;
-  const s1 = courtState.score.team1;
-  const s2 = courtState.score.team2;
-  const maxScore = Math.max(s1, s2);
+  const sL = courtState.score.left;
+  const sR = courtState.score.right;
+  const maxScore = Math.max(sL, sR);
 
-  if ((s1 >= target && s1 > s2) || (s2 >= target && s2 > s1)) return 'bg-green-500/30 text-green-300 font-bold';
+  if ((sL >= target && sL > sR) || (sR >= target && sR > sL)) return 'bg-green-500/30 text-green-300 font-bold';
   if (maxScore === target - 1) return 'bg-red-500/40 text-red-200 animate-pulse font-bold';
   if (maxScore >= target - 3) return 'bg-red-500/30 text-red-300 animate-pulse';
   if (maxScore >= target - 5) return 'bg-yellow-500/30 text-yellow-300';
@@ -360,23 +466,42 @@ function getProgressClass() {
 }
 
 // ==========================================
-// 점수 조작 - 1세트 단판
+// 좌우 교체 (전후반)
+// ==========================================
+function swapSides() {
+  // 점수도 같이 교체
+  const tmpScore = courtState.score.left;
+  courtState.score.left = courtState.score.right;
+  courtState.score.right = tmpScore;
+
+  // 팀 매핑 교체
+  const tmpTeam = courtState.leftTeam;
+  courtState.leftTeam = courtState.rightTeam;
+  courtState.rightTeam = tmpTeam;
+
+  courtState.swapped = !courtState.swapped;
+
+  showCourtToast(`🔄 좌우 교체! (${courtState.swapped ? '후반' : '전반'})`, 'info');
+  renderCourt();
+}
+
+// ==========================================
+// 점수 조작
 // ==========================================
 let actionHistory = [];
 
-function changeScore(team, delta) {
-  const key = team === 1 ? 'team1' : 'team2';
-  const oldVal = courtState.score[key];
+function changeScore(side, delta) {
+  const oldVal = courtState.score[side];
   const maxScore = courtState.targetScore + 10;
   const newVal = Math.max(0, Math.min(maxScore, oldVal + delta));
   
   if (oldVal === newVal) return;
   
-  actionHistory.push({ team, oldVal, newVal });
-  courtState.score[key] = newVal;
-  
-  // 애니메이션 효과
-  const el = document.getElementById(`score-${key}`);
+  actionHistory.push({ side, oldVal, newVal });
+  courtState.score[side] = newVal;
+
+  // DOM 직접 업데이트 (빠른 반응)
+  const el = document.getElementById(`score-${side}`);
   if (el) {
     el.textContent = newVal;
     el.classList.add('score-flash');
@@ -385,29 +510,26 @@ function changeScore(team, delta) {
 
   // 목표 점수 도달 체크
   checkGameEnd();
-  
+
+  // 전체 리렌더 (상태 바 등 업데이트)
   renderCourt();
 }
 
-// 목표 점수 도달 확인 → 바로 경기 종료
 function checkGameEnd() {
   const target = courtState.targetScore;
-  const s1 = courtState.score.team1;
-  const s2 = courtState.score.team2;
+  const sL = courtState.score.left;
+  const sR = courtState.score.right;
   
-  let winner = null;
-  if (s1 >= target && s1 > s2) winner = 1;
-  else if (s2 >= target && s2 > s1) winner = 2;
+  let winnerSide = null;
+  if (sL >= target && sL > sR) winnerSide = 'left';
+  else if (sR >= target && sR > sL) winnerSide = 'right';
   
-  if (!winner) return;
+  if (!winnerSide) return;
   
-  const winnerName = winner === 1 
-    ? (courtState.currentMatch?.team1_name || '팀1') 
-    : (courtState.currentMatch?.team2_name || '팀2');
+  const winnerName = winnerSide === 'left' ? getLeftName() : getRightName();
   
   setTimeout(() => {
-    showCourtToast(`🏆 ${winnerName} 승리! (${s1}:${s2})`, 'success');
-    // 자동으로 경기종료 모달 표시
+    showCourtToast(`🏆 ${winnerName} 승리! (${sL}:${sR})`, 'success');
     setTimeout(() => showFinishModal(), 500);
   }, 300);
 }
@@ -415,8 +537,7 @@ function checkGameEnd() {
 function undoLastAction() {
   if (actionHistory.length === 0) { showCourtToast('실행취소할 항목이 없습니다.', 'warning'); return; }
   const last = actionHistory.pop();
-  const key = last.team === 1 ? 'team1' : 'team2';
-  courtState.score[key] = last.oldVal;
+  courtState.score[last.side] = last.oldVal;
   renderCourt();
   showCourtToast('실행취소 완료', 'info');
 }
@@ -429,12 +550,10 @@ async function saveCurrentScore() {
   if (!m) return;
 
   const data = {
-    team1_set1: courtState.score.team1,
-    team1_set2: 0,
-    team1_set3: 0,
-    team2_set1: courtState.score.team2,
-    team2_set2: 0,
-    team2_set3: 0,
+    team1_set1: getTeam1Score(),
+    team1_set2: 0, team1_set3: 0,
+    team2_set1: getTeam2Score(),
+    team2_set2: 0, team2_set3: 0,
     status: 'playing'
   };
 
@@ -446,57 +565,57 @@ async function saveCurrentScore() {
   } catch(e) {}
 }
 
-let selectedWinner = null;
+let selectedWinnerSide = null;
 
 function showFinishModal() {
-  selectedWinner = null;
-  const s1 = courtState.score.team1;
-  const s2 = courtState.score.team2;
+  selectedWinnerSide = null;
+  const sL = courtState.score.left;
+  const sR = courtState.score.right;
   
-  // 점수로 자동 승자 추천
-  if (s1 > s2) selectedWinner = 1;
-  else if (s2 > s1) selectedWinner = 2;
+  if (sL > sR) selectedWinnerSide = 'left';
+  else if (sR > sL) selectedWinnerSide = 'right';
   
   renderCourt();
   const modal = document.getElementById('finish-modal');
   if (modal) {
     modal.classList.remove('hidden');
-    if (selectedWinner) selectWinner(selectedWinner);
+    if (selectedWinnerSide) selectWinner(selectedWinnerSide);
   }
 }
 
 function closeFinishModal() {
   const modal = document.getElementById('finish-modal');
   if (modal) modal.classList.add('hidden');
-  selectedWinner = null;
+  selectedWinnerSide = null;
 }
 
-function selectWinner(team) {
-  selectedWinner = team;
-  const btn1 = document.getElementById('winner-btn-1');
-  const btn2 = document.getElementById('winner-btn-2');
+function selectWinner(side) {
+  selectedWinnerSide = side;
+  const btnL = document.getElementById('winner-btn-left');
+  const btnR = document.getElementById('winner-btn-right');
   const confirmBtn = document.getElementById('confirm-finish-btn');
   
-  if (btn1 && btn2) {
-    btn1.className = `py-4 rounded-2xl text-center transition ${team === 1 ? 'bg-blue-600 border-2 border-blue-400 ring-4 ring-blue-500/30 shadow-xl' : 'bg-white/5 border-2 border-white/10'}`;
-    btn2.className = `py-4 rounded-2xl text-center transition ${team === 2 ? 'bg-orange-600 border-2 border-orange-400 ring-4 ring-orange-500/30 shadow-xl' : 'bg-white/5 border-2 border-white/10'}`;
+  if (btnL && btnR) {
+    btnL.className = `py-4 rounded-2xl text-center transition ${side === 'left' ? 'bg-blue-600 border-2 border-blue-400 ring-4 ring-blue-500/30 shadow-xl' : 'bg-white/5 border-2 border-white/10'}`;
+    btnR.className = `py-4 rounded-2xl text-center transition ${side === 'right' ? 'bg-orange-600 border-2 border-orange-400 ring-4 ring-orange-500/30 shadow-xl' : 'bg-white/5 border-2 border-white/10'}`;
   }
-  if (confirmBtn) { confirmBtn.disabled = false; }
+  if (confirmBtn) confirmBtn.disabled = false;
 }
 
 async function confirmFinish() {
-  if (!selectedWinner || !courtState.currentMatch) return;
+  if (!selectedWinnerSide || !courtState.currentMatch) return;
   
   const m = courtState.currentMatch;
+  // side → 실제 team 번호로 변환
+  const winnerTeam = selectedWinnerSide === 'left' ? courtState.leftTeam : courtState.rightTeam;
+
   const data = {
-    team1_set1: courtState.score.team1,
-    team1_set2: 0,
-    team1_set3: 0,
-    team2_set1: courtState.score.team2,
-    team2_set2: 0,
-    team2_set3: 0,
+    team1_set1: getTeam1Score(),
+    team1_set2: 0, team1_set3: 0,
+    team2_set1: getTeam2Score(),
+    team2_set2: 0, team2_set3: 0,
     status: 'completed',
-    winner_team: selectedWinner
+    winner_team: winnerTeam
   };
 
   try {
@@ -506,11 +625,13 @@ async function confirmFinish() {
     showCourtToast('경기가 종료되었습니다!', 'success');
     closeFinishModal();
     
-    // 리셋 후 대기 화면으로
     courtState.currentMatch = null;
-    courtState.score = { team1: 0, team2: 0 };
+    courtState.score = { left: 0, right: 0 };
+    courtState.leftTeam = 1;
+    courtState.rightTeam = 2;
+    courtState.swapped = false;
     actionHistory = [];
-    selectedWinner = null;
+    selectedWinnerSide = null;
     
     await refreshCourtData();
   } catch(e) {}
@@ -521,7 +642,7 @@ async function confirmFinish() {
 // ==========================================
 async function startNextMatch() {
   try {
-    const res = await courtApi(`/tournaments/${courtState.tournamentId}/court/${courtState.courtNumber}/next`, {
+    await courtApi(`/tournaments/${courtState.tournamentId}/court/${courtState.courtNumber}/next`, {
       method: 'POST', body: '{}'
     });
     showCourtToast('경기 시작!', 'success');
@@ -544,15 +665,20 @@ async function refreshCourtData() {
     courtState.targetScore = data.target_score || 25;
     courtState.format = data.tournament?.format || 'kdk';
     
-    // 현재 경기가 있으면 점수 복원 (1세트만)
     if (data.current_match) {
       const m = data.current_match;
-      courtState.score = {
-        team1: m.team1_set1 || 0,
-        team2: m.team2_set1 || 0
-      };
+      // 현재 교체 상태에 맞게 점수 복원
+      if (courtState.leftTeam === 1) {
+        courtState.score = { left: m.team1_set1 || 0, right: m.team2_set1 || 0 };
+      } else {
+        courtState.score = { left: m.team2_set1 || 0, right: m.team1_set1 || 0 };
+      }
       courtState.page = 'court';
     } else {
+      // 새 경기면 교체 상태 리셋
+      courtState.leftTeam = 1;
+      courtState.rightTeam = 2;
+      courtState.swapped = false;
       courtState.page = 'court';
     }
     
@@ -639,7 +765,10 @@ function exitCourt() {
   }
   courtState.courtNumber = null;
   courtState.currentMatch = null;
-  courtState.score = { team1: 0, team2: 0 };
+  courtState.score = { left: 0, right: 0 };
+  courtState.leftTeam = 1;
+  courtState.rightTeam = 2;
+  courtState.swapped = false;
   courtState.page = 'select';
   actionHistory = [];
   
