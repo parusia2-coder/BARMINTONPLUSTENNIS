@@ -182,12 +182,12 @@ eventRoutes.post('/:tid/events/:eid/auto-assign', async (c) => {
   const teams: { p1: any; p2: any }[] = []
 
   if (event.category === 'xd') {
-    // 혼합복식: 남녀 각각 조회 후 짝짓기
+    // 혼합복식: mixed_doubles=1인 참가자 우선, 남녀 각각 조회 후 짝짓기
     const { results: males } = await db.prepare(
-      `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='m' ${levelFilter} ORDER BY level, RANDOM()`
+      `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='m' AND mixed_doubles=1 ${levelFilter} ORDER BY level, RANDOM()`
     ).bind(tid).all()
     const { results: females } = await db.prepare(
-      `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='f' ${levelFilter} ORDER BY level, RANDOM()`
+      `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='f' AND mixed_doubles=1 ${levelFilter} ORDER BY level, RANDOM()`
     ).bind(tid).all()
 
     const count = Math.min((males || []).length, (females || []).length)
@@ -216,7 +216,7 @@ eventRoutes.post('/:tid/events/:eid/auto-assign', async (c) => {
     }
   }
 
-  if (teams.length === 0) return c.json({ error: '조건에 맞는 참가자가 부족합니다.', team_count: 0 }, 400)
+  if (teams.length === 0) return c.json({ error: '조건에 맞는 참가자가 부족합니다. (혼복종목은 혼복참가 신청자만 배정됩니다)', team_count: 0 }, 400)
 
   // DB에 팀 등록
   let created = 0
@@ -277,11 +277,12 @@ eventRoutes.post('/:tid/events/auto-assign-all', async (c) => {
     const teams: { p1: any; p2: any }[] = []
 
     if (event.category === 'xd') {
+      // 혼합복식: mixed_doubles=1인 참가자만 자동 배정
       const { results: males } = await db.prepare(
-        `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='m' ${levelFilter} ORDER BY level, RANDOM()`
+        `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='m' AND mixed_doubles=1 ${levelFilter} ORDER BY level, RANDOM()`
       ).bind(tid).all()
       const { results: females } = await db.prepare(
-        `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='f' ${levelFilter} ORDER BY level, RANDOM()`
+        `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='f' AND mixed_doubles=1 ${levelFilter} ORDER BY level, RANDOM()`
       ).bind(tid).all()
       const count = Math.min((males || []).length, (females || []).length)
       for (let i = 0; i < count; i++) {
