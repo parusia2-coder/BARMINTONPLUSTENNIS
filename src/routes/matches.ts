@@ -638,3 +638,82 @@ async function recalculateStandings(db: D1Database, tournamentId: number, eventI
     ).run()
   }
 }
+
+// 코트별 타임라인 API — 전체 경기를 코트별로 순서대로 반환
+matchRoutes.get('/:tid/timeline', async (c) => {
+  const tid = c.req.param('tid')
+  const db = c.env.DB
+
+  // 대회 정보
+  const tournament = await db.prepare(
+    'SELECT id, name, courts, format FROM tournaments WHERE id = ? AND deleted = 0'
+  ).bind(tid).first()
+  if (!tournament) return c.json({ error: '대회를 찾을 수 없습니다' }, 404)
+
+  // 전체 경기를 코트번호, 경기순서 기준으로 조회
+  const matches = await db.prepare(`
+    SELECT m.id, m.event_id, m.round, m.match_order, m.court_number,
+      m.team1_id, m.team2_id,
+      m.team1_set1, m.team1_set2, m.team1_set3,
+      m.team2_set1, m.team2_set2, m.team2_set3,
+      m.status, m.winner_team, m.group_num,
+      m.created_at, m.updated_at,
+      e.name as event_name, e.category,
+      t1.team_name as team1_name, t2.team_name as team2_name
+    FROM matches m
+    JOIN events e ON m.event_id = e.id
+    LEFT JOIN teams t1 ON m.team1_id = t1.id
+    LEFT JOIN teams t2 ON m.team2_id = t2.id
+    WHERE m.tournament_id = ?
+    ORDER BY m.court_number ASC, m.match_order ASC
+  `).bind(tid).all()
+
+  // 코트별로 그룹핑
+  const courts: Record<number, any[]> = {}
+  const numCourts = (tournament as any).courts || 6
+  for (let i = 1; i <= numCourts; i++) {
+    courts[i] = []
+  }
+
+  for (const m of (matches.results || [])) {
+    const cn = (m as any).court_number
+    if (!courts[cn]) courts[cn] = []
+    courts[cn].push({
+      id: (m as any).id,
+      match_order: (m as any).match_order,
+      round: (m as any).round,
+      group_num: (m as any).group_num,
+      event_name: (m as any).event_name,
+      category: (m as any).category,
+      team1_name: (m as any).team1_name,
+      team2_name: (m as any).team2_name,
+      team1_score: ((m as any).team1_set1 || 0) + ((m as any).team1_set2 || 0) + ((m as any).team1_set3 || 0),
+      team2_score: ((m as any).team2_set1 || 0) + ((m as any).team2_set2 || 0) + ((m as any).team2_set3 || 0),
+      team1_sets: [(m as any).team1_set1, (m as any).team1_set2, (m as any).team1_set3],
+      team2_sets: [(m as any).team2_set1, (m as any).team2_set2, (m as any).team2_set3],
+      status: (m as any).status,
+      winner_team: (m as any).winner_team,
+      updated_at: (m as any).updated_at
+    })
+  }
+
+  // 통계
+  const allMatches = matches.results || []
+  const stats = {
+    total: allMatches.length,
+    completed: allMatches.filter((m: any) => m.status === 'completed').length,
+    playing: allMatches.filter((m: any) => m.status === 'playing').length,
+    pending: allMatches.filter((m: any) => m.status === 'pending').length,
+  }
+
+  return c.json({
+    tournament: {
+      id: (tournament as any).id,
+      name: (tournament as any).name,
+      courts: numCourts,
+      format: (tournament as any).format
+    },
+    courts,
+    stats
+  })
+})

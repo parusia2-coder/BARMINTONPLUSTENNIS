@@ -39,6 +39,11 @@ app.get('/dashboard', (c) => {
   return c.html(getDashboardHtml())
 })
 
+// 코트별 타임라인 (전체 경기 흐름 한눈에 보기)
+app.get('/timeline', (c) => {
+  return c.html(getTimelineHtml())
+})
+
 // SPA - serve index.html for all non-API routes
 app.get('*', (c) => {
   return c.html(getIndexHtml())
@@ -503,6 +508,324 @@ function getDashboardHtml(): string {
     load();
     // 자동 새로고침 (30초)
     if (tid) setInterval(load, 30000);
+  </script>
+</body>
+</html>`
+}
+
+function getTimelineHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏸 코트별 타임라인</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: {
+        emerald: { 50:'#ecfdf5',100:'#d1fae5',200:'#a7f3d0',300:'#6ee7b7',400:'#34d399',500:'#10b981',600:'#059669',700:'#047857',800:'#065f46',900:'#064e3b' }
+      }}}
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap');
+    body { font-family: 'Noto Sans KR', sans-serif; }
+    .fade-in { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; }
+    .pulse-live { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+    
+    /* 타임라인 레인 */
+    .court-lane {
+      position: relative;
+      min-height: 60px;
+    }
+    .court-lane::before {
+      content: '';
+      position: absolute;
+      top: 28px;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: #e2e8f0;
+      border-radius: 2px;
+      z-index: 0;
+    }
+    .match-node {
+      position: relative;
+      z-index: 1;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    .match-node:hover {
+      transform: translateY(-2px);
+      z-index: 10;
+    }
+    .match-node:hover .match-tooltip {
+      display: block;
+    }
+    .match-tooltip {
+      display: none;
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-bottom: 8px;
+      white-space: nowrap;
+      z-index: 50;
+    }
+
+    /* 스크롤 커스텀 */
+    .timeline-scroll::-webkit-scrollbar { height: 8px; }
+    .timeline-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+    .timeline-scroll::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+    .timeline-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+    /* 상태 도트 */
+    .dot-completed { background: #10b981; }
+    .dot-playing { background: #f59e0b; animation: pulse 1.5s infinite; }
+    .dot-pending { background: #cbd5e1; }
+
+    /* 종목 카테고리 색상 */
+    .cat-md { border-color: #3b82f6; }
+    .cat-wd { border-color: #ec4899; }
+    .cat-xd { border-color: #8b5cf6; }
+    .cat-bg-md { background: #eff6ff; }
+    .cat-bg-wd { background: #fdf2f8; }
+    .cat-bg-xd { background: #f5f3ff; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+  <div id="app"><div class="flex items-center justify-center h-screen"><i class="fas fa-spinner fa-spin text-4xl text-gray-400"></i></div></div>
+  <script>
+    const API = '/api';
+    const params = new URLSearchParams(window.location.search);
+    const tid = params.get('tid');
+    const CAT_LABELS = { md: '남복', wd: '여복', xd: '혼복' };
+    const CAT_COLORS = { 
+      md: { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', dot: 'bg-blue-500', ring: 'ring-blue-200' },
+      wd: { bg: 'bg-pink-50', border: 'border-pink-300', text: 'text-pink-700', dot: 'bg-pink-500', ring: 'ring-pink-200' },
+      xd: { bg: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-700', dot: 'bg-purple-500', ring: 'ring-purple-200' }
+    };
+    const STATUS = {
+      completed: { label: '완료', bg: 'bg-emerald-500', text: 'text-white', ring: 'ring-emerald-200', icon: 'fa-check' },
+      playing: { label: '진행중', bg: 'bg-amber-400', text: 'text-amber-900', ring: 'ring-amber-200', icon: 'fa-play' },
+      pending: { label: '대기', bg: 'bg-slate-200', text: 'text-slate-500', ring: 'ring-slate-100', icon: 'fa-clock' }
+    };
+
+    let filterCategory = 'all';
+    let timelineData = null;
+
+    async function load() {
+      const app = document.getElementById('app');
+      if (!tid) {
+        try {
+          const res = await fetch(API+'/tournaments');
+          const d = await res.json();
+          app.innerHTML = renderSelectTournament(d.tournaments);
+        } catch(e) { app.innerHTML = '<div class="text-center py-20 text-gray-400">로딩 실패</div>'; }
+        return;
+      }
+      try {
+        const res = await fetch(API+'/tournaments/'+tid+'/timeline');
+        if (!res.ok) throw new Error();
+        timelineData = await res.json();
+        renderTimeline();
+      } catch(e) {
+        app.innerHTML = '<div class="text-center py-20 text-gray-400"><i class="fas fa-exclamation-circle text-3xl mb-3"></i><p>데이터를 불러올 수 없습니다.</p></div>';
+      }
+    }
+
+    function renderSelectTournament(tournaments) {
+      return '<div class="max-w-lg mx-auto px-4 py-8 fade-in">'+
+        '<div class="text-center mb-8">'+
+          '<div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 mb-3 shadow-lg"><i class="fas fa-stream text-2xl text-white"></i></div>'+
+          '<h1 class="text-2xl font-extrabold text-gray-900">코트별 타임라인</h1>'+
+          '<p class="text-gray-500 mt-1">대회를 선택하세요</p>'+
+        '</div>'+
+        '<div class="space-y-3">'+
+          tournaments.map(function(t) { return '<a href="/timeline?tid='+t.id+'" class="block bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition"><h3 class="font-bold text-gray-900">'+t.name+'</h3><p class="text-sm text-gray-500">'+t.courts+'코트</p></a>'; }).join('')+
+        '</div>'+
+        '<a href="/" class="block text-center mt-6 text-sm text-gray-500 hover:text-gray-700"><i class="fas fa-home mr-1"></i>메인으로</a>'+
+      '</div>';
+    }
+
+    function renderTimeline() {
+      const d = timelineData;
+      const t = d.tournament;
+      const courts = d.courts;
+      const stats = d.stats;
+      const progress = stats.total > 0 ? Math.round(stats.completed / stats.total * 100) : 0;
+
+      // 필터 적용
+      var filteredCourts = {};
+      for (var cn in courts) {
+        if (filterCategory === 'all') {
+          filteredCourts[cn] = courts[cn];
+        } else {
+          filteredCourts[cn] = courts[cn].filter(function(m) { return m.category === filterCategory; });
+        }
+      }
+
+      // 최대 경기 수 (스크롤 너비 기준)
+      var maxMatches = 0;
+      for (var cn in filteredCourts) {
+        if (filteredCourts[cn].length > maxMatches) maxMatches = filteredCourts[cn].length;
+      }
+
+      var html = '<div class="fade-in">';
+      
+      // 헤더
+      html += '<div class="bg-white border-b border-gray-200 sticky top-0 z-30">';
+      html += '<div class="max-w-[1800px] mx-auto px-4 sm:px-6 py-4">';
+      html += '<div class="flex items-center justify-between flex-wrap gap-3">';
+      html += '<div class="flex items-center gap-3">';
+      html += '<a href="/" class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition"><i class="fas fa-home text-gray-600"></i></a>';
+      html += '<div>';
+      html += '<h1 class="text-xl font-bold text-gray-900"><i class="fas fa-stream mr-2 text-emerald-500"></i>코트별 타임라인</h1>';
+      html += '<p class="text-sm text-gray-500">'+t.name+' · '+t.courts+'코트</p>';
+      html += '</div></div>';
+      
+      // 통계 + 필터
+      html += '<div class="flex items-center gap-3 flex-wrap">';
+      // 진행률
+      html += '<div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 border">';
+      html += '<div class="w-24 bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full '+(progress>=100?'bg-emerald-500':progress>=50?'bg-blue-500':'bg-amber-500')+'" style="width:'+progress+'%"></div></div>';
+      html += '<span class="text-xs font-bold '+(progress>=100?'text-emerald-600':'text-gray-600')+'">'+progress+'%</span>';
+      html += '</div>';
+      // 숫자 통계
+      html += '<div class="flex items-center gap-1.5 text-xs">';
+      html += '<span class="px-2 py-1 rounded bg-emerald-50 text-emerald-700 font-bold">'+stats.completed+' 완료</span>';
+      html += '<span class="px-2 py-1 rounded bg-amber-50 text-amber-700 font-bold">'+stats.playing+' 진행</span>';
+      html += '<span class="px-2 py-1 rounded bg-gray-100 text-gray-600 font-bold">'+stats.pending+' 대기</span>';
+      html += '</div>';
+      // 필터 버튼
+      html += '<div class="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg">';
+      var filterOpts = [{v:'all',l:'전체'},{v:'md',l:'남복'},{v:'wd',l:'여복'},{v:'xd',l:'혼복'}];
+      for (var i=0; i<filterOpts.length; i++) {
+        var f = filterOpts[i];
+        html += '<button onclick="setFilter(\\''+f.v+'\\');renderTimeline()" class="px-3 py-1 rounded-md text-xs font-medium transition '+(filterCategory===f.v?'bg-white shadow text-gray-900':'text-gray-500 hover:text-gray-700')+'">'+f.l+'</button>';
+      }
+      html += '</div>';
+      // 새로고침
+      html += '<button onclick="load()" class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition"><i class="fas fa-sync-alt mr-1"></i>새로고침</button>';
+      html += '</div></div></div></div>';
+
+      // 타임라인 본체
+      html += '<div class="max-w-[1800px] mx-auto px-4 sm:px-6 py-6">';
+
+      // 범례
+      html += '<div class="flex items-center gap-4 mb-6 text-xs text-gray-500">';
+      html += '<span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500"></span>완료</span>';
+      html += '<span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-400 pulse-live"></span>진행중</span>';
+      html += '<span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-slate-200"></span>대기</span>';
+      html += '<span class="mx-2 text-gray-300">|</span>';
+      html += '<span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-blue-100 border border-blue-300"></span>남복</span>';
+      html += '<span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-pink-100 border border-pink-300"></span>여복</span>';
+      html += '<span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-purple-100 border border-purple-300"></span>혼복</span>';
+      html += '</div>';
+
+      // 각 코트 레인
+      for (var cn = 1; cn <= t.courts; cn++) {
+        var matches = filteredCourts[cn] || [];
+        var courtCompleted = matches.filter(function(m){return m.status==='completed'}).length;
+        var courtPlaying = matches.filter(function(m){return m.status==='playing'}).length;
+        var courtTotal = matches.length;
+        var courtProgress = courtTotal > 0 ? Math.round(courtCompleted / courtTotal * 100) : 0;
+
+        html += '<div class="mb-6 bg-white rounded-2xl border border-gray-200 overflow-hidden">';
+        
+        // 코트 헤더
+        html += '<div class="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-100">';
+        html += '<div class="flex items-center gap-3">';
+        html += '<div class="w-10 h-10 rounded-xl '+(courtPlaying>0?'bg-gradient-to-br from-amber-400 to-amber-500':'courtCompleted===courtTotal&&courtTotal>0?bg-gradient-to-br from-emerald-400 to-emerald-500':'bg-gradient-to-br from-slate-400 to-slate-500')+' flex items-center justify-center text-white font-extrabold text-lg shadow-sm">'+cn+'</div>';
+        html += '<div>';
+        html += '<span class="font-bold text-gray-900">코트 '+cn+'</span>';
+        html += '<span class="text-xs text-gray-400 ml-2">'+courtCompleted+'/'+courtTotal+'경기</span>';
+        html += '</div></div>';
+        html += '<div class="flex items-center gap-2">';
+        html += '<div class="w-20 bg-gray-200 rounded-full h-1.5"><div class="h-1.5 rounded-full '+(courtProgress>=100?'bg-emerald-500':'bg-blue-500')+'" style="width:'+courtProgress+'%"></div></div>';
+        html += '<span class="text-xs font-bold text-gray-500">'+courtProgress+'%</span>';
+        html += '</div></div>';
+
+        // 타임라인 스크롤 영역
+        html += '<div class="timeline-scroll overflow-x-auto px-5 py-4">';
+        html += '<div class="flex items-center gap-2" style="min-width:'+Math.max(matches.length * 56, 200)+'px">';
+        
+        for (var mi = 0; mi < matches.length; mi++) {
+          var m = matches[mi];
+          var st = STATUS[m.status] || STATUS.pending;
+          var cat = CAT_COLORS[m.category] || CAT_COLORS.md;
+          var catLabel = CAT_LABELS[m.category] || '';
+          
+          // 경기 노드
+          html += '<div class="match-node relative flex-shrink-0">';
+          
+          // 도트
+          html += '<div class="w-11 h-11 rounded-xl '+st.bg+' '+st.text+' flex items-center justify-center text-xs font-bold border-2 '+(m.status==='playing'?'border-amber-400 ring-2 ring-amber-100':m.status==='completed'?'border-emerald-400':'border-transparent')+' shadow-sm">';
+          if (m.status === 'completed') {
+            html += '<i class="fas fa-check text-xs"></i>';
+          } else if (m.status === 'playing') {
+            html += '<i class="fas fa-play text-[10px]"></i>';
+          } else {
+            html += '<span class="text-[10px]">'+(mi+1)+'</span>';
+          }
+          html += '</div>';
+          
+          // 종목 표시 (하단 작은 도트)
+          html += '<div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full '+cat.dot+'"></div>';
+
+          // 툴팁
+          html += '<div class="match-tooltip">';
+          html += '<div class="'+cat.bg+' border '+cat.border+' rounded-xl px-4 py-3 shadow-xl min-w-[200px]">';
+          html += '<div class="flex items-center justify-between mb-2">';
+          html += '<span class="badge '+cat.bg+' '+cat.text+' border '+cat.border+'">'+catLabel+' '+(m.group_num?m.group_num+'조':'')+'</span>';
+          html += '<span class="badge '+st.bg+' '+st.text+'">'+st.label+'</span>';
+          html += '</div>';
+          html += '<div class="text-sm font-bold text-gray-900 mb-1">'+(m.team1_name||'TBD')+'</div>';
+          html += '<div class="text-xs text-gray-400 mb-1">vs</div>';
+          html += '<div class="text-sm font-bold text-gray-900">'+(m.team2_name||'TBD')+'</div>';
+          if (m.status === 'completed') {
+            html += '<div class="mt-2 pt-2 border-t '+cat.border+' text-center">';
+            html += '<span class="text-lg font-extrabold '+(m.winner_team===1?'text-emerald-600':'text-gray-600')+'">'+m.team1_score+'</span>';
+            html += '<span class="mx-2 text-gray-300">:</span>';
+            html += '<span class="text-lg font-extrabold '+(m.winner_team===2?'text-emerald-600':'text-gray-600')+'">'+m.team2_score+'</span>';
+            html += '</div>';
+          }
+          html += '<div class="text-[10px] text-gray-400 mt-1">#'+m.match_order+' · '+m.event_name+'</div>';
+          html += '</div></div>';
+
+          html += '</div>'; // match-node
+
+          // 연결선 (마지막 아닌 경우)
+          if (mi < matches.length - 1) {
+            var nextM = matches[mi+1];
+            html += '<div class="w-3 h-0.5 flex-shrink-0 rounded '+(m.status==='completed'?'bg-emerald-300':m.status==='playing'?'bg-amber-300':'bg-slate-200')+'"></div>';
+          }
+        }
+
+        if (matches.length === 0) {
+          html += '<div class="text-sm text-gray-400 py-2"><i class="fas fa-info-circle mr-1"></i>배정된 경기가 없습니다</div>';
+        }
+
+        html += '</div></div></div>'; // flex, scroll, card
+      }
+
+      html += '</div>'; // container
+      html += '</div>'; // fade-in
+
+      document.getElementById('app').innerHTML = html;
+    }
+
+    function setFilter(cat) {
+      filterCategory = cat;
+    }
+
+    load();
+    if (tid) setInterval(load, 15000);
   </script>
 </body>
 </html>`

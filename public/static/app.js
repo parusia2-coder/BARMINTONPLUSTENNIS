@@ -129,7 +129,7 @@ function renderHome() {
       </div>
 
       <!-- Feature Cards -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-16 max-w-4xl mx-auto">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mt-16 max-w-5xl mx-auto">
         <!-- Court Scoreboard -->
         <a href="/court" class="glass-card rounded-2xl p-5 sm:p-6 text-center cursor-pointer block fade-in-delay-1">
           <div class="feature-icon bg-gradient-to-br from-green-400 to-green-600 mx-auto shadow-lg shadow-green-500/20">
@@ -161,6 +161,14 @@ function renderHome() {
           </div>
           <h3 class="text-white font-bold text-sm sm:text-base mb-1">운영 매뉴얼</h3>
           <p class="text-slate-400 text-xs leading-relaxed hidden sm:block">장비 셋팅부터<br>당일 운영까지</p>
+        </a>
+        <!-- Timeline -->
+        <a href="/timeline" class="glass-card rounded-2xl p-5 sm:p-6 text-center cursor-pointer block fade-in-delay-4">
+          <div class="feature-icon bg-gradient-to-br from-cyan-400 to-cyan-600 mx-auto shadow-lg shadow-cyan-500/20">
+            <i class="fas fa-stream text-white"></i>
+          </div>
+          <h3 class="text-white font-bold text-sm sm:text-base mb-1">코트 타임라인</h3>
+          <p class="text-slate-400 text-xs leading-relaxed hidden sm:block">전체 경기 흐름<br>한눈에 보기</p>
         </a>
       </div>
     </div>
