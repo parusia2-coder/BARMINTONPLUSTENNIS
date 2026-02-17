@@ -5,9 +5,13 @@ import { participantRoutes } from './routes/participants'
 import { eventRoutes } from './routes/events'
 import { matchRoutes } from './routes/matches'
 import { bracketRoutes } from './routes/brackets'
+import { notificationRoutes } from './routes/notifications'
 
 type Bindings = {
   DB: D1Database
+  VAPID_PUBLIC_KEY: string
+  VAPID_PRIVATE_KEY: string
+  VAPID_SUBJECT: string
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -20,6 +24,7 @@ app.route('/api/tournaments', participantRoutes)
 app.route('/api/tournaments', eventRoutes)
 app.route('/api/tournaments', matchRoutes)
 app.route('/api/tournaments', bracketRoutes)
+app.route('/api/tournaments', notificationRoutes)
 
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))
@@ -42,6 +47,11 @@ app.get('/dashboard', (c) => {
 // 코트별 타임라인 (전체 경기 흐름 한눈에 보기)
 app.get('/timeline', (c) => {
   return c.html(getTimelineHtml())
+})
+
+// Service Worker (루트에서 접근 필요)
+app.get('/sw.js', (c) => {
+  return c.text(getServiceWorkerJs(), 200, { 'Content-Type': 'application/javascript', 'Service-Worker-Allowed': '/' })
 })
 
 // SPA - serve index.html for all non-API routes
@@ -326,7 +336,7 @@ function getMyPageHtml(): string {
   <script>
     tailwind.config = {
       theme: { extend: { colors: {
-        shuttle: { 50:'#f0fdf4',100:'#dcfce7',200:'#bbf7d0',300:'#86efac',400:'#4ade80',500:'#22c55e',600:'#16a34a',700:'#15803d',800:'#166534',900:'#14532d' }
+        emerald: { 50:'#ecfdf5',100:'#d1fae5',200:'#a7f3d0',300:'#6ee7b7',400:'#34d399',500:'#10b981',600:'#059669',700:'#047857',800:'#065f46',900:'#064e3b' }
       }}}
     }
   </script>
@@ -338,62 +348,243 @@ function getMyPageHtml(): string {
     .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
     .pulse-live { animation: pulse 2s infinite; }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+    /* 알림 배너 */
+    .notif-banner { animation: slideDown 0.4s ease-out, glow 2s infinite; }
+    @keyframes slideDown { from { transform: translateY(-100%); opacity:0; } to { transform: translateY(0); opacity:1; } }
+    @keyframes glow { 0%,100% { box-shadow: 0 4px 15px rgba(16,185,129,0.3); } 50% { box-shadow: 0 4px 25px rgba(16,185,129,0.6); } }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
+  <div id="notif-area"></div>
   <div id="app"></div>
   <script>
-    const API = '/api';
-    const LEVELS = { s: 'S', a: 'A', b: 'B', c: 'C', d: 'D', e: 'E' };
-    const LEVEL_COLORS = { s: 'bg-red-100 text-red-700', a: 'bg-orange-100 text-orange-700', b: 'bg-yellow-100 text-yellow-700', c: 'bg-green-100 text-green-700', d: 'bg-blue-100 text-blue-700', e: 'bg-gray-100 text-gray-600' };
+    var API='/api', tid=new URLSearchParams(location.search).get('tid');
+    var LEVELS={s:'S',a:'A',b:'B',c:'C',d:'D',e:'E'};
+    var LEVEL_COLORS={s:'bg-red-100 text-red-700',a:'bg-orange-100 text-orange-700',b:'bg-yellow-100 text-yellow-700',c:'bg-green-100 text-green-700',d:'bg-blue-100 text-blue-700',e:'bg-gray-100 text-gray-600'};
+    var tournament=null, currentName='', currentPhone='', lastData=null, pushSubscribed=false;
 
-    const params = new URLSearchParams(window.location.search);
-    const tid = params.get('tid');
-    let tournament = null;
-
-    function showToast(msg, type='info') {
-      const t = document.createElement('div');
-      const c = { info: 'bg-blue-500', success: 'bg-green-500', error: 'bg-red-500', warning: 'bg-yellow-500 text-gray-900' };
-      t.className = 'fixed top-4 right-4 z-[9999] px-5 py-3 rounded-lg text-white shadow-lg '+c[type]+' fade-in max-w-md';
-      t.textContent = msg; document.body.appendChild(t);
-      setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity 0.3s'; setTimeout(() => t.remove(), 300); }, 3000);
+    function showToast(msg,type){
+      var t=document.createElement('div');
+      var c={info:'bg-blue-500',success:'bg-emerald-500',error:'bg-red-500',warning:'bg-yellow-500 text-gray-900'};
+      t.className='fixed top-4 right-4 z-[9999] px-5 py-3 rounded-lg text-white shadow-lg '+(c[type]||c.info)+' fade-in max-w-md';
+      t.textContent=msg; document.body.appendChild(t);
+      setTimeout(function(){t.style.opacity='0';t.style.transition='opacity 0.3s';setTimeout(function(){t.remove()},300)},3000);
     }
 
+    // ─── 알림 배너 표시 ───
+    function showNotifBanner(title, body, courtNum) {
+      var area = document.getElementById('notif-area');
+      var id = 'nb-'+Date.now();
+      var html = '<div id="'+id+'" class="notif-banner fixed top-0 left-0 right-0 z-[9998] bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 py-3 shadow-xl">';
+      html += '<div class="max-w-2xl mx-auto flex items-center justify-between">';
+      html += '<div class="flex items-center gap-3"><div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center"><i class="fas fa-bell text-lg"></i></div>';
+      html += '<div><div class="font-bold text-sm">'+title+'</div><div class="text-xs text-emerald-100">'+body+'</div></div></div>';
+      html += '<button onclick="document.getElementById(\\''+id+'\\').remove()" class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30"><i class="fas fa-times text-sm"></i></button>';
+      html += '</div></div>';
+      area.insertAdjacentHTML('beforeend', html);
+      // 진동
+      if (navigator.vibrate) navigator.vibrate([200,100,200,100,300]);
+      // 소리
+      try { var ac=new AudioContext(); var o=ac.createOscillator(); o.frequency.value=880; o.type='sine'; var g=ac.createGain(); g.gain.value=0.3; o.connect(g); g.connect(ac.destination); o.start(); setTimeout(function(){o.stop();ac.close()},200); } catch(e){}
+      // 10초 후 자동 닫기
+      setTimeout(function(){ var el=document.getElementById(id); if(el)el.remove(); }, 10000);
+    }
+
+    // ─── Service Worker & Push 구독 ───
+    async function registerSW() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+      try {
+        var reg = await navigator.serviceWorker.register('/sw.js');
+        await navigator.serviceWorker.ready;
+        return reg;
+      } catch(e) { return false; }
+    }
+
+    async function subscribePush(name, phone) {
+      var reg = await registerSW();
+      if (!reg) { showToast('이 브라우저는 푸시 알림을 지원하지 않습니다', 'warning'); return false; }
+      try {
+        var res = await fetch(API+'/tournaments/'+tid+'/push/vapid-key');
+        var d = await res.json();
+        var permission = await Notification.requestPermission();
+        if (permission !== 'granted') { showToast('알림 권한이 거부되었습니다. 브라우저 설정에서 허용해주세요.', 'warning'); return false; }
+        var sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(d.publicKey)
+        });
+        var subJson = sub.toJSON();
+        await fetch(API+'/tournaments/'+tid+'/push/subscribe', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ subscription: { endpoint: subJson.endpoint, keys: subJson.keys }, name: name, phone: phone||'' })
+        });
+        pushSubscribed = true;
+        showToast('알림 구독 완료! 경기 시작 시 푸시 알림을 받습니다.', 'success');
+        updatePushButton();
+        return true;
+      } catch(e) { showToast('알림 구독 실패: '+e.message, 'error'); return false; }
+    }
+
+    async function unsubscribePush() {
+      if (!('serviceWorker' in navigator)) return;
+      try {
+        var reg = await navigator.serviceWorker.ready;
+        var sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch(API+'/tournaments/'+tid+'/push/unsubscribe', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ endpoint: sub.endpoint })
+          });
+          await sub.unsubscribe();
+        }
+        pushSubscribed = false;
+        showToast('알림 구독이 해제되었습니다.', 'info');
+        updatePushButton();
+      } catch(e) { showToast('구독 해제 실패', 'error'); }
+    }
+
+    async function testPush() {
+      if (!currentName) return;
+      try {
+        var res = await fetch(API+'/tournaments/'+tid+'/push/test', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ name: currentName })
+        });
+        var d = await res.json();
+        if (d.success) showToast('테스트 알림 발송! ('+d.sent+'건)', 'success');
+        else showToast(d.error || '발송 실패', 'error');
+      } catch(e) { showToast('발송 실패', 'error'); }
+    }
+
+    async function checkPushStatus(name) {
+      try {
+        var res = await fetch(API+'/tournaments/'+tid+'/push/status?name='+encodeURIComponent(name));
+        var d = await res.json();
+        pushSubscribed = d.subscribed;
+      } catch(e) {}
+    }
+
+    function updatePushButton() {
+      var btn = document.getElementById('push-btn');
+      if (!btn) return;
+      if (pushSubscribed) {
+        btn.innerHTML = '<div class="flex items-center gap-2"><div class="flex items-center gap-1.5 text-emerald-700"><i class="fas fa-bell text-emerald-500"></i><span class="font-bold text-sm">알림 ON</span></div><div class="flex gap-1"><button onclick="testPush()" class="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-200"><i class="fas fa-paper-plane mr-1"></i>테스트</button><button onclick="unsubscribePush()" class="px-2 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200"><i class="fas fa-bell-slash mr-1"></i>해제</button></div></div>';
+      } else {
+        btn.innerHTML = '<button onclick="subscribePush(\\''+currentName.replace(/'/g,"\\\\'")+'\\',\\''+currentPhone.replace(/'/g,"\\\\'")+'\\');" class="w-full px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-bold text-sm hover:shadow-lg transition flex items-center justify-center gap-2"><i class="fas fa-bell"></i>경기 시작 알림 받기 (푸시)</button>';
+      }
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+      var padding = '='.repeat((4 - base64String.length % 4) % 4);
+      var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      var rawData = atob(base64);
+      var outputArray = new Uint8Array(rawData.length);
+      for (var i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+      return outputArray;
+    }
+
+    // ─── 폴링 기반 인앱 알림 ───
+    var pollInterval = null;
+    function startPolling() {
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(pollForChanges, 15000);
+    }
+
+    async function pollForChanges() {
+      if (!currentName || !tid) return;
+      try {
+        var res = await fetch(API+'/tournaments/'+tid+'/my-matches?name='+encodeURIComponent(currentName)+(currentPhone?'&phone='+encodeURIComponent(currentPhone):''));
+        if (!res.ok) return;
+        var data = await res.json();
+        if (lastData) {
+          detectChanges(lastData, data);
+        }
+        lastData = data;
+        // 결과도 갱신
+        var el = document.getElementById('result');
+        if (el) el.innerHTML = renderResult(data);
+      } catch(e) {}
+    }
+
+    function detectChanges(oldD, newD) {
+      var oldMatches = {};
+      (oldD.matches||[]).forEach(function(m){ oldMatches[m.id] = m.status; });
+      var upcoming = newD.upcoming_matches||[];
+      for (var i=0; i<upcoming.length; i++) {
+        var m = upcoming[i];
+        var oldStatus = oldMatches[m.id];
+        // 대기→진행 전환 감지
+        if (oldStatus === 'pending' && m.status === 'playing') {
+          showNotifBanner(
+            '🏸 경기 시작!',
+            '코트 '+m.court_number+'에서 경기가 시작됩니다!\\n'+m.team1_name+' vs '+m.team2_name,
+            m.court_number
+          );
+        }
+      }
+    }
+
+    // ─── 초기화 ───
     async function init() {
-      const app = document.getElementById('app');
+      var app = document.getElementById('app');
       if (!tid) {
-        // 대회 선택 화면
         try {
-          const res = await fetch(API+'/tournaments'); const d = await res.json();
-          app.innerHTML = '<div class="max-w-lg mx-auto px-4 py-8 fade-in"><div class="text-center mb-8"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-400 to-indigo-600 mb-3"><i class="fas fa-user text-2xl text-white"></i></div><h1 class="text-2xl font-extrabold text-gray-900">내 경기 조회</h1><p class="text-gray-500 mt-1">대회를 선택하세요</p></div><div class="space-y-3">'+
-            d.tournaments.map(t => '<a href="/my?tid='+t.id+'" class="block bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition"><h3 class="font-bold text-gray-900">'+t.name+'</h3><p class="text-sm text-gray-500">'+t.courts+'코트</p></a>').join('')+
+          var res = await fetch(API+'/tournaments'); var d = await res.json();
+          app.innerHTML = '<div class="max-w-lg mx-auto px-4 py-8 fade-in"><div class="text-center mb-8"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 mb-3 shadow-lg"><i class="fas fa-user text-2xl text-white"></i></div><h1 class="text-2xl font-extrabold text-gray-900">내 경기 조회</h1><p class="text-gray-500 mt-1">대회를 선택하세요</p></div><div class="space-y-3">'+
+            d.tournaments.map(function(t){return '<a href="/my?tid='+t.id+'" class="block bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition"><h3 class="font-bold text-gray-900">'+t.name+'</h3><p class="text-sm text-gray-500">'+t.courts+'코트</p></a>';}).join('')+
             '</div><a href="/" class="block text-center mt-6 text-sm text-gray-500 hover:text-gray-700"><i class="fas fa-home mr-1"></i>메인으로</a></div>';
-        } catch(e) { app.innerHTML = '<div class="text-center py-20 text-gray-400">로딩 실패</div>'; }
+        } catch(e) { app.innerHTML='<div class="text-center py-20 text-gray-400">로딩 실패</div>'; }
         return;
       }
-      // 대회 정보 + 검색 폼
-      try {
-        const res = await fetch(API+'/tournaments/'+tid); const d = await res.json();
-        tournament = d.tournament;
-      } catch(e) {}
+      try { var res=await fetch(API+'/tournaments/'+tid); var d=await res.json(); tournament=d.tournament; } catch(e){}
       renderSearchPage();
     }
 
     function renderSearchPage() {
-      const app = document.getElementById('app');
-      app.innerHTML = '<div class="max-w-2xl mx-auto px-4 py-8 fade-in"><div class="flex items-center justify-between mb-6"><a href="/my" class="text-gray-500 hover:text-gray-700 text-sm"><i class="fas fa-arrow-left mr-1"></i>대회 선택</a><a href="/" class="text-gray-500 hover:text-gray-700 text-sm"><i class="fas fa-home mr-1"></i>메인</a></div><div class="text-center mb-6"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-400 to-indigo-600 mb-3"><i class="fas fa-user text-2xl text-white"></i></div><h1 class="text-2xl font-extrabold text-gray-900">내 경기 조회</h1><p class="text-gray-500 mt-1">'+(tournament?.name||'')+'</p></div><div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6"><form id="search-form" class="flex flex-wrap gap-3 items-end"><div class="flex-1 min-w-[150px]"><label class="block text-xs font-semibold text-gray-500 mb-1">이름 <span class="text-red-500">*</span></label><input id="s-name" required placeholder="이름 입력" class="w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"></div><div class="flex-1 min-w-[150px]"><label class="block text-xs font-semibold text-gray-500 mb-1">연락처 (선택)</label><input id="s-phone" placeholder="010-xxxx-xxxx" class="w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"></div><button type="submit" class="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700"><i class="fas fa-search mr-1"></i>조회</button></form></div><div id="result"></div></div>';
-      document.getElementById('search-form').addEventListener('submit', async (e) => {
+      var app = document.getElementById('app');
+      var h = '<div class="max-w-2xl mx-auto px-4 py-8 fade-in">';
+      h += '<div class="flex items-center justify-between mb-6"><a href="/my" class="text-gray-500 hover:text-gray-700 text-sm"><i class="fas fa-arrow-left mr-1"></i>대회 선택</a><a href="/" class="text-gray-500 hover:text-gray-700 text-sm"><i class="fas fa-home mr-1"></i>메인</a></div>';
+      h += '<div class="text-center mb-6"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 mb-3 shadow-lg"><i class="fas fa-user text-2xl text-white"></i></div>';
+      h += '<h1 class="text-2xl font-extrabold text-gray-900">내 경기 조회</h1>';
+      h += '<p class="text-gray-500 mt-1">'+(tournament?.name||'')+'</p></div>';
+      // 검색 폼
+      h += '<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-4">';
+      h += '<form id="search-form" class="flex flex-wrap gap-3 items-end">';
+      h += '<div class="flex-1 min-w-[150px]"><label class="block text-xs font-semibold text-gray-500 mb-1">이름 <span class="text-red-500">*</span></label>';
+      h += '<input id="s-name" required placeholder="이름 입력" class="w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"></div>';
+      h += '<div class="flex-1 min-w-[150px]"><label class="block text-xs font-semibold text-gray-500 mb-1">연락처 (선택)</label>';
+      h += '<input id="s-phone" placeholder="010-xxxx-xxxx" class="w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"></div>';
+      h += '<button type="submit" class="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition"><i class="fas fa-search mr-1"></i>조회</button>';
+      h += '</form></div>';
+      // 푸시 알림 버튼 영역
+      h += '<div id="push-btn" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 mb-6 hidden"></div>';
+      // 인앱 알림 안내
+      h += '<div id="polling-status" class="hidden text-center text-xs text-gray-400 mb-4"><i class="fas fa-sync-alt fa-spin mr-1"></i>15초마다 자동 갱신 중</div>';
+      // 결과 영역
+      h += '<div id="result"></div></div>';
+      app.innerHTML = h;
+
+      document.getElementById('search-form').addEventListener('submit', async function(e) {
         e.preventDefault();
-        const name = document.getElementById('s-name').value.trim();
-        const phone = document.getElementById('s-phone').value.trim();
-        if (!name) { showToast('이름을 입력해주세요', 'warning'); return; }
-        const el = document.getElementById('result');
+        currentName = document.getElementById('s-name').value.trim();
+        currentPhone = document.getElementById('s-phone').value.trim();
+        if (!currentName) { showToast('이름을 입력해주세요','warning'); return; }
+        var el = document.getElementById('result');
         el.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i></div>';
         try {
-          const res = await fetch(API+'/tournaments/'+tid+'/my-matches?name='+encodeURIComponent(name)+(phone?'&phone='+encodeURIComponent(phone):''));
-          if (!res.ok) throw new Error();
-          const data = await res.json();
+          var res = await fetch(API+'/tournaments/'+tid+'/my-matches?name='+encodeURIComponent(currentName)+(currentPhone?'&phone='+encodeURIComponent(currentPhone):''));
+          if (!res.ok) throw 0;
+          var data = await res.json();
+          lastData = data;
           el.innerHTML = renderResult(data);
+          // 푸시 버튼 표시
+          var pushEl = document.getElementById('push-btn');
+          pushEl.classList.remove('hidden');
+          await checkPushStatus(currentName);
+          updatePushButton();
+          // 폴링 시작
+          document.getElementById('polling-status').classList.remove('hidden');
+          startPolling();
         } catch(e) {
           el.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-user-slash text-3xl mb-2"></i><p>참가자를 찾을 수 없습니다.</p></div>';
         }
@@ -401,29 +592,43 @@ function getMyPageHtml(): string {
     }
 
     function renderResult(data) {
-      const p = data.participant; const teams = data.teams||[]; const matches = data.matches||[];
-      const rec = data.record||{}; const upcoming = data.upcoming_matches||[];
-      const completed = matches.filter(m => m.status==='completed');
-      return '<div class="fade-in">'+
-        '<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6"><div class="flex items-center gap-4"><div class="w-14 h-14 rounded-2xl bg-gradient-to-br '+(p.gender==='m'?'from-blue-400 to-blue-600':'from-pink-400 to-pink-600')+' flex items-center justify-center"><i class="fas fa-user text-xl text-white"></i></div><div><h2 class="text-xl font-extrabold">'+p.name+'</h2><div class="flex items-center gap-2 mt-1"><span class="badge '+(p.gender==='m'?'bg-blue-100 text-blue-700':'bg-pink-100 text-pink-700')+'">'+(p.gender==='m'?'남':'여')+'</span><span class="badge '+(LEVEL_COLORS[p.level]||'bg-gray-100 text-gray-600')+'">'+(LEVELS[p.level]||'C')+'급</span>'+(p.club?'<span class="badge bg-teal-50 text-teal-700">'+p.club+'</span>':'')+'</div></div></div></div>'+
-        '<div class="grid grid-cols-4 gap-3 mb-6"><div class="bg-white rounded-xl border p-3 text-center"><div class="text-xl font-extrabold">'+data.total_matches+'</div><div class="text-xs text-gray-500">총</div></div><div class="bg-green-50 rounded-xl border border-green-200 p-3 text-center"><div class="text-xl font-extrabold text-green-600">'+(rec.wins||0)+'</div><div class="text-xs text-gray-500">승</div></div><div class="bg-red-50 rounded-xl border border-red-200 p-3 text-center"><div class="text-xl font-extrabold text-red-500">'+(rec.losses||0)+'</div><div class="text-xs text-gray-500">패</div></div><div class="bg-blue-50 rounded-xl border border-blue-200 p-3 text-center"><div class="text-xl font-extrabold text-blue-600">'+(rec.total_score-rec.total_lost>0?'+':'')+(rec.total_score-rec.total_lost)+'</div><div class="text-xs text-gray-500">득실</div></div></div>'+
-        (teams.length>0?'<div class="bg-white rounded-2xl shadow-sm border p-5 mb-6"><h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-users mr-2 text-shuttle-500"></i>소속 팀</h3><div class="space-y-2">'+teams.map(t => '<div class="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3"><div><span class="font-bold">'+t.team_name+'</span><span class="ml-2 text-xs text-gray-500">'+t.event_name+'</span>'+(t.group_num?'<span class="badge bg-indigo-50 text-indigo-600 text-xs ml-1">'+t.group_num+'조</span>':'')+'</div><span class="text-sm text-gray-600">'+t.p1_name+' · '+t.p2_name+'</span></div>').join('')+'</div></div>':'')+
-        (upcoming.length>0?'<div class="bg-white rounded-2xl shadow-sm border-2 border-green-200 p-5 mb-6"><h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-clock mr-2 text-green-500"></i>예정/진행중 ('+upcoming.length+')</h3><div class="space-y-2">'+upcoming.map(m => {
-          const isT1 = teams.some(t=>t.id===m.team1_id);
-          const my = isT1?m.team1_name:m.team2_name;
-          const opp = isT1?m.team2_name:m.team1_name;
-          return '<div class="flex items-center justify-between rounded-xl px-4 py-3 '+(m.status==='playing'?'bg-green-50 border-2 border-green-300':'bg-gray-50')+'"><div><span class="font-bold">'+my+'</span> <span class="text-gray-400">vs</span> <span>'+(opp||'BYE')+'</span><p class="text-xs text-gray-500 mt-0.5">'+(m.event_name||'')+' #'+m.match_order+'</p></div><div>'+(m.court_number?'<span class="badge bg-yellow-100 text-yellow-700">'+m.court_number+'코트</span>':'')+(m.status==='playing'?'<span class="badge bg-green-100 text-green-700 ml-1">진행중</span>':'<span class="badge bg-gray-100 text-gray-600 ml-1">대기</span>')+'</div></div>';
-        }).join('')+'</div></div>':'')+
-        (completed.length>0?'<div class="bg-white rounded-2xl shadow-sm border p-5"><h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-history mr-2 text-blue-500"></i>경기 결과 ('+completed.length+')</h3><div class="space-y-2">'+completed.map(m => {
-          const isT1=teams.some(t=>t.id===m.team1_id);
-          const isW=(isT1&&m.winner_team===1)||(!isT1&&m.winner_team===2);
-          const myS=isT1?(m.team1_set1||0):(m.team2_set1||0);
-          const opS=isT1?(m.team2_set1||0):(m.team1_set1||0);
-          const my=isT1?m.team1_name:m.team2_name;
-          const opp=isT1?m.team2_name:m.team1_name;
+      var p=data.participant, teams=data.teams||[], matches=data.matches||[];
+      var rec=data.record||{}, upcoming=data.upcoming_matches||[];
+      var completed=matches.filter(function(m){return m.status==='completed'});
+      var h='<div class="fade-in">';
+      // 프로필 카드
+      h+='<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6"><div class="flex items-center gap-4"><div class="w-14 h-14 rounded-2xl bg-gradient-to-br '+(p.gender==='m'?'from-blue-400 to-blue-600':'from-pink-400 to-pink-600')+' flex items-center justify-center"><i class="fas fa-user text-xl text-white"></i></div><div><h2 class="text-xl font-extrabold">'+p.name+'</h2><div class="flex items-center gap-2 mt-1"><span class="badge '+(p.gender==='m'?'bg-blue-100 text-blue-700':'bg-pink-100 text-pink-700')+'">'+(p.gender==='m'?'남':'여')+'</span><span class="badge '+(LEVEL_COLORS[p.level]||'bg-gray-100 text-gray-600')+'">'+(LEVELS[p.level]||'C')+'급</span>'+(p.club?'<span class="badge bg-teal-50 text-teal-700">'+p.club+'</span>':'')+'</div></div></div></div>';
+      // 전적
+      h+='<div class="grid grid-cols-4 gap-3 mb-6"><div class="bg-white rounded-xl border p-3 text-center"><div class="text-xl font-extrabold">'+data.total_matches+'</div><div class="text-xs text-gray-500">총</div></div><div class="bg-green-50 rounded-xl border border-green-200 p-3 text-center"><div class="text-xl font-extrabold text-green-600">'+(rec.wins||0)+'</div><div class="text-xs text-gray-500">승</div></div><div class="bg-red-50 rounded-xl border border-red-200 p-3 text-center"><div class="text-xl font-extrabold text-red-500">'+(rec.losses||0)+'</div><div class="text-xs text-gray-500">패</div></div><div class="bg-blue-50 rounded-xl border border-blue-200 p-3 text-center"><div class="text-xl font-extrabold text-blue-600">'+((rec.total_score||0)-(rec.total_lost||0)>0?'+':'')+((rec.total_score||0)-(rec.total_lost||0))+'</div><div class="text-xs text-gray-500">득실</div></div></div>';
+      // 소속 팀
+      if(teams.length>0){
+        h+='<div class="bg-white rounded-2xl shadow-sm border p-5 mb-6"><h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-users mr-2 text-emerald-500"></i>소속 팀</h3><div class="space-y-2">'+teams.map(function(t){return '<div class="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3"><div><span class="font-bold">'+t.team_name+'</span><span class="ml-2 text-xs text-gray-500">'+t.event_name+'</span>'+(t.group_num?'<span class="badge bg-indigo-50 text-indigo-600 text-xs ml-1">'+t.group_num+'조</span>':'')+'</div><span class="text-sm text-gray-600">'+t.p1_name+' · '+t.p2_name+'</span></div>';}).join('')+'</div></div>';
+      }
+      // 예정/진행중
+      if(upcoming.length>0){
+        h+='<div class="bg-white rounded-2xl shadow-sm border-2 border-emerald-200 p-5 mb-6"><h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-clock mr-2 text-emerald-500"></i>예정/진행중 ('+upcoming.length+')</h3><div class="space-y-2">'+upcoming.map(function(m){
+          var isT1=teams.some(function(t){return t.id===m.team1_id});
+          var my=isT1?m.team1_name:m.team2_name;
+          var opp=isT1?m.team2_name:m.team1_name;
+          return '<div class="flex items-center justify-between rounded-xl px-4 py-3 '+(m.status==='playing'?'bg-emerald-50 border-2 border-emerald-300':'bg-gray-50')+'"><div><span class="font-bold">'+my+'</span> <span class="text-gray-400">vs</span> <span>'+(opp||'BYE')+'</span><p class="text-xs text-gray-500 mt-0.5">'+(m.event_name||'')+' #'+m.match_order+'</p></div><div>'+(m.court_number?'<span class="badge bg-yellow-100 text-yellow-700">'+m.court_number+'코트</span>':'')+(m.status==='playing'?'<span class="badge bg-emerald-100 text-emerald-700 ml-1 pulse-live">진행중</span>':'<span class="badge bg-gray-100 text-gray-600 ml-1">대기</span>')+'</div></div>';
+        }).join('')+'</div></div>';
+      }
+      // 완료
+      if(completed.length>0){
+        h+='<div class="bg-white rounded-2xl shadow-sm border p-5"><h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-history mr-2 text-blue-500"></i>경기 결과 ('+completed.length+')</h3><div class="space-y-2">'+completed.map(function(m){
+          var isT1=teams.some(function(t){return t.id===m.team1_id});
+          var isW=(isT1&&m.winner_team===1)||(!isT1&&m.winner_team===2);
+          var myS=isT1?(m.team1_set1||0):(m.team2_set1||0);
+          var opS=isT1?(m.team2_set1||0):(m.team1_set1||0);
+          var my=isT1?m.team1_name:m.team2_name;
+          var opp=isT1?m.team2_name:m.team1_name;
           return '<div class="flex items-center justify-between rounded-xl px-4 py-3 '+(isW?'bg-green-50':'bg-red-50')+'"><div><span class="font-bold '+(isW?'text-green-700':'text-red-600')+'">'+(isW?'🏆':'💔')+' '+my+'</span> <span class="text-gray-400">vs</span> <span>'+opp+'</span><p class="text-xs text-gray-500 mt-0.5">'+(m.event_name||'')+(m.court_number?' '+m.court_number+'코트':'')+'</p></div><div class="text-right"><span class="text-xl font-extrabold '+(isW?'text-green-600':'text-red-500')+'">'+myS+' : '+opS+'</span><span class="badge '+(isW?'bg-green-100 text-green-700':'bg-red-100 text-red-600')+' block mt-1 text-center">'+(isW?'승리':'패배')+'</span></div></div>';
-        }).join('')+'</div></div>':'<div class="text-center py-8 text-gray-400"><p>완료된 경기가 없습니다.</p></div>')+
-      '</div>';
+        }).join('')+'</div></div>';
+      } else {
+        h+='<div class="text-center py-8 text-gray-400"><p>완료된 경기가 없습니다.</p></div>';
+      }
+      h+='</div>';
+      return h;
     }
 
     init();
@@ -735,4 +940,33 @@ function getTimelineHtml(): string {
   </script>
 </body>
 </html>`
+}
+
+function getServiceWorkerJs(): string {
+  return `// Service Worker for Push Notifications - 배드민턴 대회 운영 시스템
+self.addEventListener('push', function(event) {
+  var data = { title: '🏸 배드민턴 대회', body: '알림이 있습니다.', tag: 'default' };
+  if (event.data) { try { data = event.data.json(); } catch(e) { data.body = event.data.text(); } }
+  var options = {
+    body: data.body || '', tag: data.tag || 'match-notification', renotify: true,
+    vibrate: [200, 100, 200, 100, 300],
+    data: { url: data.url || '/', matchId: data.matchId, courtNumber: data.courtNumber, tournamentId: data.tournamentId },
+    actions: data.actions || [{ action: 'open', title: '확인하기' }, { action: 'dismiss', title: '닫기' }]
+  };
+  event.waitUntil(self.registration.showNotification(data.title || '🏸 배드민턴 대회', options));
+});
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  if (event.action === 'dismiss') return;
+  var urlToOpen = event.notification.data && event.notification.data.url ? event.notification.data.url : '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      for (var i = 0; i < clientList.length; i++) { if (clientList[i].url.indexOf('/my') !== -1 && 'focus' in clientList[i]) return clientList[i].focus(); }
+      return clients.openWindow(urlToOpen);
+    })
+  );
+});
+self.addEventListener('install', function() { self.skipWaiting(); });
+self.addEventListener('activate', function(event) { event.waitUntil(clients.claim()); });
+`
 }
