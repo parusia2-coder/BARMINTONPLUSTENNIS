@@ -10,7 +10,7 @@
     {
       "binding": "DB",
       "database_name": "badminton-production",
-      "database_id": "local-dev-db"
+      "database_id": "8a0b2fc8-5a4a-4ca7-90ee-f7a908719e99"
     }
   ]
 }
