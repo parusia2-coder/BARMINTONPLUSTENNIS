@@ -1,19 +1,20 @@
 # 배드민턴 대회 운영 시스템 - 프로젝트 히스토리
 
 > 세션이 끊어졌을 때 이 파일을 읽으면 프로젝트 전체 맥락을 복원할 수 있습니다.
-> 마지막 업데이트: 2026-02-16
+> 마지막 업데이트: 2026-02-17
 
 ---
 
 ## 1. 프로젝트 개요
 
 - **프로젝트명**: 배드민턴 대회 운영 시스템
+- **대회명**: 2026 안양시배드민턴협회 장년부 자체대회
 - **프로젝트 경로**: `/home/user/webapp`
 - **기술 스택**: Hono + TypeScript + Cloudflare Workers (D1 SQLite) + Tailwind CSS (CDN)
 - **포트**: 3000
 - **PM2 프로세스명**: `badminton`
 - **관리자 테스트 비밀번호**: `admin123`
-- **프로젝트 아카이브**: https://www.genspark.ai/api/files/s/Qkc2iuBA (≈0.9 MB)
+- **프로젝트 아카이브**: https://www.genspark.ai/api/files/s/pPnALUHP (≈1.1 MB, v2.2)
 
 ### 기기별 역할
 | 기기 | URL | 용도 |
@@ -22,23 +23,24 @@
 | 코트 태블릿 | `/court?tid={대회ID}&court={코트번호}&locked=1&autonext=true` | 코트별 실시간 점수 입력 (잠금모드) |
 | 대형 모니터 | `/dashboard?tid={대회ID}` | 관중용 실시간 현황 (30초 자동갱신) |
 | 참가자 스마트폰 | `/my?tid={대회ID}` | 개인 일정/결과 확인 (QR 접속) |
+| 코트별 타임라인 | `/timeline?tid={대회ID}` | 전체 경기 흐름 한눈에 보기 (20초 자동갱신) |
 
 ---
 
-## 2. 파일 구조 (총 6,985줄)
+## 2. 파일 구조 (총 7,520줄)
 
 ```
 /home/user/webapp/
 ├── src/
-│   ├── index.tsx                 (399줄) 메인 Hono 앱, 라우팅, HTML 템플릿, /court /dashboard /my 페이지
+│   ├── index.tsx                 (738줄) 메인 Hono 앱, 라우팅, HTML 템플릿, /court /dashboard /my /timeline 페이지
 │   └── routes/
 │       ├── tournaments.ts        (148줄) 대회 CRUD, 인증, 통계
 │       ├── participants.ts       (200줄) 참가자 등록/수정/삭제, 일괄등록, 클럽 정보
 │       ├── events.ts             (698줄) 종목 관리, 팀 등록, 자동팀편성, 급수합병, 조 배정
-│       ├── matches.ts            (640줄) 경기/점수/순위, 코트 점수판 API, 서명, 대시보드, 내경기
+│       ├── matches.ts            (691줄) 경기/점수/순위, 코트 점수판 API, 서명, 대시보드, 내경기, 타임라인
 │       └── brackets.ts           (668줄) 대진표 생성 (KDK/풀리그/토너먼트), 결선 토너먼트
 ├── public/static/
-│   ├── app.js                    (1,687줄) 메인 프론트엔드 SPA
+│   ├── app.js                    (1,832줄) 메인 프론트엔드 SPA (Sport Command Center 테마)
 │   ├── court.js                  (1,471줄) 코트 전용 점수판 프론트엔드
 │   ├── style.css                          커스텀 스타일
 │   ├── manual.html               (1,074줄) A4 인쇄용 현장 운영 매뉴얼
@@ -205,10 +207,11 @@
 | POST | `/api/tournaments/:tid/court/:courtNum/next` | 코트 다음 경기 자동 시작 |
 | GET | `/api/tournaments/:tid/courts/overview` | 전체 코트 현황 |
 | GET | `/api/tournaments/:tid/audit-logs` | 최근 100건 감사 로그 |
-| POST | `/api/tournaments/:tid/matches/:mid/signature` | 경기 서명 저장 |
+| PUT | `/api/tournaments/:tid/matches/:mid/signature` | 경기 서명 저장 |
 | GET | `/api/tournaments/:tid/matches/:mid/signature` | 경기 서명 조회 |
 | GET | `/api/tournaments/:tid/dashboard` | 통계 대시보드 (전체/종목별/클럽별) |
 | GET | `/api/tournaments/:tid/my-matches?name=&phone=` | 참가자 개인 경기 조회 |
+| **GET** | **`/api/tournaments/:tid/timeline`** | **코트별 타임라인 (경량 튜플 형식)** |
 
 ### 대진표 (brackets.ts)
 | 메서드 | 경로 | 파라미터 | 설명 |
@@ -220,10 +223,11 @@
 ### 프론트엔드 페이지
 | 경로 | 파라미터 | 대상 | 설명 |
 |------|----------|------|------|
-| `/` | — | 관리자 | 메인 SPA (app.js) |
+| `/` | — | 관리자 | 메인 SPA (app.js) — Sport Command Center 테마 |
 | `/court` | tid, court, locked, autonext | 코트 심판 | 코트 전용 점수판 (court.js) |
 | `/dashboard` | tid | 관중/대형모니터 | 실시간 통계 대시보드 |
 | `/my` | tid | 참가자 | 개인 일정/결과 확인 |
+| `/timeline` | tid | 운영진/관중 | 코트별 타임라인 (전체 경기 흐름) |
 | `/static/manual.html` | — | 운영자 | A4 인쇄용 현장 운영 매뉴얼 |
 | `/api/health` | — | 시스템 | 헬스체크 |
 
@@ -285,6 +289,13 @@
 - QR 코드로 빠른 접속
 - 진행중/예정/완료 경기 구분 표시
 
+### 코트별 타임라인 (matches.ts timeline) — v2.2 신규
+- 전체 경기를 코트별로 순서대로 한눈에 시각화
+- 종목별 필터 (전체/남복/여복/혼복)
+- 호버 툴팁: 팀명, 점수, 상태 표시
+- **성능 최적화**: 튜플 형식 API (92KB→28KB, -69%), 이벤트 위임 툴팁 (DOM -67%)
+- 20초 자동 갱신
+
 ---
 
 ## 6. 개발 히스토리 (Git 커밋 순서)
@@ -342,6 +353,15 @@ f7bbc3a 2026-02-16 10:46 docs: 현장 운영 셋팅 가이드 추가 - 장비/�
 4e32fb5 2026-02-16 10:54 feat: A4 인쇄용 현장 운영 매뉴얼 HTML 추가 (/static/manual.html)
 2772f76 2026-02-16 11:10 docs: 네트워크 섹션 대폭 보강 - 체육관 환경, 대역 분리, 공유기 설치, 비상 대응
 9db6648 2026-02-16 11:19 docs: 공유기 추천을 실제 구매 가능 제품으로 업데이트 (가격/링크/구매방법 포함)
+ac8e09e 2026-02-16 docs: PROJECT_HISTORY.md 전면 업데이트
+```
+
+### Phase 7: UI 리디자인 & 타임라인 (2026-02-16 ~ 02-17)
+```
+cb6a8d9 2026-02-16 11:49 design: 메인 페이지 전면 리디자인 - Sport Command Center 테마
+f6951e0 2026-02-16 feat: 코트별 타임라인 API 엔드포인트 추가 및 메인 페이지 타임라인 카드 UI 구현
+5414b92 2026-02-16 perf: 타임라인 대폭 최적화 - API 응답 69% 경량화(92KB→28KB), DOM 67% 절감, 툴팁 이벤트 위임
+1065a01 2026-02-17 fix: 대회 타이틀 변경 → 2026 안양시배드민턴협회 장년부 자체대회
 ```
 
 ---
@@ -354,7 +374,7 @@ f7bbc3a 2026-02-16 10:46 docs: 현장 운영 셋팅 가이드 추가 - 장비/�
 | 소속 클럽 | 18개 |
 | 팀 | 116팀 |
 | 조 | 25개 |
-| 경기 | 214경기 |
+| 경기 | 214경기 (6코트 배분) |
 
 ---
 
@@ -425,7 +445,7 @@ npm run db:seed           # 시드 데이터
 
 ## 10. 현재 상태 & 남은 작업
 
-### ✅ 완료된 기능
+### ✅ 완료된 기능 (22개)
 - [x] 대회 CRUD (생성/수정/삭제/상태변경)
 - [x] 참가자 관리 (개별/일괄 등록, 참가비, 체크인, 클럽)
 - [x] 종목 시스템 (남복/여복/혼복, 연령대, 급수)
@@ -433,19 +453,21 @@ npm run db:seed           # 시드 데이터
 - [x] 급수합병 (인접급수 자동 합병)
 - [x] 조 배정 (종목별 그룹 배정)
 - [x] 대진표 생성 (KDK/풀리그/토너먼트, 조별 옵션)
-- [x] **결선 토너먼트** (조별 상위팀 → 단판 싱글 엘리미네이션)
+- [x] 결선 토너먼트 (조별 상위팀 → 단판 싱글 엘리미네이션)
 - [x] 점수 관리 (세트별 점수, 승자, 순위 자동계산)
-- [x] **코트 전용 점수판** (/court) — URL 파라미터, 자동 다음경기, QR코드, 읽기전용, 전체보기
+- [x] 코트 전용 점수판 (/court) — URL 파라미터, 자동 다음경기, QR코드, 읽기전용, 전체보기
 - [x] 경기 서명 확인 기능
-- [x] **통계 대시보드** (/dashboard) — 전체/종목별/클럽별 실시간 통계
-- [x] **참가자 개인 페이지** (/my) — 이름+연락처로 내 경기 조회, QR 접속
+- [x] 통계 대시보드 (/dashboard) — 전체/종목별/클럽별 실시간 통계
+- [x] 참가자 개인 페이지 (/my) — 이름+연락처로 내 경기 조회, QR 접속
 - [x] 스코어보드 (관중용, 자동갱신)
 - [x] 결과/순위표 + PDF 출력
 - [x] 감사 로그
 - [x] 반응형 UI (모바일/태블릿/데스크탑)
-- [x] **A4 인쇄용 현장 운영 매뉴얼** (/static/manual.html)
+- [x] A4 인쇄용 현장 운영 매뉴얼 (/static/manual.html)
 - [x] 네트워크 구성 가이드 (공유기 추천, 구매 링크 포함)
 - [x] 실제 장년부 데이터 시딩 (177명, 18개 클럽)
+- [x] **메인 페이지 Sport Command Center 리디자인** (에메랄드 테마)
+- [x] **코트별 타임라인** (/timeline) — 전체 경기 흐름 시각화, 성능 최적화 완료
 
 ### 🔮 향후 개선 가능 사항
 - [ ] Cloudflare Pages 실 배포 (wrangler pages deploy)
@@ -485,5 +507,6 @@ curl http://localhost:3000/api/tournaments
 # 코트 점수판: http://localhost:3000/court?tid=1&court=1
 # 대시보드: http://localhost:3000/dashboard?tid=1
 # 내 경기: http://localhost:3000/my?tid=1
+# 타임라인: http://localhost:3000/timeline?tid=1
 # 운영 매뉴얼: http://localhost:3000/static/manual.html
 ```
