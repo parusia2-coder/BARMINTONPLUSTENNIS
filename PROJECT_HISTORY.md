@@ -14,7 +14,7 @@
 - **포트**: 3000
 - **PM2 프로세스명**: `badminton`
 - **관리자 테스트 비밀번호**: `admin123`
-- **프로젝트 아카이브**: https://www.genspark.ai/api/files/s/pPnALUHP (≈1.1 MB, v2.2)
+- **프로젝트 아카이브**: https://www.genspark.ai/api/files/s/SoAvklYG (≈1.2 MB, v2.3)
 
 ### 기기별 역할
 | 기기 | URL | 용도 |
@@ -22,22 +22,23 @@
 | 관리자 노트북 | `/` | 대회관리, 참가자등록, 종목/팀편성, 대진표 |
 | 코트 태블릿 | `/court?tid={대회ID}&court={코트번호}&locked=1&autonext=true` | 코트별 실시간 점수 입력 (잠금모드) |
 | 대형 모니터 | `/dashboard?tid={대회ID}` | 관중용 실시간 현황 (30초 자동갱신) |
-| 참가자 스마트폰 | `/my?tid={대회ID}` | 개인 일정/결과 확인 (QR 접속) |
+| 참가자 스마트폰 | `/my?tid={대회ID}` | 개인 일정/결과 확인 + 푸시 알림 구독 (QR 접속) |
 | 코트별 타임라인 | `/timeline?tid={대회ID}` | 전체 경기 흐름 한눈에 보기 (20초 자동갱신) |
 
 ---
 
-## 2. 파일 구조 (총 7,520줄)
+## 2. 파일 구조 (총 8,309줄)
 
 ```
 /home/user/webapp/
 ├── src/
-│   ├── index.tsx                 (738줄) 메인 Hono 앱, 라우팅, HTML 템플릿, /court /dashboard /my /timeline 페이지
+│   ├── index.tsx                 (972줄) 메인 Hono 앱, 라우팅, HTML 템플릿, /court /dashboard /my /timeline 페이지, SW 라우트
 │   └── routes/
 │       ├── tournaments.ts        (148줄) 대회 CRUD, 인증, 통계
 │       ├── participants.ts       (200줄) 참가자 등록/수정/삭제, 일괄등록, 클럽 정보
 │       ├── events.ts             (698줄) 종목 관리, 팀 등록, 자동팀편성, 급수합병, 조 배정
-│       ├── matches.ts            (691줄) 경기/점수/순위, 코트 점수판 API, 서명, 대시보드, 내경기, 타임라인
+│       ├── matches.ts            (763줄) 경기/점수/순위, 코트 점수판 API, 서명, 대시보드, 내경기, 타임라인, 알림연동
+│       ├── notifications.ts      (406줄) 푸시 알림 시스템 (VAPID JWT, ECE 암호화, Web Push)
 │       └── brackets.ts           (668줄) 대진표 생성 (KDK/풀리그/토너먼트), 결선 토너먼트
 ├── public/static/
 │   ├── app.js                    (1,832줄) 메인 프론트엔드 SPA (Sport Command Center 테마)
@@ -45,11 +46,14 @@
 │   ├── style.css                          커스텀 스타일
 │   ├── manual.html               (1,074줄) A4 인쇄용 현장 운영 매뉴얼
 │   └── test_participants_100.txt          테스트 데이터 100명
+├── public/
+│   └── sw.js                     (77줄) Service Worker (푸시 알림 수신/클릭 처리)
 ├── migrations/
 │   ├── 0001_initial_schema.sql            DB 스키마 (기본 테이블)
 │   ├── 0002_add_signatures.sql            경기 서명 필드 추가
 │   ├── 0003_add_mixed_doubles.sql         혼합복식 참가 필드
-│   └── 0004_add_club_and_groups.sql       클럽/조 번호/인덱스 추가
+│   ├── 0004_add_club_and_groups.sql       클럽/조 번호/인덱스 추가
+│   └── 0005_add_push_notifications.sql    푸시 알림 구독/로그 테이블
 ├── seed.sql                               실제 장년부 데이터 (177명, 18개 클럽)
 ├── ecosystem.config.cjs                   PM2 설정
 ├── wrangler.jsonc                         Cloudflare 설정
@@ -63,7 +67,7 @@
 
 ---
 
-## 3. DB 스키마 (D1 SQLite) — 4개 마이그레이션
+## 3. DB 스키마 (D1 SQLite) — 5개 마이그레이션
 
 ### tournaments (대회)
 | 컬럼 | 타입 | 설명 |
@@ -147,10 +151,34 @@
 ### audit_logs (감사로그)
 - tournament_id, match_id, action, old_value, new_value, updated_by, created_at
 
-### 추가 인덱스 (0004)
+### push_subscriptions (푸시 알림 구독 - 0005 추가)
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | INTEGER PK | 자동증가 |
+| tournament_id | INTEGER FK | 대회 |
+| participant_name | TEXT | 참가자 이름 |
+| participant_phone | TEXT | 연락처 (선택) |
+| endpoint | TEXT UNIQUE | 푸시 서비스 엔드포인트 |
+| p256dh | TEXT | 암호화 키 |
+| auth | TEXT | 인증 키 |
+
+### notification_logs (알림 발송 로그 - 0005 추가)
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | INTEGER PK | 자동증가 |
+| tournament_id | INTEGER FK | 대회 |
+| match_id | INTEGER FK | 경기 |
+| participant_name | TEXT | 수신자 이름 |
+| notification_type | TEXT | match_starting / match_upcoming |
+| UNIQUE | (match_id, participant_name, notification_type) | 중복 발송 방지 |
+
+### 추가 인덱스 (0004, 0005)
 - `idx_participants_club` — 클럽별 조회 최적화
 - `idx_teams_group_num` — 조별 조회 최적화
 - `idx_matches_group_num` — 조별 경기 조회 최적화
+- `idx_push_sub_tournament` — 대회별 구독 조회
+- `idx_push_sub_name` — 대회+이름별 구독 조회
+- `idx_notif_log_match` — 경기별 알림 로그 조회
 
 ---
 
@@ -213,6 +241,15 @@
 | GET | `/api/tournaments/:tid/my-matches?name=&phone=` | 참가자 개인 경기 조회 |
 | **GET** | **`/api/tournaments/:tid/timeline`** | **코트별 타임라인 (경량 튜플 형식)** |
 
+### 푸시 알림 (notifications.ts) — v2.3 신규
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | `/api/tournaments/:tid/push/vapid-key` | VAPID 공개키 조회 |
+| POST | `/api/tournaments/:tid/push/subscribe` | 푸시 구독 등록 (이름/연락처/구독정보) |
+| POST | `/api/tournaments/:tid/push/unsubscribe` | 푸시 구독 해제 |
+| GET | `/api/tournaments/:tid/push/status?name=` | 구독 상태 확인 |
+| POST | `/api/tournaments/:tid/push/test` | 테스트 알림 발송 |
+
 ### 대진표 (brackets.ts)
 | 메서드 | 경로 | 파라미터 | 설명 |
 |--------|------|----------|------|
@@ -228,6 +265,7 @@
 | `/dashboard` | tid | 관중/대형모니터 | 실시간 통계 대시보드 |
 | `/my` | tid | 참가자 | 개인 일정/결과 확인 |
 | `/timeline` | tid | 운영진/관중 | 코트별 타임라인 (전체 경기 흐름) |
+| `/sw.js` | — | 시스템 | Service Worker (푸시 알림 수신) |
 | `/static/manual.html` | — | 운영자 | A4 인쇄용 현장 운영 매뉴얼 |
 | `/api/health` | — | 시스템 | 헬스체크 |
 
@@ -296,6 +334,18 @@
 - **성능 최적화**: 튜플 형식 API (92KB→28KB, -69%), 이벤트 위임 툴팁 (DOM -67%)
 - 20초 자동 갱신
 
+### 푸시 알림 & 인앱 알림 시스템 — v2.3 신규
+- **Web Push API** (VAPID JWT + ECE aes128gcm 암호화, Cloudflare Workers 순수 구현)
+- Service Worker (`/sw.js`) — 푸시 수신, 알림 표시 (아이콘/진동/소리), 클릭 시 /my 이동
+- `/my` 페이지에서 "경기 시작 알림 받기" 버튼으로 구독/해제
+- 테스트 알림 발송 기능
+- **인앱 폴링 알림**: 15초마다 상태 변경 감지 → 배너+진동+소리로 알림
+- **자동 알림 발송 트리거**:
+  - 경기 상태 → `playing` 전환 시 해당 선수에게 "경기 시작" 푸시
+  - 경기 시작 시 같은 코트 다음 대기 경기 선수에게 "준비" 푸시
+  - 코트 다음 경기 자동시작(POST /:tid/court/:courtNum/next) 시에도 동일 알림
+- 중복 발송 방지 (notification_logs 테이블)
+
 ---
 
 ## 6. 개발 히스토리 (Git 커밋 순서)
@@ -362,6 +412,17 @@ cb6a8d9 2026-02-16 11:49 design: 메인 페이지 전면 리디자인 - Sport Co
 f6951e0 2026-02-16 feat: 코트별 타임라인 API 엔드포인트 추가 및 메인 페이지 타임라인 카드 UI 구현
 5414b92 2026-02-16 perf: 타임라인 대폭 최적화 - API 응답 69% 경량화(92KB→28KB), DOM 67% 절감, 툴팁 이벤트 위임
 1065a01 2026-02-17 fix: 대회 타이틀 변경 → 2026 안양시배드민턴협회 장년부 자체대회
+```
+
+### Phase 8: 푸시 알림 시스템 (2026-02-17)
+```
+024d98c 2026-02-17 docs: PROJECT_HISTORY.md 전면 업데이트
+43b291b 2026-02-17 feat: 푸시 알림 & 인앱 알림 시스템 구현
+  - DB: push_subscriptions, notification_logs 테이블
+  - Backend: VAPID JWT + ECE 암호화 순수 구현 (Web Crypto API)
+  - Frontend: /my 페이지 구독 UI, 인앱 배너, 15초 폴링 감지
+  - Service Worker, 진동/소리 효과
+  - matches.ts 연동: 경기 시작/준비 자동 발송
 ```
 
 ---
@@ -445,7 +506,7 @@ npm run db:seed           # 시드 데이터
 
 ## 10. 현재 상태 & 남은 작업
 
-### ✅ 완료된 기능 (22개)
+### ✅ 완료된 기능 (24개)
 - [x] 대회 CRUD (생성/수정/삭제/상태변경)
 - [x] 참가자 관리 (개별/일괄 등록, 참가비, 체크인, 클럽)
 - [x] 종목 시스템 (남복/여복/혼복, 연령대, 급수)
@@ -468,14 +529,15 @@ npm run db:seed           # 시드 데이터
 - [x] 실제 장년부 데이터 시딩 (177명, 18개 클럽)
 - [x] **메인 페이지 Sport Command Center 리디자인** (에메랄드 테마)
 - [x] **코트별 타임라인** (/timeline) — 전체 경기 흐름 시각화, 성능 최적화 완료
+- [x] **푸시 알림** (Web Push API, VAPID JWT, ECE 암호화, Service Worker)
+- [x] **인앱 알림** (15초 폴링, 배너+진동+소리, 상태 변경 감지)
 
 ### 🔮 향후 개선 가능 사항
 - [ ] Cloudflare Pages 실 배포 (wrangler pages deploy)
 - [ ] GitHub 푸시
 - [ ] 실시간 WebSocket (현재는 폴링 방식)
-- [ ] 참가자 본인 경기 알림 (푸시 알림)
 - [ ] 다중 대회 동시 운영 최적화
-- [ ] 오프라인 모드 (Service Worker)
+- [ ] 오프라인 모드 (Service Worker 캐싱 확장)
 - [ ] 대회 결과 통계 리포트 (PDF 자동 생성)
 
 ---
@@ -509,4 +571,7 @@ curl http://localhost:3000/api/tournaments
 # 내 경기: http://localhost:3000/my?tid=1
 # 타임라인: http://localhost:3000/timeline?tid=1
 # 운영 매뉴얼: http://localhost:3000/static/manual.html
+
+# 6. 알림 DB 마이그레이션 (최초 1회)
+npx wrangler d1 migrations apply badminton-production --local
 ```
