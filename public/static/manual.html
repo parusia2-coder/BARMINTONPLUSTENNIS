@@ -135,10 +135,10 @@
   <h1>배드민턴 대회 운영 매뉴얼</h1>
   <div class="subtitle">현장 장비 셋팅 & 시스템 운영 가이드</div>
   <div class="cover-info">
-    <div><strong>시스템</strong> 배드민턴 대회 운영 시스템 v1.0</div>
+    <div><strong>시스템</strong> 배드민턴 대회 운영 시스템 v2.3</div>
     <div><strong>대상</strong> 200명 이하 동호회/클럽 대회</div>
-    <div><strong>기준</strong> 6코트 / 177명 / 214경기 (안양시장배 장년부)</div>
-    <div><strong>작성일</strong> 2026-02-16</div>
+    <div><strong>기준</strong> 6코트 / 177명 / 214경기 (안양시배드민턴협회 장년부)</div>
+    <div><strong>작성일</strong> 2026-02-17</div>
   </div>
 </div>
 
@@ -149,9 +149,9 @@
 
 <p>웹 기반 배드민턴 대회 운영 시스템입니다. 인터넷 브라우저만 있으면 별도 앱 설치 없이 모든 장비에서 사용할 수 있습니다.</p>
 
-<h3>주요 화면 4가지</h3>
+<h3>주요 화면 6가지</h3>
 <table>
-  <tr><th style="width:25%">화면</th><th style="width:30%">URL</th><th style="width:20%">대상</th><th>용도</th></tr>
+  <tr><th style="width:22%">화면</th><th style="width:28%">URL</th><th style="width:16%">대상</th><th>용도</th></tr>
   <tr>
     <td><span class="badge badge-blue">관리</span> 메인 관리</td>
     <td><code>/</code></td>
@@ -174,7 +174,19 @@
     <td><span class="badge badge-gray">참가자</span> 내 경기</td>
     <td><code>/my?tid=1</code></td>
     <td>참가자 스마트폰</td>
-    <td>본인 경기 일정/결과 조회</td>
+    <td>본인 경기 일정/결과 + <strong>🔔 푸시 알림</strong></td>
+  </tr>
+  <tr>
+    <td><span class="badge" style="background:#7c3aed">타임라인</span> 경기 흐름</td>
+    <td><code>/timeline?tid=1</code></td>
+    <td>운영진 / 관중</td>
+    <td>코트별 전체 경기 흐름 시각화 (20초 자동갱신)</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-gray">매뉴얼</span> 운영 가이드</td>
+    <td><code>/static/manual.html</code></td>
+    <td>운영자</td>
+    <td>이 문서 (A4 인쇄 가능)</td>
   </tr>
 </table>
 
@@ -189,7 +201,9 @@
     ↓                              ↓                                  ↓
 대진표 생성                     서명 → 자동 다음경기               시상식
     ↓                              ↓
-장비 충전                       대시보드 실시간 모니터링</div>
+장비 충전                       대시보드 + 타임라인 실시간 모니터링
+                                    ↓
+                                🔔 푸시 알림 자동 발송 (경기 시작/준비)</div>
 
 <!-- ========================================== -->
 <!--              2. 필요 장비                    -->
@@ -805,7 +819,76 @@
   </ul>
 </div>
 
-<p>참가자는: QR 스캔 → 이름 입력 → <strong>본인 경기 일정/결과 확인</strong></p>
+<p>참가자는: QR 스캔 → 이름 입력 → <strong>본인 경기 일정/결과 확인 + 🔔 경기 시작 알림 구독</strong></p>
+
+<!-- ========================================== -->
+<!--        4-5. 참가자 푸시 알림                   -->
+<!-- ========================================== -->
+<h3>4-5. 참가자 경기 알림 (푸시 알림) <span class="badge badge-red">NEW v2.3</span></h3>
+
+<p>참가자가 본인 경기 시작 시 스마트폰으로 <strong>푸시 알림</strong>을 받을 수 있습니다. 앱 설치 없이 브라우저만으로 동작합니다.</p>
+
+<div class="box box-green">
+  <div class="box-title">🔔 알림 작동 방식 (2단계)</div>
+  <table>
+    <tr><th style="width:20%">알림 종류</th><th style="width:30%">발송 시점</th><th>내용</th></tr>
+    <tr>
+      <td><span class="badge badge-green">푸시 알림</span></td>
+      <td>경기 상태 → "진행중" 전환 시</td>
+      <td><strong>"🏸 경기 시작!"</strong> — 코트 번호, 상대 팀 표시<br>+ 같은 코트 다음 대기 선수에게 <strong>"🏸 다음 경기 준비"</strong> 발송</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-blue">인앱 알림</span></td>
+      <td>/my 페이지 열어둔 상태에서 15초마다 감지</td>
+      <td>상단 배너 + 진동 + 소리로 경기 시작 알림<br>(브라우저 권한 거부 시에도 동작)</td>
+    </tr>
+  </table>
+</div>
+
+<h4>참가자 알림 설정 방법</h4>
+<div class="diagram">① QR 스캔 또는 URL 접속          ② 이름 입력 & 조회          ③ 알림 구독
+┌─────────────────┐        ┌──────────────┐       ┌──────────────────────┐
+│ /my?tid=1        │   →    │ 이름: 홍길동   │  →    │ 🔔 경기 시작 알림 받기  │
+│ QR코드 스캔       │        │ [조회] 클릭    │       │  (푸시) 버튼 클릭       │
+└─────────────────┘        └──────────────┘       └──────────────────────┘
+                                                            │
+                                                    ④ 브라우저 권한 허용
+                                                   ┌──────────────────────┐
+                                                   │ "알림을 허용하시겠습니까?"│
+                                                   │  [허용] 클릭            │
+                                                   └──────────────────────┘
+                                                            │
+                                                    ✅ 구독 완료!
+                                                   → 경기 시작 시 자동 알림</div>
+
+<table>
+  <tr><th style="width:25%">지원 환경</th><th style="width:30%">동작 여부</th><th>비고</th></tr>
+  <tr><td><strong>안드로이드 크롬</strong></td><td class="hl-green">✅ 완벽 지원</td><td>브라우저만으로 푸시 알림 수신</td></tr>
+  <tr><td><strong>iPhone Safari</strong></td><td class="hl">⚠️ 조건부 지원</td><td>홈 화면에 추가 후 실행해야 푸시 수신 (iOS 16.4+)</td></tr>
+  <tr><td><strong>PC 크롬/엣지</strong></td><td class="hl-green">✅ 지원</td><td>데스크탑 알림으로 수신</td></tr>
+</table>
+
+<div class="box box-yellow">
+  <div class="box-title">📱 iPhone 사용자 안내 (중요)</div>
+  <p>iPhone에서 푸시 알림을 받으려면 <strong>Safari에서 "홈 화면에 추가"</strong>를 한 뒤, 홈 화면 아이콘으로 접속해야 합니다.</p>
+  <ol>
+    <li>Safari에서 <code>/my?tid=1</code> 접속</li>
+    <li>하단 공유 버튼 (□↑) 탭 → <strong>"홈 화면에 추가"</strong></li>
+    <li>홈 화면 아이콘으로 실행</li>
+    <li>이름 입력 → 조회 → <strong>"경기 시작 알림 받기"</strong> 클릭</li>
+    <li>알림 허용 팝업에서 <strong>"허용"</strong></li>
+  </ol>
+</div>
+
+<div class="box box-blue">
+  <div class="box-title">💡 운영진 알림 활용 팁</div>
+  <ul>
+    <li><strong>참가자 안내 문구 (방송/카톡):</strong> "경기 시작 알림을 받으시려면 QR을 스캔하고 이름을 입력한 뒤 '알림 받기' 버튼을 눌러주세요"</li>
+    <li><strong>테스트 발송:</strong> 알림 구독 후 "테스트" 버튼으로 정상 수신 확인 가능</li>
+    <li><strong>알림 해제:</strong> 같은 화면에서 "해제" 버튼 클릭</li>
+    <li>푸시 알림을 구독하지 않아도 <code>/my</code> 페이지를 열어두면 <strong>인앱 배너 알림</strong>(진동+소리)이 자동으로 표시됩니다</li>
+  </ul>
+</div>
 
 <!-- ========================================== -->
 <!--             5. 인력 배치                     -->
@@ -879,9 +962,9 @@
 <table class="tbl-alt">
   <tr><th style="width:15%">시점</th><th style="width:35%">작업</th><th>상세</th></tr>
   <tr><td>시작</td><td>체크인 처리</td><td>참가자 도착 시 체크인 토글</td></tr>
-  <tr><td>시작</td><td class="hl">1라운드 경기 시작</td><td>본부에서 6개 코트 경기 일괄 "시작" 클릭</td></tr>
+  <tr><td>시작</td><td class="hl">1라운드 경기 시작</td><td>본부에서 6개 코트 경기 일괄 "시작" 클릭<br><span class="small">→ 🔔 해당 선수에게 자동 푸시 알림 발송</span></td></tr>
   <tr><td>진행중</td><td>코트 점수 입력</td><td>각 코트 태블릿에서 좌/우 터치 입력</td></tr>
-  <tr><td>진행중</td><td>경기 완료 → 서명 → 다음 경기</td><td>autonext로 자동 순환</td></tr>
+  <tr><td>진행중</td><td>경기 완료 → 서명 → 다음 경기</td><td>autonext로 자동 순환<br><span class="small">→ 🔔 다음 경기 선수에게 "준비" 알림 자동 발송</span></td></tr>
   <tr><td>진행중</td><td>본부 모니터링</td><td>대시보드로 진행률/지연 코트 확인</td></tr>
   <tr><td>예선 종료</td><td class="hl-red">결선 토너먼트 생성</td><td>경기탭 → "결선 토너먼트 생성" 클릭</td></tr>
   <tr><td>결선</td><td>결선 경기 운영</td><td>21점 선취제, 동일 흐름</td></tr>
@@ -971,6 +1054,21 @@
     <td>브라우저 탭 비활성</td>
     <td>탭 클릭하여 활성화 또는 새로고침</td>
   </tr>
+  <tr>
+    <td>푸시 알림이 안 옴</td>
+    <td>브라우저 권한 미허용</td>
+    <td>브라우저 설정 → 사이트 알림 → "허용"으로 변경<br>iPhone은 "홈 화면에 추가" 후 재접속 필요</td>
+  </tr>
+  <tr>
+    <td>알림 구독 버튼 안 보임</td>
+    <td>이름 미검색 상태</td>
+    <td><code>/my</code> 페이지에서 이름 입력 후 "조회" 먼저 클릭</td>
+  </tr>
+  <tr>
+    <td>iPhone에서 알림 불가</td>
+    <td>Safari 직접 접속 상태</td>
+    <td>Safari → 공유 → "홈 화면에 추가" → 홈 아이콘으로 재접속<br>(iOS 16.4 이상 필요)</td>
+  </tr>
 </table>
 
 <!-- ========================================== -->
@@ -1007,6 +1105,11 @@
       <p>모든 경기는 승/패팀 서명으로 확인됩니다. 중요 경기는 서명 화면 캡처를 권장합니다.</p>
     </div>
   </div>
+</div>
+
+<div class="box box-green" style="margin-top:3mm">
+  <div class="box-title">✅ 푸시 알림 적극 활용</div>
+  <p>참가자에게 <code>/my</code> 페이지에서 알림 구독을 안내하면 <strong>경기 호출 방송 횟수를 크게 줄일 수 있습니다.</strong> 경기 시작 시 해당 선수와 다음 대기 선수에게 자동으로 알림이 발송되므로, 운영 인력이 일일이 호출하지 않아도 됩니다.</p>
 </div>
 
 <!-- ========================================== -->
@@ -1048,13 +1151,21 @@
   <li>전체화면 모드 (F11)</li>
 </ul>
 
+<h3>🔔 참가자 알림</h3>
+<ul class="checklist">
+  <li>QR 코드 포스터에 "알림 받기" 안내 문구 포함 여부 확인</li>
+  <li>참가자 3~5명에게 알림 구독 테스트 (테스트 발송 버튼으로 확인)</li>
+  <li>iPhone 사용자에게 "홈 화면에 추가" 안내 준비</li>
+  <li>카카오톡 단톡방에 알림 구독 방법 안내 메시지 작성</li>
+</ul>
+
 <h3>📋 기타</h3>
 <ul class="checklist">
-  <li>QR 코드 포스터 부착 (접수처, 대기석)</li>
-  <li>카카오톡 단톡방에 참가자 조회 URL 공유</li>
+  <li>QR 코드 포스터 부착 (접수처, 대기석) — "경기 알림 받기" 문구 포함</li>
+  <li>카카오톡 단톡방에 참가자 조회 URL + 알림 안내 공유</li>
   <li>테스트 점수 입력 → 대시보드 반영 확인 → 테스트 데이터 원복</li>
   <li>운영 인력 역할 확인 및 브리핑 완료</li>
-  <li>마이크/방송 장비 확인 (경기 호출용)</li>
+  <li>마이크/방송 장비 확인 (경기 호출용 — 알림 구독자 많으면 방송 최소화 가능)</li>
 </ul>
 
 <hr>
@@ -1066,7 +1177,7 @@
 </div>
 
 <div class="footer">
-  🏸 배드민턴 대회 운영 매뉴얼 | Badminton Tournament Management System v1.0 | 2026-02-16
+  🏸 배드민턴 대회 운영 매뉴얼 | Badminton Tournament Management System v2.3 | 2026-02-17
 </div>
 
 </div><!-- /page-container -->
