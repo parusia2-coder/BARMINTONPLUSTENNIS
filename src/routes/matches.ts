@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { sendMatchNotifications } from './notifications'
+import { sendMatchNotifications } from '../services/pushService'
 
 type Bindings = {
   DB: D1Database
@@ -101,43 +101,49 @@ matchRoutes.patch('/:tid/matches/:mid/status', async (c) => {
     `UPDATE matches SET status=?, updated_at=datetime('now') WHERE id=? AND tournament_id=?`
   ).bind(status, mid, tid).run()
 
-  // 경기가 시작되면 해당 선수에게 알림 발송
+  // #1 waitUntil — 알림 발송을 백그라운드 비동기로 처리 (응답 즉시 반환)
   if (status === 'playing') {
-    try {
-      const match = await db.prepare(`
-        SELECT m.court_number, t1.team_name as team1_name, t2.team_name as team2_name
-        FROM matches m
-        LEFT JOIN teams t1 ON m.team1_id = t1.id
-        LEFT JOIN teams t2 ON m.team2_id = t2.id
-        WHERE m.id = ?
-      `).bind(mid).first() as any
-      if (match) {
-        // 현재 경기 선수에게 '경기 시작' 알림
-        await sendMatchNotifications(
-          db, parseInt(tid), parseInt(mid), match.court_number,
-          match.team1_name || '', match.team2_name || '',
-          'match_starting',
-          c.env.VAPID_PUBLIC_KEY, c.env.VAPID_PRIVATE_KEY, c.env.VAPID_SUBJECT
-        )
-        // 다음 대기 경기 선수에게 '준비' 알림
-        const nextMatch = await db.prepare(`
-          SELECT m.id, m.court_number, t1.team_name as team1_name, t2.team_name as team2_name
+    c.executionCtx.waitUntil((async () => {
+      try {
+        const match = await db.prepare(`
+          SELECT m.court_number, t1.team_name as team1_name, t2.team_name as team2_name
           FROM matches m
           LEFT JOIN teams t1 ON m.team1_id = t1.id
           LEFT JOIN teams t2 ON m.team2_id = t2.id
-          WHERE m.tournament_id = ? AND m.court_number = ? AND m.status = 'pending'
-          ORDER BY m.round ASC, m.match_order ASC LIMIT 1
-        `).bind(tid, match.court_number).first() as any
-        if (nextMatch) {
-          await sendMatchNotifications(
-            db, parseInt(tid), nextMatch.id, nextMatch.court_number,
-            nextMatch.team1_name || '', nextMatch.team2_name || '',
-            'match_upcoming',
-            c.env.VAPID_PUBLIC_KEY, c.env.VAPID_PRIVATE_KEY, c.env.VAPID_SUBJECT
-          )
+          WHERE m.id = ?
+        `).bind(mid).first() as any
+        if (match) {
+          // 현재 경기 선수 + 다음 대기 경기 선수 알림을 병렬로
+          const notifPromises: Promise<any>[] = [
+            sendMatchNotifications(
+              db, parseInt(tid), parseInt(mid), match.court_number,
+              match.team1_name || '', match.team2_name || '',
+              'match_starting',
+              c.env.VAPID_PUBLIC_KEY, c.env.VAPID_PRIVATE_KEY, c.env.VAPID_SUBJECT
+            )
+          ]
+          const nextMatch = await db.prepare(`
+            SELECT m.id, m.court_number, t1.team_name as team1_name, t2.team_name as team2_name
+            FROM matches m
+            LEFT JOIN teams t1 ON m.team1_id = t1.id
+            LEFT JOIN teams t2 ON m.team2_id = t2.id
+            WHERE m.tournament_id = ? AND m.court_number = ? AND m.status = 'pending'
+            ORDER BY m.round ASC, m.match_order ASC LIMIT 1
+          `).bind(tid, match.court_number).first() as any
+          if (nextMatch) {
+            notifPromises.push(
+              sendMatchNotifications(
+                db, parseInt(tid), nextMatch.id, nextMatch.court_number,
+                nextMatch.team1_name || '', nextMatch.team2_name || '',
+                'match_upcoming',
+                c.env.VAPID_PUBLIC_KEY, c.env.VAPID_PRIVATE_KEY, c.env.VAPID_SUBJECT
+              )
+            )
+          }
+          await Promise.allSettled(notifPromises)
         }
-      }
-    } catch (e) { /* 알림 실패해도 경기 상태 변경은 유지 */ }
+      } catch (e) { /* 알림 실패해도 경기 상태 변경은 유지 */ }
+    })())
   }
 
   return c.json({ message: `경기 상태가 '${status}'로 변경되었습니다.` })
@@ -285,32 +291,38 @@ matchRoutes.post('/:tid/court/:courtNum/next', async (c) => {
     `UPDATE matches SET status='playing', updated_at=datetime('now') WHERE id=?`
   ).bind(next.id).run()
 
-  // 경기 시작 알림 발송
-  try {
-    await sendMatchNotifications(
-      db, parseInt(tid), next.id as number, parseInt(courtNum as string),
-      (next as any).team1_name || '', (next as any).team2_name || '',
-      'match_starting',
-      c.env.VAPID_PUBLIC_KEY, c.env.VAPID_PRIVATE_KEY, c.env.VAPID_SUBJECT
-    )
-    // 그 다음 대기 경기 선수에게 '준비' 알림
-    const upcoming = await db.prepare(`
-      SELECT m.id, m.court_number, t1.team_name as team1_name, t2.team_name as team2_name
-      FROM matches m
-      LEFT JOIN teams t1 ON m.team1_id = t1.id
-      LEFT JOIN teams t2 ON m.team2_id = t2.id
-      WHERE m.tournament_id=? AND m.court_number=? AND m.status='pending' AND m.id != ?
-      ORDER BY m.round ASC, m.match_order ASC LIMIT 1
-    `).bind(tid, courtNum, next.id).first() as any
-    if (upcoming) {
-      await sendMatchNotifications(
-        db, parseInt(tid), upcoming.id, upcoming.court_number,
-        upcoming.team1_name || '', upcoming.team2_name || '',
-        'match_upcoming',
-        c.env.VAPID_PUBLIC_KEY, c.env.VAPID_PRIVATE_KEY, c.env.VAPID_SUBJECT
-      )
-    }
-  } catch (e) { /* 알림 실패해도 경기 시작은 유지 */ }
+  // #1 waitUntil — 알림 발송을 백그라운드 비동기로 처리
+  c.executionCtx.waitUntil((async () => {
+    try {
+      const notifPromises: Promise<any>[] = [
+        sendMatchNotifications(
+          db, parseInt(tid), next.id as number, parseInt(courtNum as string),
+          (next as any).team1_name || '', (next as any).team2_name || '',
+          'match_starting',
+          c.env.VAPID_PUBLIC_KEY, c.env.VAPID_PRIVATE_KEY, c.env.VAPID_SUBJECT
+        )
+      ]
+      const upcoming = await db.prepare(`
+        SELECT m.id, m.court_number, t1.team_name as team1_name, t2.team_name as team2_name
+        FROM matches m
+        LEFT JOIN teams t1 ON m.team1_id = t1.id
+        LEFT JOIN teams t2 ON m.team2_id = t2.id
+        WHERE m.tournament_id=? AND m.court_number=? AND m.status='pending' AND m.id != ?
+        ORDER BY m.round ASC, m.match_order ASC LIMIT 1
+      `).bind(tid, courtNum, next.id).first() as any
+      if (upcoming) {
+        notifPromises.push(
+          sendMatchNotifications(
+            db, parseInt(tid), upcoming.id, upcoming.court_number,
+            upcoming.team1_name || '', upcoming.team2_name || '',
+            'match_upcoming',
+            c.env.VAPID_PUBLIC_KEY, c.env.VAPID_PRIVATE_KEY, c.env.VAPID_SUBJECT
+          )
+        )
+      }
+      await Promise.allSettled(notifPromises)
+    } catch (e) { /* 알림 실패해도 경기 시작은 유지 */ }
+  })())
 
   return c.json({ message: '경기가 시작되었습니다.', match: next })
 })

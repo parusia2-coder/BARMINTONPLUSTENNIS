@@ -610,7 +610,7 @@ function getMyPageHtml(): string {
           var isT1=teams.some(function(t){return t.id===m.team1_id});
           var my=isT1?m.team1_name:m.team2_name;
           var opp=isT1?m.team2_name:m.team1_name;
-          return '<div class="flex items-center justify-between rounded-xl px-4 py-3 '+(m.status==='playing'?'bg-emerald-50 border-2 border-emerald-300':'bg-gray-50')+'"><div><span class="font-bold">'+my+'</span> <span class="text-gray-400">vs</span> <span>'+(opp||'BYE')+'</span><p class="text-xs text-gray-500 mt-0.5">'+(m.event_name||'')+' #'+m.match_order+'</p></div><div>'+(m.court_number?'<span class="badge bg-yellow-100 text-yellow-700">'+m.court_number+'코트</span>':'')+(m.status==='playing'?'<span class="badge bg-emerald-100 text-emerald-700 ml-1 pulse-live">진행중</span>':'<span class="badge bg-gray-100 text-gray-600 ml-1">대기</span>')+'</div></div>';
+          return '<div data-mid="'+m.id+'" class="flex items-center justify-between rounded-xl px-4 py-3 '+(m.status==='playing'?'bg-emerald-50 border-2 border-emerald-300':'bg-gray-50')+'"><div><span class="font-bold">'+my+'</span> <span class="text-gray-400">vs</span> <span>'+(opp||'BYE')+'</span><p class="text-xs text-gray-500 mt-0.5">'+(m.event_name||'')+' #'+m.match_order+'</p></div><div>'+(m.court_number?'<span class="badge bg-yellow-100 text-yellow-700">'+m.court_number+'코트</span>':'')+(m.status==='playing'?'<span class="badge bg-emerald-100 text-emerald-700 ml-1 pulse-live">진행중</span>':'<span class="badge bg-gray-100 text-gray-600 ml-1">대기</span>')+'</div></div>';
         }).join('')+'</div></div>';
       }
       // 완료
@@ -622,7 +622,7 @@ function getMyPageHtml(): string {
           var opS=isT1?(m.team2_set1||0):(m.team1_set1||0);
           var my=isT1?m.team1_name:m.team2_name;
           var opp=isT1?m.team2_name:m.team1_name;
-          return '<div class="flex items-center justify-between rounded-xl px-4 py-3 '+(isW?'bg-green-50':'bg-red-50')+'"><div><span class="font-bold '+(isW?'text-green-700':'text-red-600')+'">'+(isW?'🏆':'💔')+' '+my+'</span> <span class="text-gray-400">vs</span> <span>'+opp+'</span><p class="text-xs text-gray-500 mt-0.5">'+(m.event_name||'')+(m.court_number?' '+m.court_number+'코트':'')+'</p></div><div class="text-right"><span class="text-xl font-extrabold '+(isW?'text-green-600':'text-red-500')+'">'+myS+' : '+opS+'</span><span class="badge '+(isW?'bg-green-100 text-green-700':'bg-red-100 text-red-600')+' block mt-1 text-center">'+(isW?'승리':'패배')+'</span></div></div>';
+          return '<div data-mid="'+m.id+'" class="flex items-center justify-between rounded-xl px-4 py-3 '+(isW?'bg-green-50':'bg-red-50')+'"><div><span class="font-bold '+(isW?'text-green-700':'text-red-600')+'">'+(isW?'🏆':'💔')+' '+my+'</span> <span class="text-gray-400">vs</span> <span>'+opp+'</span><p class="text-xs text-gray-500 mt-0.5">'+(m.event_name||'')+(m.court_number?' '+m.court_number+'코트':'')+'</p></div><div class="text-right"><span class="text-xl font-extrabold '+(isW?'text-green-600':'text-red-500')+'">'+myS+' : '+opS+'</span><span class="badge '+(isW?'bg-green-100 text-green-700':'bg-red-100 text-red-600')+' block mt-1 text-center">'+(isW?'승리':'패배')+'</span></div></div>';
         }).join('')+'</div></div>';
       } else {
         h+='<div class="text-center py-8 text-gray-400"><p>완료된 경기가 없습니다.</p></div>';
@@ -631,7 +631,33 @@ function getMyPageHtml(): string {
       return h;
     }
 
-    init();
+    // ─── #4 하이라이트: URL ?highlight=matchId → 해당 경기 강조 ───
+    function highlightMatch(matchId) {
+      if (!matchId) return;
+      setTimeout(function() {
+        var els = document.querySelectorAll('[data-mid="'+matchId+'"]');
+        if (els.length > 0) {
+          els[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+          els[0].classList.add('ring-2', 'ring-emerald-500', 'ring-offset-2');
+          els[0].style.transition = 'all 0.3s';
+          setTimeout(function(){ els[0].classList.remove('ring-2','ring-emerald-500','ring-offset-2'); }, 5000);
+        }
+      }, 500);
+    }
+    var hlParam = new URLSearchParams(location.search).get('highlight');
+
+    // Service Worker → 프론트엔드 메시지 수신 (이미 열린 /my 창에서)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'MATCH_NOTIFICATION') {
+          pollForChanges(); // 즉시 갱신
+          highlightMatch(event.data.matchId);
+          showNotifBanner('🏸 경기 알림!', '코트 '+(event.data.courtNumber||'')+' 경기 알림이 도착했습니다.', event.data.courtNumber);
+        }
+      });
+    }
+
+    init().then(function() { if (hlParam) highlightMatch(hlParam); });
   </script>
 </body>
 </html>`

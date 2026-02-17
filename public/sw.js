@@ -1,11 +1,9 @@
 // Service Worker for Push Notifications
-// 배드민턴 대회 운영 시스템
-
-const CACHE_NAME = 'badminton-v1';
+// 배드민턴 대회 운영 시스템 v2.3
 
 // Push 알림 수신
 self.addEventListener('push', function(event) {
-  let data = { title: '🏸 배드민턴 대회', body: '알림이 있습니다.', tag: 'default' };
+  var data = { title: '🏸 배드민턴 대회', body: '알림이 있습니다.', tag: 'default' };
   
   if (event.data) {
     try {
@@ -15,7 +13,7 @@ self.addEventListener('push', function(event) {
     }
   }
 
-  const options = {
+  var options = {
     body: data.body || '',
     icon: data.icon || '/static/icon-192.png',
     badge: data.badge || '/static/icon-72.png',
@@ -39,19 +37,34 @@ self.addEventListener('push', function(event) {
   );
 });
 
-// 알림 클릭 처리
+// 알림 클릭 처리 — matchId 딥링크 + 하이라이트
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
 
-  const urlToOpen = event.notification.data?.url || '/';
-
   if (event.action === 'dismiss') return;
+
+  var notifData = event.notification.data || {};
+  var tid = notifData.tournamentId;
+  var matchId = notifData.matchId;
+  // 딥링크: matchId가 있으면 highlight 파라미터로 전달
+  var urlToOpen = notifData.url || '/';
+  if (matchId && urlToOpen.indexOf('highlight') === -1) {
+    urlToOpen += (urlToOpen.indexOf('?') !== -1 ? '&' : '?') + 'highlight=' + matchId;
+  }
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-      // 이미 열린 창이 있으면 포커스
-      for (const client of clientList) {
-        if (client.url.includes('/my') && 'focus' in client) {
+      // 이미 열린 /my 창이 있으면 URL 업데이트 + 포커스
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        if (client.url.indexOf('/my') !== -1 && 'focus' in client) {
+          // 열린 창에 메시지 전송 → 프론트엔드에서 하이라이트 처리
+          client.postMessage({
+            type: 'MATCH_NOTIFICATION',
+            matchId: matchId,
+            courtNumber: notifData.courtNumber,
+            tournamentId: tid
+          });
           return client.focus();
         }
       }
@@ -61,10 +74,8 @@ self.addEventListener('notificationclick', function(event) {
   );
 });
 
-// 알림 닫기 이벤트
-self.addEventListener('notificationclose', function(event) {
-  // 분석용: 알림 닫기 추적 가능
-});
+// 알림 닫기 이벤트 (분석용)
+self.addEventListener('notificationclose', function(event) {});
 
 // Service Worker 설치
 self.addEventListener('install', function(event) {
