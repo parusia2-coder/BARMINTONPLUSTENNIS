@@ -204,3 +204,137 @@ tournamentRoutes.get('/:id/print-data', async (c) => {
     teamsByEvent
   })
 })
+
+// =============================================
+// 🔴 대회 데이터 전체 내보내기 (JSON Export)
+// =============================================
+tournamentRoutes.get('/:id/export', async (c) => {
+  const tid = c.req.param('id')
+  const db = c.env.DB
+
+  const [tournament, participants, events, matches, teams, standings] = await Promise.all([
+    db.prepare(`SELECT * FROM tournaments WHERE id=? AND deleted=0`).bind(tid).first(),
+    db.prepare(`SELECT * FROM participants WHERE tournament_id=? AND deleted=0 ORDER BY id`).bind(tid).all(),
+    db.prepare(`SELECT * FROM events WHERE tournament_id=? ORDER BY id`).bind(tid).all(),
+    db.prepare(`SELECT * FROM matches WHERE tournament_id=? ORDER BY id`).bind(tid).all(),
+    db.prepare(`SELECT * FROM teams WHERE tournament_id=? ORDER BY id`).bind(tid).all(),
+    db.prepare(`SELECT * FROM standings WHERE tournament_id=? ORDER BY event_id, rank`).bind(tid).all()
+  ])
+
+  if (!tournament) return c.json({ error: '대회를 찾을 수 없습니다.' }, 404)
+
+  const exportData = {
+    _meta: {
+      version: '3.2',
+      exported_at: new Date().toISOString(),
+      system: '배드민턴 대회 운영 시스템'
+    },
+    tournament,
+    participants: participants.results || [],
+    events: events.results || [],
+    teams: teams.results || [],
+    matches: matches.results || [],
+    standings: standings.results || []
+  }
+
+  return c.json(exportData)
+})
+
+// =============================================
+// 🔴 대회 데이터 가져오기 (JSON Import)
+// =============================================
+tournamentRoutes.post('/import', async (c) => {
+  const db = c.env.DB
+  const body = await c.req.json()
+
+  if (!body._meta || !body.tournament) {
+    return c.json({ error: '유효하지 않은 백업 파일입니다.' }, 400)
+  }
+
+  const t = body.tournament
+  // 새 대회 생성
+  const newT = await db.prepare(
+    `INSERT INTO tournaments (name, description, status, format, games_per_player, courts, merge_threshold, admin_password)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    `[복원] ${t.name}`, t.description || '', t.status || 'draft',
+    t.format || 'kdk', t.games_per_player || 4, t.courts || 2,
+    t.merge_threshold || 4, t.admin_password || 'admin123'
+  ).run()
+  const newTid = newT.meta.last_row_id
+
+  // ID 매핑 테이블
+  const pMap: Record<number, number> = {}   // old participant id → new
+  const eMap: Record<number, number> = {}   // old event id → new
+  const tMap: Record<number, number> = {}   // old team id → new
+
+  // 참가자 복원
+  for (const p of (body.participants || [])) {
+    const r = await db.prepare(
+      `INSERT INTO participants (tournament_id, name, phone, gender, birth_year, level, paid, checked_in, club, mixed_doubles)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(newTid, p.name, p.phone || '', p.gender || 'm', p.birth_year, p.level || 'c',
+      p.paid || 0, p.checked_in || 0, p.club || '', p.mixed_doubles || 0).run()
+    pMap[p.id] = r.meta.last_row_id as number
+  }
+
+  // 종목 복원
+  for (const e of (body.events || [])) {
+    const r = await db.prepare(
+      `INSERT INTO events (tournament_id, category, age_group, level_group, name, status, merged_from)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(newTid, e.category, e.age_group || 'open', e.level_group || 'all',
+      e.name, e.status || 'pending', e.merged_from || null).run()
+    eMap[e.id] = r.meta.last_row_id as number
+  }
+
+  // 팀 복원
+  for (const team of (body.teams || [])) {
+    const p1 = pMap[team.player1_id] || team.player1_id
+    const p2 = pMap[team.player2_id] || team.player2_id
+    const eid = eMap[team.event_id] || team.event_id
+    const r = await db.prepare(
+      `INSERT INTO teams (event_id, tournament_id, player1_id, player2_id, team_name, group_num)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).bind(eid, newTid, p1, p2, team.team_name || '', team.group_num || null).run()
+    tMap[team.id] = r.meta.last_row_id as number
+  }
+
+  // 경기 복원
+  for (const m of (body.matches || [])) {
+    const eid = eMap[m.event_id] || m.event_id
+    const t1 = tMap[m.team1_id] || m.team1_id
+    const t2 = tMap[m.team2_id] || m.team2_id
+    await db.prepare(
+      `INSERT INTO matches (tournament_id, event_id, round, match_order, court_number,
+        team1_id, team2_id, team1_set1, team1_set2, team1_set3,
+        team2_set1, team2_set2, team2_set3, status, winner_team, group_num)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(newTid, eid, m.round || 1, m.match_order || 0, m.court_number,
+      t1, t2, m.team1_set1 || 0, m.team1_set2 || 0, m.team1_set3 || 0,
+      m.team2_set1 || 0, m.team2_set2 || 0, m.team2_set3 || 0,
+      m.status || 'pending', m.winner_team || null, m.group_num || null).run()
+  }
+
+  // 순위 복원
+  for (const s of (body.standings || [])) {
+    const eid = eMap[s.event_id] || s.event_id
+    const tid2 = tMap[s.team_id] || s.team_id
+    await db.prepare(
+      `INSERT OR IGNORE INTO standings (tournament_id, event_id, team_id, wins, losses, points, score_for, score_against, goal_difference, rank)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(newTid, eid, tid2, s.wins || 0, s.losses || 0, s.points || 0,
+      s.score_for || 0, s.score_against || 0, s.goal_difference || 0, s.rank || 0).run()
+  }
+
+  return c.json({
+    message: '대회 데이터 복원 완료!',
+    tournament_id: newTid,
+    stats: {
+      participants: Object.keys(pMap).length,
+      events: Object.keys(eMap).length,
+      teams: Object.keys(tMap).length,
+      matches: (body.matches || []).length
+    }
+  }, 201)
+})

@@ -467,6 +467,8 @@ function renderTournament() {
       <div id="admin-panel" class="hidden">
         <div class="flex flex-wrap gap-2 p-3 bg-white rounded-xl border border-gray-200">
           <button onclick="navigate('scoreboard')" class="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 transition"><i class="fas fa-tv mr-1"></i>스코어보드</button>
+          <button onclick="exportTournament(${t.id})" class="px-3 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-100 transition"><i class="fas fa-download mr-1"></i>데이터 백업</button>
+          <button onclick="showImportModal()" class="px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-100 transition"><i class="fas fa-upload mr-1"></i>데이터 복원</button>
           <button onclick="deleteTournament(${t.id})" class="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition"><i class="fas fa-trash-alt mr-1"></i>대회 삭제</button>
         </div>
       </div>
@@ -507,6 +509,28 @@ function toggleParticipantForm() {
   if (panel) {
     panel.classList.toggle('hidden');
     if (arrow) arrow.style.transform = panel.classList.contains('hidden') ? '' : 'rotate(180deg)';
+  }
+}
+function filterParticipants() {
+  const search = (document.getElementById('participant-search')?.value || '').toLowerCase();
+  const gender = document.getElementById('participant-filter-gender')?.value || '';
+  const level = document.getElementById('participant-filter-level')?.value || '';
+  const club = document.getElementById('participant-filter-club')?.value || '';
+  const rows = document.querySelectorAll('.participant-row');
+  let shown = 0;
+  rows.forEach(row => {
+    const matchSearch = !search || row.dataset.name.includes(search) || row.dataset.club.includes(search);
+    const matchGender = !gender || row.dataset.gender === gender;
+    const matchLevel = !level || row.dataset.level === level;
+    const matchClub = !club || row.dataset.club === club.toLowerCase();
+    const show = matchSearch && matchGender && matchLevel && matchClub;
+    row.style.display = show ? '' : 'none';
+    if (show) shown++;
+  });
+  const countEl = document.getElementById('participant-count-filtered');
+  if (countEl) {
+    const total = rows.length;
+    countEl.textContent = (search || gender || level || club) ? `${shown}/${total}명 표시` : '';
   }
 }
 function toggleEventForm() {
@@ -598,6 +622,26 @@ function renderParticipantsTab(isAdmin) {
       </div>
     </div>` : ''}
 
+    <!-- Participant Search/Filter -->
+    <div class="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
+      <div class="flex flex-wrap gap-2 items-center">
+        <div class="relative flex-1 min-w-[150px]">
+          <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+          <input id="participant-search" type="text" placeholder="이름 또는 소속 검색..." oninput="filterParticipants()" class="w-full pl-8 pr-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+        <select id="participant-filter-gender" onchange="filterParticipants()" class="px-2 py-2 border rounded-lg text-sm outline-none">
+          <option value="">전체 성별</option><option value="m">남자</option><option value="f">여자</option>
+        </select>
+        <select id="participant-filter-level" onchange="filterParticipants()" class="px-2 py-2 border rounded-lg text-sm outline-none">
+          <option value="">전체 급수</option>${Object.entries(LEVELS).map(([k,v]) => `<option value="${k}">${v}급</option>`).join('')}
+        </select>
+        <select id="participant-filter-club" onchange="filterParticipants()" class="px-2 py-2 border rounded-lg text-sm outline-none">
+          <option value="">전체 소속</option>${clubList.map(([name]) => `<option value="${name}">${name}</option>`).join('')}
+        </select>
+        <span id="participant-count-filtered" class="text-xs text-gray-400"></span>
+      </div>
+    </div>
+
     <!-- Participant Table -->
     <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto shadow-sm">
       <table class="w-full">
@@ -617,7 +661,7 @@ function renderParticipantsTab(isAdmin) {
           ${state.participants.length === 0 ? `<tr><td colspan="${isAdmin?10:9}" class="px-4 py-8 text-center text-gray-400">등록된 참가자가 없습니다.</td></tr>` : ''}
           ${state.participants.map((p, i) => {
             const lv = LEVEL_COLORS[p.level] || LEVEL_COLORS.c;
-            return `<tr class="hover:bg-gray-50">
+            return `<tr class="hover:bg-gray-50 participant-row" data-name="${(p.name||'').toLowerCase()}" data-club="${(p.club||'').toLowerCase()}" data-gender="${p.gender}" data-level="${p.level}">
               <td class="px-2 py-2 text-sm text-gray-400">${i+1}</td>
               <td class="px-2 py-2 font-medium text-gray-900 text-sm">${p.name}</td>
               <td class="px-2 py-2 text-center"><span class="badge text-xs ${p.gender==='m' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender==='m'?'남':'여'}</span></td>
@@ -1615,14 +1659,26 @@ function switchTab(tab) {
   bindEvents();
 }
 
-// Auth
+// Auth (세션 유지: localStorage)
 function showAuthModal(tid) { document.getElementById('auth-modal').classList.remove('hidden'); document.getElementById('auth-password').focus(); state._authTid = tid; }
 function closeAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
 async function authenticate() {
   const pw = document.getElementById('auth-password').value.trim();
   try { await api(`/tournaments/${state._authTid}/auth`, { method: 'POST', body: JSON.stringify({ admin_password: pw }) });
-    state.adminAuth[state._authTid] = true; state.adminPasswords[state._authTid] = pw; closeAuthModal(); document.getElementById('auth-password').value = ''; showToast('관리자 인증 성공!', 'success'); render();
+    state.adminAuth[state._authTid] = true; state.adminPasswords[state._authTid] = pw;
+    // localStorage에 세션 저장
+    try { localStorage.setItem('badminton_admin_auth', JSON.stringify(state.adminAuth)); localStorage.setItem('badminton_admin_pw', JSON.stringify(state.adminPasswords)); } catch(e){}
+    closeAuthModal(); document.getElementById('auth-password').value = ''; showToast('관리자 인증 성공!', 'success'); render();
   } catch(e){ document.getElementById('auth-password').value = ''; document.getElementById('auth-password').focus(); }
+}
+// 세션 복원
+function restoreAdminSession() {
+  try {
+    const auth = localStorage.getItem('badminton_admin_auth');
+    const pw = localStorage.getItem('badminton_admin_pw');
+    if (auth) Object.assign(state.adminAuth, JSON.parse(auth));
+    if (pw) Object.assign(state.adminPasswords, JSON.parse(pw));
+  } catch(e){}
 }
 
 // Participant actions
@@ -2150,8 +2206,90 @@ async function deleteTournament(tid) {
   } catch(e) {}
 }
 
+// 🔴 대회 데이터 백업 (JSON Export)
+async function exportTournament(tid) {
+  try {
+    showToast('데이터를 내보내는 중...', 'info');
+    const data = await api(`/tournaments/${tid}/export`);
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const name = data.tournament?.name || '대회';
+    const date = new Date().toISOString().split('T')[0];
+    a.href = url; a.download = `${name}_백업_${date}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('백업 파일이 다운로드되었습니다!', 'success');
+  } catch(e) { showToast('백업 실패', 'error'); }
+}
+
+// 🔴 데이터 복원 모달
+function showImportModal() {
+  const modal = document.createElement('div'); modal.id = 'import-modal';
+  modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-overlay';
+  modal.innerHTML = `<div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
+    <h3 class="text-lg font-bold mb-3"><i class="fas fa-upload mr-2 text-indigo-500"></i>데이터 복원</h3>
+    <p class="text-sm text-gray-500 mb-4">이전에 백업한 JSON 파일을 선택하면 새로운 대회로 복원됩니다.</p>
+    <div class="mb-4">
+      <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition" id="import-drop-zone">
+        <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+        <span class="text-sm text-gray-500">클릭하여 파일 선택</span>
+        <span class="text-xs text-gray-400 mt-1">또는 파일을 여기로 드래그</span>
+        <input type="file" accept=".json" id="import-file-input" class="hidden" onchange="previewImportFile(this)">
+      </label>
+    </div>
+    <div id="import-preview" class="hidden mb-4 p-3 bg-gray-50 rounded-xl border border-gray-200 text-sm">
+    </div>
+    <div class="flex gap-2">
+      <button onclick="document.getElementById('import-modal').remove()" class="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium">취소</button>
+      <button onclick="executeImport()" id="import-btn" class="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hidden">복원 실행</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+function previewImportFile(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data._meta || !data.tournament) { showToast('유효하지 않은 백업 파일입니다.', 'error'); return; }
+      window._importData = data;
+      const preview = document.getElementById('import-preview');
+      preview.classList.remove('hidden');
+      preview.innerHTML = `
+        <div class="font-bold text-gray-800 mb-2"><i class="fas fa-file-alt mr-1 text-indigo-500"></i>${data.tournament.name}</div>
+        <div class="grid grid-cols-2 gap-1 text-xs text-gray-600">
+          <div>참가자: <strong>${(data.participants||[]).length}명</strong></div>
+          <div>종목: <strong>${(data.events||[]).length}개</strong></div>
+          <div>팀: <strong>${(data.teams||[]).length}개</strong></div>
+          <div>경기: <strong>${(data.matches||[]).length}경기</strong></div>
+        </div>
+        <div class="mt-2 text-xs text-gray-400">백업일시: ${data._meta.exported_at || '-'}</div>
+      `;
+      document.getElementById('import-btn').classList.remove('hidden');
+    } catch(err) { showToast('JSON 파일 파싱 실패', 'error'); }
+  };
+  reader.readAsText(file);
+}
+
+async function executeImport() {
+  if (!window._importData) { showToast('파일을 먼저 선택해주세요.', 'warning'); return; }
+  if (!confirm(`"${window._importData.tournament.name}" 대회를 복원하시겠습니까?\n새로운 대회로 생성됩니다.`)) return;
+  try {
+    showToast('복원 중...', 'info');
+    const result = await api('/tournaments/import', { method: 'POST', body: JSON.stringify(window._importData) });
+    document.getElementById('import-modal').remove();
+    window._importData = null;
+    showToast(`복원 완료! (참가자 ${result.stats.participants}명, 경기 ${result.stats.matches}경기)`, 'success');
+    await loadTournaments();
+    if (result.tournament_id) { openTournament(result.tournament_id); }
+  } catch(e) { showToast('복원 실패', 'error'); }
+}
+
 // Init
-document.addEventListener('DOMContentLoaded', () => { render(); loadTournaments(); });
+document.addEventListener('DOMContentLoaded', () => { restoreAdminSession(); render(); loadTournaments(); });
 
 // ==========================================
 // ★ 결선 토너먼트 모달 ★
