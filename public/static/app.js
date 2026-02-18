@@ -8,7 +8,8 @@ const LEVEL_COLORS = { s: 'bg-red-100 text-red-700', a: 'bg-orange-100 text-oran
 const AGE_GROUPS = [
   { value: 'open', label: '오픈 (전연령)' },
   { value: '20대', label: '20대' }, { value: '30대', label: '30대' },
-  { value: '40대', label: '40대' }, { value: '50대이상', label: '50대 이상' }
+  { value: '40대', label: '40대' }, { value: '50대', label: '50대' },
+  { value: '55대', label: '55대 (55세 이상)' }, { value: '60대', label: '60대 (60세 이상)' }
 ];
 
 // State
@@ -321,6 +322,7 @@ function renderTournament() {
         <button onclick="loadDashboard(${t.id});navigate('dashboard')" class="px-4 py-2 bg-orange-50 text-orange-700 rounded-lg text-sm hover:bg-orange-100 transition"><i class="fas fa-chart-bar mr-1"></i>통계</button>
         <button onclick="navigate('mypage')" class="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm hover:bg-indigo-100 transition"><i class="fas fa-user mr-1"></i>내 경기</button>
         <button onclick="loadStandingsAndNavigate(${t.id})" class="px-4 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm hover:bg-purple-100 transition"><i class="fas fa-medal mr-1"></i>결과</button>
+        ${isAdmin ? `<button onclick="deleteTournament(${t.id})" class="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm hover:bg-red-100 transition" title="대회 삭제"><i class="fas fa-trash-alt mr-1"></i>대회 삭제</button>` : ''}
       </div>
     </div>
     <!-- Tabs -->
@@ -1354,6 +1356,23 @@ async function exportToPDF() {
     pdf.addImage(img,'PNG',10,25,w-20,h-20); pdf.save(`${state.currentTournament?.name||'대회'}-결과.pdf`);
     showToast('PDF 저장 완료!', 'success');
   } catch(e) { showToast('PDF 생성 실패', 'error'); }
+}
+
+// 대회 삭제
+async function deleteTournament(tid) {
+  const t = state.currentTournament;
+  if (!t) return;
+  const pw = state.adminPasswords[tid];
+  if (!pw) { showToast('관리자 인증이 필요합니다.', 'warning'); return; }
+  if (!confirm(`정말로 "${t.name}" 대회를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) return;
+  if (!confirm('대회에 포함된 모든 참가자, 종목, 경기 데이터도 함께 삭제됩니다.\n정말 삭제하시겠습니까?')) return;
+  try {
+    await api(`/tournaments/${tid}`, { method: 'DELETE', body: JSON.stringify({ admin_password: pw }) });
+    showToast('대회가 삭제되었습니다.', 'success');
+    state.currentTournament = null;
+    navigate('home');
+    loadTournaments();
+  } catch(e) {}
 }
 
 // Init
