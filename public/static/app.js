@@ -486,7 +486,7 @@ function renderTournament() {
   <div id="auth-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
     <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
       <h3 class="text-lg font-bold mb-4"><i class="fas fa-lock mr-2 text-emerald-500"></i>관리자 인증</h3>
-      <input id="auth-password" type="password" class="w-full px-4 py-3 border rounded-xl mb-4 outline-none focus:ring-2 focus:ring-emerald-500" placeholder="관리자 비밀번호">
+      <input id="auth-password" type="password" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" class="w-full px-4 py-3 border rounded-xl mb-4 outline-none focus:ring-2 focus:ring-emerald-500" placeholder="관리자 비밀번호">
       <div class="flex gap-2"><button onclick="closeAuthModal()" class="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition">취소</button><button onclick="authenticate()" class="flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-medium hover:from-emerald-400 hover:to-emerald-500 transition-all">확인</button></div>
     </div>
   </div>`;
@@ -1618,10 +1618,10 @@ function switchTab(tab) {
 function showAuthModal(tid) { document.getElementById('auth-modal').classList.remove('hidden'); document.getElementById('auth-password').focus(); state._authTid = tid; }
 function closeAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
 async function authenticate() {
-  const pw = document.getElementById('auth-password').value;
+  const pw = document.getElementById('auth-password').value.trim();
   try { await api(`/tournaments/${state._authTid}/auth`, { method: 'POST', body: JSON.stringify({ admin_password: pw }) });
-    state.adminAuth[state._authTid] = true; state.adminPasswords[state._authTid] = pw; closeAuthModal(); showToast('관리자 인증 성공!', 'success'); render();
-  } catch(e){}
+    state.adminAuth[state._authTid] = true; state.adminPasswords[state._authTid] = pw; closeAuthModal(); document.getElementById('auth-password').value = ''; showToast('관리자 인증 성공!', 'success'); render();
+  } catch(e){ document.getElementById('auth-password').value = ''; document.getElementById('auth-password').focus(); }
 }
 
 // Participant actions
