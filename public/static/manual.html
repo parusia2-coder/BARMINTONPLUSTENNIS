@@ -135,7 +135,7 @@
   <h1>배드민턴 대회 운영 매뉴얼</h1>
   <div class="subtitle">현장 장비 셋팅 & 시스템 운영 가이드</div>
   <div class="cover-info">
-    <div><strong>시스템</strong> 배드민턴 대회 운영 시스템 v2.7</div>
+    <div><strong>시스템</strong> 배드민턴 대회 운영 시스템 v3.1</div>
     <div><strong>대상</strong> 200명 이하 동호회/클럽 대회</div>
     <div><strong>기준</strong> 6코트 / 177명 / 214경기 (안양시배드민턴협회 장년부)</div>
     <div><strong>작성일</strong> 2026-02-18</div>
@@ -149,7 +149,7 @@
 
 <p>웹 기반 배드민턴 대회 운영 시스템입니다. 인터넷 브라우저만 있으면 별도 앱 설치 없이 모든 장비에서 사용할 수 있습니다.</p>
 
-<h3>주요 화면 6가지</h3>
+<h3>주요 화면 7가지</h3>
 <table>
   <tr><th style="width:22%">화면</th><th style="width:28%">URL</th><th style="width:16%">대상</th><th>용도</th></tr>
   <tr>
@@ -183,6 +183,12 @@
     <td>코트별 전체 경기 흐름 시각화 (20초 자동갱신)</td>
   </tr>
   <tr>
+    <td><span class="badge badge-red">인쇄</span> 인쇄 센터</td>
+    <td><code>/print?tid=1</code></td>
+    <td>운영진</td>
+    <td>수기 운영 대비 6종 A4 인쇄물 <strong>NEW v3.1</strong></td>
+  </tr>
+  <tr>
     <td><span class="badge badge-gray">매뉴얼</span> 운영 가이드</td>
     <td><code>/static/manual.html</code></td>
     <td>운영자</td>
@@ -201,9 +207,9 @@
     ↓                              ↓                                  ↓
 대진표 생성                     서명 → 자동 다음경기               시상식
     ↓                              ↓
-장비 충전                       대시보드 + 타임라인 실시간 모니터링
-                                    ↓
-                                🔔 푸시 알림 자동 발송 (경기 시작/준비)</div>
+<span class="hl">A4 인쇄물 출력 (수기 대비)</span>     대시보드 + 타임라인 실시간 모니터링
+    ↓                                    ↓
+장비 충전                       🔔 푸시 알림 자동 발송 (경기 시작/준비)</div>
 
 <!-- ========================================== -->
 <!--              2. 필요 장비                    -->
@@ -991,6 +997,83 @@
 <p>참가자 탭 상단에 연령대별 인원수 통계 배지가 표시되며, 참가자 목록 테이블에 <strong>연령대 컬럼</strong>이 추가되어 출생년도 기반으로 자동 계산된 연령대를 확인할 수 있습니다.</p>
 
 <!-- ========================================== -->
+<!--       5-2 인쇄 센터 (수기 운영 대비)      -->
+<!-- ========================================== -->
+<div class="page-break"></div>
+<h2>5-2. 인쇄 센터 (수기 운영 대비) <span class="badge badge-red">NEW v3.1</span></h2>
+
+<p>시스템/인터넷 장애 시 수기로 대회를 운영할 수 있도록 <strong>6종 A4 인쇄물</strong>을 제공합니다. 대회 전날 미리 인쇄해두면 비상 시 즉시 전환할 수 있습니다.</p>
+
+<h3>접속 방법</h3>
+<div class="box box-blue">
+  <div class="box-title">🖨️ 인쇄 센터 URL</div>
+  <p><code>/print?tid={대회ID}</code> &mdash; 예: <code>/print?tid=1</code></p>
+  <p class="small">• 홈 화면 "인쇄 센터" 카드 클릭 또는 대회 상세 상단 "인쇄" 버튼으로도 접속 가능</p>
+</div>
+
+<h3>6종 인쇄물 내용</h3>
+<table>
+  <tr><th style="width:8%">번호</th><th style="width:22%">인쇄물</th><th>내용</th><th style="width:18%">사용 시점</th></tr>
+  <tr>
+    <td>①</td>
+    <td><strong>참가자 명단</strong></td>
+    <td>클럽별 그룹, 이름/성별/출생년도/급수/연락처, 체크인/참가비 체크박스</td>
+    <td>당일 접수</td>
+  </tr>
+  <tr>
+    <td>②</td>
+    <td><strong>팀 편성표</strong></td>
+    <td>종목별 팀 목록 (1번선수 · 2번선수 · 급수 · 소속), 조 번호</td>
+    <td>조 편성 후</td>
+  </tr>
+  <tr>
+    <td>③</td>
+    <td><strong>조별 대진표</strong></td>
+    <td>라운드/코트/팀A vs 팀B, 승자 체크박스 (경기 미생성 시 빈 양식)</td>
+    <td>대진표 생성 후</td>
+  </tr>
+  <tr>
+    <td>④</td>
+    <td><strong>점수 기록지</strong></td>
+    <td>코트별 경기 기록용지 (세트 점수, 승자, 서명란) (경기 미생성 시 빈 양식)</td>
+    <td>경기 진행 중</td>
+  </tr>
+  <tr>
+    <td>⑤</td>
+    <td><strong>순위 집계표</strong></td>
+    <td>조별 승/패/승점/득실차/순위 기록란</td>
+    <td>예선 종료 후</td>
+  </tr>
+  <tr>
+    <td>⑥</td>
+    <td><strong>결선 대진표</strong></td>
+    <td>토너먼트 브래킷 (크로스 시드, BYE 자동, 승자 흐름 화살표)</td>
+    <td>결선 진행 시</td>
+  </tr>
+</table>
+
+<h3>사용법</h3>
+<div class="box box-green">
+  <div class="box-title">인쇄 절차</div>
+  <ol>
+    <li>홈 화면 → <strong>"인쇄 센터"</strong> 카드 클릭 (또는 대회 상세 → 상단 "인쇄" 버튼)</li>
+    <li>대회 선택 → 데이터 자동 로드 (6개 섹션 모두 표시)</li>
+    <li>상단 <strong>토글 버튼</strong>으로 필요한 섹션만 선택/해제 (클릭 시 해당 섹션으로 스크롤)</li>
+    <li><strong>"프린트" 버튼</strong> 클릭 → 브라우저 인쇄 대화상자 → "PDF로 저장" 또는 프린터 선택</li>
+  </ol>
+  <p class="small"><strong>팁:</strong> 인쇄 시 토글 버튼/컨트롤 패널은 자동으로 숨겨짐 (A4 용지만 출력)</p>
+</div>
+
+<div class="box box-yellow">
+  <div class="box-title">⚠️ 주의사항</div>
+  <ul>
+    <li><strong>대진표/점수기록지</strong>: 경기가 생성되지 않은 상태라면 빈 양식이 출력됩니다 (수기 기입용)</li>
+    <li><strong>결선 대진표</strong>: 조별 상위 2팀을 기입하면 브래킷이 완성됨 (크로스 시드: 1조 1위 vs 2조 2위)</li>
+    <li><strong>인쇄 타이밍</strong>: 대회 전날 대진표 생성 후 인쇄해두면 비상 시 즉시 사용 가능</li>
+  </ul>
+</div>
+
+<!-- ========================================== -->
 <!--             6. 당일 타임라인                  -->
 <!-- ========================================== -->
 <h2>6. 대회 당일 타임라인</h2>
@@ -1216,6 +1299,15 @@
   <li>카카오톡 단톡방에 알림 구독 방법 안내 메시지 작성</li>
 </ul>
 
+<h3>🖨️ 인쇄 센터 (비상 대비)</h3>
+<ul class="checklist">
+  <li>/print?tid=1 접속하여 6종 인쇄물 정상 표시 확인</li>
+  <li>참가자 명단 인쇄 (접수 체크인용)</li>
+  <li>팀 편성표 + 조별 대진표 인쇄 (코트 게시용)</li>
+  <li>점수 기록지 인쇄 (코트당 여유분 5~10매)</li>
+  <li>순위 집계표 + 결선 대진표 인쇄 (본부 기록용)</li>
+</ul>
+
 <h3>📋 기타</h3>
 <ul class="checklist">
   <li>QR 코드 포스터 부착 (접수처, 대기석) — "경기 알림 받기" 문구 포함</li>
@@ -1234,7 +1326,7 @@
 </div>
 
 <div class="footer">
-  🏸 배드민턴 대회 운영 매뉴얼 | Badminton Tournament Management System v2.7 | 2026-02-18
+  🏸 배드민턴 대회 운영 매뉴얼 | Badminton Tournament Management System v3.1 | 2026-02-18
 </div>
 
 </div><!-- /page-container -->

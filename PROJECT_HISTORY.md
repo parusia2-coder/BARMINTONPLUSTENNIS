@@ -1,7 +1,7 @@
 # 배드민턴 대회 운영 시스템 - 프로젝트 히스토리
 
 > 세션이 끊어졌을 때 이 파일을 읽으면 프로젝트 전체 맥락을 복원할 수 있습니다.
-> 마지막 업데이트: 2026-02-18 (v2.8.1)
+> 마지막 업데이트: 2026-02-18 (v3.1)
 
 ---
 
@@ -15,6 +15,7 @@
 - **PM2 프로세스명**: `badminton`
 - **관리자 테스트 비밀번호**: `admin123`
 - **프로젝트 아카이브**: https://www.genspark.ai/api/files/s/8GMd9OIh (≈1.9 MB, v2.8.1)
+- **최신 아카이브**: (v3.1, 71커밋)
 - **배포 URL**: https://badminton-tournament-5ny.pages.dev
 
 ### 기기별 역할
@@ -25,27 +26,29 @@
 | 대형 모니터 | `/dashboard?tid={대회ID}` | 관중용 실시간 현황 (30초 자동갱신) |
 | 참가자 스마트폰 | `/my?tid={대회ID}` | 개인 일정/결과 확인 + 푸시 알림 구독 (QR 접속) |
 | 코트별 타임라인 | `/timeline?tid={대회ID}` | 전체 경기 흐름 한눈에 보기 (20초 자동갱신) |
+| **인쇄 센터** | **`/print?tid={대회ID}`** | **수기 운영 대비 6종 인쇄물 (A4 PDF)** |
+| 운영 매뉴얼 | `/static/manual.html` | A4 인쇄용 현장 운영 매뉴얼 |
 
 ---
 
-## 2. 파일 구조 (총 8,902줄)
+## 2. 파일 구조 (총 9,968줄)
 
 ```
 /home/user/webapp/
 ├── src/
-│   ├── index.tsx                 (998줄) 메인 Hono 앱, 라우팅, HTML 템플릿, /court /dashboard /my /timeline 페이지, SW 라우트
+│   ├── index.tsx                 (1,744줄) 메인 Hono 앱, 라우팅, HTML 템플릿, /court /dashboard /my /timeline /print 페이지, 인쇄센터(6종 인쇄물+결선 브래킷), SW 라우트
 │   └── routes/
-│       ├── tournaments.ts        (148줄) 대회 CRUD, 인증, 통계, merge_threshold PATCH
+│       ├── tournaments.ts        (206줄) 대회 CRUD, 인증, 통계, merge_threshold PATCH, print-data 통합 API
 │       ├── participants.ts       (200줄) 참가자 등록/수정/삭제, 일괄등록, 클럽 정보
 │       ├── events.ts             (1,030줄) 종목 관리, 팀 등록, 자동팀편성, 급수합병(수동/자동/취소), 조 배정, 일괄삭제
 │       ├── matches.ts            (775줄) 경기/점수/순위, 코트 점수판 API, 서명, 대시보드, 내경기, 타임라인, 알림연동
 │       ├── notifications.ts      (126줄) 푸시 알림 시스템 (VAPID JWT, ECE 암호화, Web Push)
 │       └── brackets.ts           (668줄) 대진표 생성 (KDK/풀리그/토너먼트), 결선 토너먼트
 ├── public/static/
-│   ├── app.js                    (2,244줄) 메인 프론트엔드 SPA (Sport Command Center 테마)
-│   ├── court.js                  (1,471줄) 코트 전용 점수판 프론트엔드
+│   ├── app.js                    (2,253줄) 메인 프론트엔드 SPA (Sport Command Center 테마)
+│   ├── court.js                  (1,471줄) 코트 전용 점수판 프론트엔드 (승리/패배 라벨 수정 완료)
 │   ├── style.css                          커스텀 스타일
-│   ├── manual.html               (1,242줄) A4 인쇄용 현장 운영 매뉴얼 (v2.7)
+│   ├── manual.html               (1,310줄+) A4 인쇄용 현장 운영 매뉴얼 (v3.1)
 │   └── test_participants_100.txt          테스트 데이터 100명
 ├── public/
 │   └── sw.js                     (77줄) Service Worker (푸시 알림 수신/클릭 처리)
@@ -506,6 +509,29 @@ f62be92 2026-02-18 fix: 합병 후 팀원 이름 미표시 버그 수정 - INSER
   - 프론트엔드: team_name 비어있을 때 p1_name · p2_name fallback 표시 (이중 안전장치)
 ```
 
+### Phase 15: 인쇄 센터 구현 & 개선 (2026-02-18)
+```
+798fff9 2026-02-18 feat: 인쇄 센터 페이지 추가 (/print) - 수기 운영 대비 6종 인쇄물
+75c9be6 2026-02-18 feat: 인쇄 센터 진입점 추가 - 홈 화면 카드 + 대회 상세 상단 인쇄 버튼
+9df8f23 2026-02-18 perf: 인쇄 페이지 로딩 속도 개선 - 통합 API(/print-data) 도입
+99ffe0b 2026-02-18 improve: 인쇄 센터 - Google Fonts 비차단 로드 + 경기 미생성 시 빈 양식 제공
+4988e6b 2026-02-18 fix: 인쇄 센터 메뉴 토글 반응 개선 - 로딩 중 버튼 비활성화, 스크롤 이동, 취소선 표시
+845f893 2026-02-18 improve: 결선 대진표 개선 - 시각적 브래킷 + 4강 크로스 시드 배치 + 라운드별 승자 흐름
+aed7f54 2026-02-18 fix: 결선 대진표 누락 종목 수정 - group_num=NULL도 전체 브래킷 생성, BYE 배치
+  - /print?tid={대회ID}: 수기 운영 대비 6종 A4 인쇄물
+    ① 참가자 명단 (클럽별 그룹, 체크인/참가비 체크박스)
+    ② 팀 편성표 (종목별 팀 목록, 조 번호)
+    ③ 조별 대진표 (라운드/코트/팀 대진, 경기 미생성 시 빈 양식)
+    ④ 점수 기록지 (코트별 기록용지, 경기 미생성 시 빈 양식)
+    ⑤ 순위 집계표 (조별 승/패/승점/득실차)
+    ⑥ 결선 대진표 (시각적 토너먼트 브래킷, 크로스 시드, BYE 자동 배치)
+  - 통합 API: GET /api/tournaments/:tid/print-data (참가자+종목+경기+팀 1회 조회)
+  - Google Fonts 비차단 로드 (렌더링 블로킹 해소)
+  - 메뉴 토글 UX: 로딩 중 비활성화, 토글 시 해당 섹션 스크롤, 비활성 취소선
+  - 결선 브래킷: 조별(크로스 시드) + 리그전(전체 시드) + 단독(부전승) 3가지 유형
+  - group_num=NULL인 종목도 전체 팀을 시드 배치한 토너먼트 브래킷 자동 생성
+```
+
 ---
 
 ## 7. 샘플 데이터 현황
@@ -587,7 +613,7 @@ npm run db:seed           # 시드 데이터
 
 ## 10. 현재 상태 & 남은 작업
 
-### ✅ 완료된 기능 (35개)
+### ✅ 완료된 기능 (38개)
 - [x] 대회 CRUD (생성/수정/삭제/상태변경)
 - [x] **대회 삭제 버튼** — 관리자 전용, 이중 확인 대화상자
 - [x] 참가자 관리 (개별/일괄 등록, 참가비, 체크인, 클럽)
@@ -623,6 +649,9 @@ npm run db:seed           # 시드 데이터
 - [x] **실시간 합병 기준 변경** — 슬라이더 UI + PATCH API
 - [x] **합병 취소(되돌리기)** — merged_from 복원, 팀 재배치
 - [x] **합병 후 급수균형 재조합** — 팀 해체 → 급수 정렬 → 상위+하위 페어링
+- [x] **인쇄 센터** (/print) — 수기 운영 대비 6종 A4 인쇄물 (참가자/팀/대진표/점수기록지/순위표/결선브래킷)
+- [x] **결선 대진표 시각화** — 토너먼트 브래킷 형태, 크로스 시드, BYE 자동 배치, group_num=NULL 종목 지원
+- [x] **코트 점수판 승리/패배 라벨 수정** — 라벨 반대 표시 버그 수정 + 서명 후 버튼 가시성 개선
 
 ### 🔮 향후 개선 가능 사항
 - [x] ~~Cloudflare Pages 실 배포~~ ✅ 완료
@@ -662,6 +691,7 @@ curl http://localhost:3000/api/tournaments
 # 대시보드: http://localhost:3000/dashboard?tid=1
 # 내 경기: http://localhost:3000/my?tid=1
 # 타임라인: http://localhost:3000/timeline?tid=1
+# 인쇄 센터: http://localhost:3000/print?tid=1
 # 운영 매뉴얼: http://localhost:3000/static/manual.html
 
 # 6. 알림 DB 마이그레이션 (최초 1회)
