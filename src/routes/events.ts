@@ -930,8 +930,8 @@ eventRoutes.post('/:tid/events/execute-merge', async (c) => {
     // 5) 새 팀 DB 삽입
     for (const team of newTeams) {
       await db.prepare(
-        `INSERT INTO teams (event_id, player1_id, player2_id) VALUES (?, ?, ?)`
-      ).bind(newEventId, team.p1.id, team.p2.id).run()
+        `INSERT INTO teams (event_id, tournament_id, player1_id, player2_id) VALUES (?, ?, ?, ?)`
+      ).bind(newEventId, tid, team.p1.id, team.p2.id).run()
     }
 
     // 6) 조 재편성
