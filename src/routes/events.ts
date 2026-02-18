@@ -927,11 +927,12 @@ eventRoutes.post('/:tid/events/execute-merge', async (c) => {
       newTeams.push({ p1: upper[i], p2: lower[i] })
     }
 
-    // 5) 새 팀 DB 삽입
+    // 5) 새 팀 DB 삽입 (team_name 포함)
     for (const team of newTeams) {
+      const teamName = `${team.p1.name} · ${team.p2.name}`
       await db.prepare(
-        `INSERT INTO teams (event_id, tournament_id, player1_id, player2_id) VALUES (?, ?, ?, ?)`
-      ).bind(newEventId, tid, team.p1.id, team.p2.id).run()
+        `INSERT INTO teams (event_id, tournament_id, player1_id, player2_id, team_name) VALUES (?, ?, ?, ?, ?)`
+      ).bind(newEventId, tid, team.p1.id, team.p2.id, teamName).run()
     }
 
     // 6) 조 재편성

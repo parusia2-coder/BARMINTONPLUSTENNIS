@@ -1481,7 +1481,7 @@ async function loadTeams(eid) {
         <div class="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50">
           <div class="flex items-center gap-2">
             <span class="text-xs text-gray-400 w-5">${i+1}</span>
-            <span class="font-medium text-sm">${t.team_name}</span>
+            <span class="font-medium text-sm">${t.team_name || (t.p1_name && t.p2_name ? t.p1_name + ' · ' + t.p2_name : '팀 ' + (i+1))}</span>
             <span class="badge ${LEVEL_COLORS[t.p1_level]||''} text-xs">${LEVELS[t.p1_level]||''}</span>
             <span class="badge ${LEVEL_COLORS[t.p2_level]||''} text-xs">${LEVELS[t.p2_level]||''}</span>
             ${t.p1_club ? `<span class="text-xs text-teal-600">${t.p1_club}</span>` : ''}
