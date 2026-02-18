@@ -135,10 +135,10 @@
   <h1>배드민턴 대회 운영 매뉴얼</h1>
   <div class="subtitle">현장 장비 셋팅 & 시스템 운영 가이드</div>
   <div class="cover-info">
-    <div><strong>시스템</strong> 배드민턴 대회 운영 시스템 v2.3</div>
+    <div><strong>시스템</strong> 배드민턴 대회 운영 시스템 v2.7</div>
     <div><strong>대상</strong> 200명 이하 동호회/클럽 대회</div>
     <div><strong>기준</strong> 6코트 / 177명 / 214경기 (안양시배드민턴협회 장년부)</div>
-    <div><strong>작성일</strong> 2026-02-17</div>
+    <div><strong>작성일</strong> 2026-02-18</div>
   </div>
 </div>
 
@@ -788,6 +788,8 @@
   <li>점수 수정 (오입력 정정)</li>
   <li>결선 토너먼트 생성</li>
   <li>참가자 추가 등록 / 체크인 처리</li>
+  <li><strong>대회 삭제</strong> (이중 확인 대화상자, 관리자 전용)</li>
+  <li><strong>종목 일괄 생성</strong> (다중선택 조합 자동 생성 + 팀편성)</li>
   <li>긴급 대응 (경기 취소, 순서 변경 등)</li>
 </ul>
 
@@ -934,6 +936,61 @@
 </div>
 
 <!-- ========================================== -->
+<!--       5.5 v2.7 신규 기능 안내               -->
+<!-- ========================================== -->
+<div class="page-break"></div>
+<h2>5-1. v2.7 신규 기능 안내 <span class="badge badge-red">NEW</span></h2>
+
+<h3>대회 삭제 기능</h3>
+<div class="box box-red">
+  <div class="box-title">🗑️ 대회 삭제 (관리자 전용)</div>
+  <p>대회 상세 페이지 상단에 <strong>빨간색 "대회 삭제" 버튼</strong>이 추가되었습니다. 관리자 인증된 상태에서만 표시됩니다.</p>
+  <ul>
+    <li><strong>이중 확인</strong>: "정말로 대회를 삭제하시겠습니까?" → "되돌릴 수 없습니다. 정말 삭제하시겠습니까?" 2번 확인</li>
+    <li>삭제 후 메인 페이지로 자동 이동</li>
+    <li>잘못 만든 테스트 대회 정리에 유용</li>
+  </ul>
+</div>
+
+<h3>연령대 세분화 (출생년도 기반 자동 분류)</h3>
+<div class="box box-blue">
+  <div class="box-title">📊 연령대 자동 분류 기준 (2026년 기준)</div>
+  <table>
+    <tr><th>연령대</th><th>나이 범위</th><th>출생년도 범위</th></tr>
+    <tr><td><span class="badge badge-blue">20대</span></td><td>만 20~29세</td><td>1997~2006년생</td></tr>
+    <tr><td><span class="badge badge-green">30대</span></td><td>만 30~39세</td><td>1987~1996년생</td></tr>
+    <tr><td><span class="badge badge-orange">40대</span></td><td>만 40~49세</td><td>1977~1986년생</td></tr>
+    <tr><td><span class="badge" style="background:#8B5CF6;color:white">50대</span></td><td>만 50~54세</td><td>1972~1976년생</td></tr>
+    <tr><td><span class="badge" style="background:#7C3AED;color:white">55대</span></td><td>만 55~59세</td><td>1967~1971년생</td></tr>
+    <tr><td><span class="badge badge-red">60대</span></td><td>만 60세 이상</td><td>~1966년생</td></tr>
+  </table>
+  <p class="small">참가자 등록 시 <strong>출생년도</strong>를 입력하면, 종목 편성 및 팀 배정 시 자동으로 연령대가 분류됩니다.</p>
+</div>
+
+<h3>종목 일괄 생성 + 자동 편성</h3>
+<div class="box box-green">
+  <div class="box-title">⚡ 일괄 생성 기능 (종목/팀 탭)</div>
+  <p>종목/팀 탭의 <strong>보라색 "일괄 생성" 버튼</strong>을 클릭하면 4단계 모달이 열립니다:</p>
+  
+  <div class="diagram">STEP 1                     STEP 2                   STEP 3                   STEP 4
+───────                 ───────                 ───────                 ───────
+☑ 남자복식               ☑ 오픈 (전연령)           ● 전체 급수              ● 클럽 우선
+☑ 여자복식               ☑ 50대 (12명)            ○ 개별 급수              ○ 급수 매칭
+☐ 혼합복식               ☑ 55대 (8명)               ☐ S ☐ A ☐ B ...       ○ 랜덤
+                         ☑ 60대 (5명)
+                         ☐ 40대 (23명)
+                         
+  종목 유형               연령대 (인원수 표시)        급수 선택                팀편성 방식</div>
+  
+  <p><strong>사용 예시:</strong> 남복 + 여복 선택 → 50대 + 55대 선택 → 전체급수 → 클럽 우선<br>
+  → 자동으로 4개 종목 생성: <code>남자복식 50대 전체</code>, <code>남자복식 55대 전체</code>, <code>여자복식 50대 전체</code>, <code>여자복식 55대 전체</code><br>
+  → 각 종목별 자동 팀편성까지 한번에 완료!</p>
+</div>
+
+<h3>참가자 목록 연령대 표시</h3>
+<p>참가자 탭 상단에 연령대별 인원수 통계 배지가 표시되며, 참가자 목록 테이블에 <strong>연령대 컬럼</strong>이 추가되어 출생년도 기반으로 자동 계산된 연령대를 확인할 수 있습니다.</p>
+
+<!-- ========================================== -->
 <!--             6. 당일 타임라인                  -->
 <!-- ========================================== -->
 <h2>6. 대회 당일 타임라인</h2>
@@ -942,7 +999,7 @@
 <table>
   <tr><th style="width:15%">시점</th><th style="width:35%">작업</th><th>상세 내용</th></tr>
   <tr><td>전날</td><td>대회 생성 & 참가자 등록</td><td>엑셀 일괄 등록, 참가비 확인, 소속 클럽 확인</td></tr>
-  <tr><td>전날</td><td>종목 생성 & 조편성</td><td>팀 편성 방식 선택 → 조 배정 → 미리보기 확인</td></tr>
+  <tr><td>전날</td><td>종목 생성 & 조편성</td><td><strong>"일괄 생성" 버튼</strong>으로 종목유형/연령대/급수 다중선택 → 자동 생성 + 팀편성</td></tr>
   <tr><td>전날</td><td>대진표 생성</td><td>전체 종목 대진표 생성 & 경기 수 확인</td></tr>
   <tr><td>전날</td><td>장비 충전</td><td>태블릿 완충, 보조배터리 준비, HDMI 케이블 확인</td></tr>
 </table>
@@ -1177,7 +1234,7 @@
 </div>
 
 <div class="footer">
-  🏸 배드민턴 대회 운영 매뉴얼 | Badminton Tournament Management System v2.3 | 2026-02-17
+  🏸 배드민턴 대회 운영 매뉴얼 | Badminton Tournament Management System v2.7 | 2026-02-18
 </div>
 
 </div><!-- /page-container -->
