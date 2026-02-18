@@ -73,7 +73,9 @@ function getCourtHtml(): string {
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <title>🏸 코트 점수판</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/vendor/tailwind.js"></script>
+  <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
+  <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <script>
     tailwind.config = {
@@ -176,7 +178,9 @@ function getIndexHtml(): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🏸 배드민턴 대회 운영 시스템</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/vendor/tailwind.js"></script>
+  <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
+  <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
@@ -336,7 +340,9 @@ function getMyPageHtml(): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🏸 내 경기 조회</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/vendor/tailwind.js"></script>
+  <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
+  <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <script>
     tailwind.config = {
@@ -675,7 +681,9 @@ function getDashboardHtml(): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🏸 통계 대시보드</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/vendor/tailwind.js"></script>
+  <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
+  <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <script>
     tailwind.config = {
@@ -756,7 +764,9 @@ function getTimelineHtml(): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🏸 코트별 타임라인</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/vendor/tailwind.js"></script>
+  <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
+  <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <script>
     tailwind.config = {
