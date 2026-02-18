@@ -478,6 +478,7 @@ function renderEventsTab(isAdmin) {
       <button onclick="showTeamAssignModal()" class="px-4 py-2.5 bg-teal-500 text-white rounded-lg text-sm font-semibold hover:bg-teal-600 shadow-sm"><i class="fas fa-users-cog mr-1"></i>조편성 옵션</button>
       <button onclick="showBracketOptionsModal()" class="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-lg text-sm font-semibold shadow-md hover:shadow-lg"><i class="fas fa-magic mr-1"></i>대진표 옵션</button>
       <button onclick="checkMerge()" class="px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-100"><i class="fas fa-compress-arrows-alt mr-1"></i>급수합병 체크</button>
+      <button onclick="showManualMergeModal()" class="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600"><i class="fas fa-object-group mr-1"></i>수동 합병</button>
       <button onclick="bulkDeleteAssignments()" class="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 border border-red-200"><i class="fas fa-eraser mr-1"></i>조편성 일괄삭제</button>
       <button onclick="bulkDeleteEverything()" class="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600"><i class="fas fa-trash-alt mr-1"></i>종목 전체삭제</button>
     </div>` : ''}
@@ -493,6 +494,7 @@ function renderEventsTab(isAdmin) {
             ${ev.merged_from ? '<span class="badge bg-amber-100 text-amber-700 text-xs"><i class="fas fa-compress-arrows-alt mr-1"></i>합병</span>' : ''}
           </div>
           <div class="flex items-center gap-2">
+            ${isAdmin && ev.merged_from ? `<button onclick="unmergeEvent(${ev.id})" class="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 border border-amber-200"><i class="fas fa-undo mr-1"></i>합병취소</button>` : ''}
             ${isAdmin ? `<button onclick="showTeamModal(${ev.id}, '${ev.category}')" class="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-100"><i class="fas fa-user-plus mr-1"></i>팀 등록</button>` : ''}
             ${isAdmin ? `<button onclick="deleteEvent(${ev.id})" class="text-red-400 hover:text-red-600 text-sm"><i class="fas fa-trash-alt"></i></button>` : ''}
           </div>
@@ -1541,11 +1543,22 @@ async function checkMerge() {
   try {
     const d = await api(`/tournaments/${tid}/events/check-merge`, { method: 'POST' });
     const el = document.getElementById('merge-result');
-    if (d.merges.length === 0) { el.innerHTML = '<div class="p-3 bg-green-50 text-green-700 rounded-lg text-sm mb-4"><i class="fas fa-check mr-1"></i>급수합병 대상이 없습니다. (기준: 종목당 최소 ' + d.threshold + '팀)</div>'; return; }
+    if (d.merges.length === 0) {
+      el.innerHTML = `<div class="p-3 bg-green-50 text-green-700 rounded-xl text-sm mb-4">
+        <div class="flex items-center justify-between">
+          <span><i class="fas fa-check mr-1"></i>급수합병 대상이 없습니다. (기준: 종목당 최소 ${d.threshold}팀)</span>
+          <button onclick="showThresholdModal()" class="px-3 py-1 bg-green-100 text-green-800 rounded-lg text-xs font-medium hover:bg-green-200"><i class="fas fa-sliders-h mr-1"></i>기준 변경</button>
+        </div>
+      </div>`;
+      return;
+    }
     el.innerHTML = `<div class="p-4 bg-amber-50 border border-amber-200 rounded-xl mb-4">
-      <h4 class="font-bold text-amber-800 mb-2"><i class="fas fa-compress-arrows-alt mr-1"></i>급수합병 필요 (기준: ${d.threshold}팀 미만)</h4>
+      <div class="flex items-center justify-between mb-3">
+        <h4 class="font-bold text-amber-800"><i class="fas fa-compress-arrows-alt mr-1"></i>급수합병 필요 (기준: ${d.threshold}팀 미만)</h4>
+        <button onclick="showThresholdModal()" class="px-3 py-1 bg-amber-100 text-amber-800 rounded-lg text-xs font-medium hover:bg-amber-200"><i class="fas fa-sliders-h mr-1"></i>기준 변경</button>
+      </div>
       ${d.merges.map((m, i) => `<div class="flex items-center justify-between py-2 ${i>0?'border-t border-amber-100':''}">
-        <div><p class="text-sm font-medium text-amber-900">${m.merged_name}</p><p class="text-xs text-amber-600">${m.reason}</p></div>
+        <div><p class="text-sm font-medium text-amber-900">${m.merged_name} (${m.combined_teams}팀)</p><p class="text-xs text-amber-600">${m.reason}</p></div>
         <button onclick="executeMerge([${m.events.map(e=>e.id).join(',')}])" class="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700">합병 실행</button>
       </div>`).join('')}
     </div>`;
@@ -1553,9 +1566,135 @@ async function checkMerge() {
 }
 
 async function executeMerge(eventIds) {
-  if (!confirm('선택된 종목을 합병합니다.')) return;
+  if (!confirm('선택된 종목을 합병합니다. 계속하시겠습니까?')) return;
   const tid = state.currentTournament.id;
-  try { await api(`/tournaments/${tid}/events/execute-merge`, { method: 'POST', body: JSON.stringify({ event_ids: eventIds }) }); showToast('급수합병 완료!', 'success'); await loadEvents(tid); render(); } catch(e){}
+  try { await api(`/tournaments/${tid}/events/execute-merge`, { method: 'POST', body: JSON.stringify({ event_ids: eventIds }) }); showToast('급수합병 완료!', 'success'); await loadEvents(tid); navigate('tournament'); } catch(e){}
+}
+
+// ==========================================
+// ★ 수동 합병 모달 ★
+// ==========================================
+function showManualMergeModal() {
+  if (state.events.length < 2) return showToast('합병하려면 종목이 2개 이상 필요합니다.', 'warning');
+  const existing = document.getElementById('manual-merge-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'manual-merge-modal';
+  modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-overlay';
+  modal.innerHTML = `<div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 max-h-[85vh] overflow-y-auto">
+    <div class="sticky top-0 bg-white px-6 py-4 border-b flex items-center justify-between z-10">
+      <h3 class="text-lg font-bold text-gray-900"><i class="fas fa-object-group mr-2 text-amber-500"></i>수동 종목 합병</h3>
+      <button onclick="this.closest('.modal-overlay').remove()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+    <div class="p-6 space-y-4">
+      <p class="text-sm text-gray-500">합병할 종목을 2개 이상 선택하세요. 카테고리/연령대가 달라도 합병 가능합니다.</p>
+      <div class="space-y-2 max-h-60 overflow-y-auto border rounded-lg p-3">
+        ${state.events.map(ev => `
+          <label class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+            <input type="checkbox" value="${ev.id}" class="merge-cb w-4 h-4 text-amber-500 rounded focus:ring-amber-400">
+            <div class="flex-1">
+              <span class="badge text-xs ${ev.category==='md'?'bg-blue-100 text-blue-700':ev.category==='wd'?'bg-pink-100 text-pink-700':'bg-purple-100 text-purple-700'}">${CATEGORIES[ev.category]}</span>
+              <span class="text-sm font-medium ml-1">${ev.name}</span>
+              <span class="text-xs text-gray-400 ml-1">${ev.team_count || 0}팀</span>
+              ${ev.merged_from ? '<span class="badge bg-amber-100 text-amber-700 text-xs ml-1">합병</span>' : ''}
+            </div>
+          </label>
+        `).join('')}
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">합병 종목명 (비우면 자동 생성)</label>
+        <input type="text" id="merge-custom-name" placeholder="예: 남복 50~55대 A+B급" class="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-amber-400">
+      </div>
+      <div id="merge-preview" class="text-sm text-gray-500"></div>
+      <button onclick="executeManualMerge()" class="w-full py-3 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 shadow-md"><i class="fas fa-compress-arrows-alt mr-2"></i>선택 종목 합병</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+
+  // 체크박스 변경 시 미리보기 업데이트
+  modal.querySelectorAll('.merge-cb').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const checked = [...modal.querySelectorAll('.merge-cb:checked')].map(c => parseInt(c.value));
+      const preview = document.getElementById('merge-preview');
+      if (checked.length < 2) { preview.innerHTML = '<span class="text-gray-400">2개 이상 선택하세요</span>'; return; }
+      const selected = state.events.filter(e => checked.includes(e.id));
+      const totalTeams = selected.reduce((s, e) => s + (e.team_count || 0), 0);
+      preview.innerHTML = `<span class="text-amber-700 font-medium">${selected.length}개 종목 선택 (총 ${totalTeams}팀)</span>`;
+    });
+  });
+}
+
+async function executeManualMerge() {
+  const modal = document.getElementById('manual-merge-modal');
+  const checked = [...modal.querySelectorAll('.merge-cb:checked')].map(c => parseInt(c.value));
+  if (checked.length < 2) return showToast('2개 이상의 종목을 선택해주세요.', 'warning');
+  const customName = document.getElementById('merge-custom-name').value.trim();
+  if (!confirm(`${checked.length}개 종목을 합병합니다. 계속하시겠습니까?`)) return;
+  const tid = state.currentTournament.id;
+  try {
+    const body = { event_ids: checked };
+    if (customName) body.custom_name = customName;
+    const res = await api(`/tournaments/${tid}/events/execute-merge`, { method: 'POST', body: JSON.stringify(body) });
+    showToast(res.message, 'success');
+    modal.remove();
+    await loadEvents(tid); navigate('tournament');
+  } catch(e) {}
+}
+
+// ==========================================
+// ★ 합병 기준(threshold) 변경 모달 ★
+// ==========================================
+function showThresholdModal() {
+  const t = state.currentTournament;
+  const existing = document.getElementById('threshold-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'threshold-modal';
+  modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-overlay';
+  modal.innerHTML = `<div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h3 class="text-lg font-bold text-gray-900"><i class="fas fa-sliders-h mr-2 text-amber-500"></i>합병 기준 변경</h3>
+      <button onclick="this.closest('.modal-overlay').remove()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+    <div class="p-6 space-y-4">
+      <p class="text-sm text-gray-500">종목의 참가팀이 이 수 미만이면 급수합병 대상으로 표시됩니다.</p>
+      <div class="flex items-center gap-3">
+        <input type="range" id="threshold-range" min="2" max="20" value="${t.merge_threshold || 4}" class="flex-1 accent-amber-500"
+          oninput="document.getElementById('threshold-val').textContent=this.value">
+        <span id="threshold-val" class="text-2xl font-bold text-amber-600 w-8 text-center">${t.merge_threshold || 4}</span>
+        <span class="text-sm text-gray-500">팀</span>
+      </div>
+      <button onclick="saveThreshold()" class="w-full py-3 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600"><i class="fas fa-check mr-2"></i>저장</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+async function saveThreshold() {
+  const val = parseInt(document.getElementById('threshold-range').value);
+  const tid = state.currentTournament.id;
+  try {
+    await api(`/tournaments/${tid}/merge-threshold`, { method: 'PATCH', body: JSON.stringify({ threshold: val }) });
+    state.currentTournament.merge_threshold = val;
+    showToast(`합병 기준이 ${val}팀으로 변경되었습니다.`, 'success');
+    document.getElementById('threshold-modal').remove();
+    checkMerge();
+  } catch(e) {}
+}
+
+// ==========================================
+// ★ 합병 취소 (되돌리기) ★
+// ==========================================
+async function unmergeEvent(eid) {
+  if (!confirm('합병을 취소하고 원래 종목으로 복원합니다.\n팀은 첫 번째 종목으로 이동되며, 재편성이 필요합니다.\n\n계속하시겠습니까?')) return;
+  const tid = state.currentTournament.id;
+  try {
+    const res = await api(`/tournaments/${tid}/events/${eid}/unmerge`, { method: 'POST' });
+    showToast(res.message, 'success');
+    await loadEvents(tid); navigate('tournament');
+  } catch(e) {}
 }
 
 // Match actions

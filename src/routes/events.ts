@@ -830,10 +830,11 @@ eventRoutes.post('/:tid/events/check-merge', async (c) => {
   return c.json({ merges, threshold })
 })
 
+// 수동 합병 실행 (카테고리/연령대 제한 없이)
 eventRoutes.post('/:tid/events/execute-merge', async (c) => {
   const tid = c.req.param('tid')
   const db = c.env.DB
-  const { event_ids } = await c.req.json()
+  const { event_ids, custom_name } = await c.req.json()
 
   if (!event_ids || event_ids.length < 2) return c.json({ error: '합병할 종목을 2개 이상 선택해주세요.' }, 400)
 
@@ -844,10 +845,22 @@ eventRoutes.post('/:tid/events/execute-merge', async (c) => {
   }
   if (events.length < 2) return c.json({ error: '유효한 종목이 부족합니다.' }, 400)
 
+  // 합병명 자동 생성 (카테고리/연령대 다르면 모두 표시)
+  let mergedName = custom_name
+  if (!mergedName) {
+    const cats = [...new Set(events.map((e: any) => e.category))]
+    const ages = [...new Set(events.map((e: any) => e.age_group))]
+    const levels = [...new Set(events.map((e: any) => e.level_group).filter((l: string) => l !== 'all' && l !== 'merged'))]
+
+    const catStr = cats.map((c: string) => CATEGORY_LABELS[c] || c).join('/')
+    const ageStr = ages.map((a: string) => a === 'open' ? '오픈' : a).join('/')
+    const levelStr = levels.length > 0 ? ' ' + levels.map((l: string) => LEVEL_LABELS[l] || l).join('+') + '급' : ' 전체'
+
+    mergedName = `${catStr} ${ageStr}${levelStr}`
+  }
+
   const cat = events[0].category as string
   const age = events[0].age_group as string
-  const levels = events.map((e: any) => LEVEL_LABELS[e.level_group] || e.level_group).join('+')
-  const mergedName = `${CATEGORY_LABELS[cat]} ${age === 'open' ? '오픈' : age} ${levels}급`
 
   const result = await db.prepare(
     `INSERT INTO events (tournament_id, category, age_group, level_group, name, merged_from) VALUES (?, ?, ?, ?, ?, ?)`
@@ -860,4 +873,57 @@ eventRoutes.post('/:tid/events/execute-merge', async (c) => {
   }
 
   return c.json({ id: newEventId, name: mergedName, message: `${events.length}개 종목이 합병되었습니다.` })
+})
+
+// 합병 취소 (되돌리기)
+eventRoutes.post('/:tid/events/:eid/unmerge', async (c) => {
+  const tid = c.req.param('tid')
+  const eid = c.req.param('eid')
+  const db = c.env.DB
+
+  const mergedEvent = await db.prepare(`SELECT * FROM events WHERE id=? AND tournament_id=?`).bind(eid, tid).first() as any
+  if (!mergedEvent) return c.json({ error: '종목을 찾을 수 없습니다.' }, 404)
+  if (!mergedEvent.merged_from) return c.json({ error: '합병된 종목이 아닙니다.' }, 400)
+
+  let originalIds: number[]
+  try { originalIds = JSON.parse(mergedEvent.merged_from) } catch { return c.json({ error: '합병 정보가 올바르지 않습니다.' }, 400) }
+
+  // 원래 종목 복원
+  const restored: any[] = []
+  for (const origId of originalIds) {
+    // 원래 종목 정보를 이름에서 추출하기 어려우므로 원본 데이터 기반으로 재생성
+    // merged_from에 저장된 원래 event_id 기반으로 복원
+    const result = await db.prepare(
+      `INSERT INTO events (tournament_id, category, age_group, level_group, name) VALUES (?, ?, ?, ?, ?)`
+    ).bind(tid, mergedEvent.category, mergedEvent.age_group, 'all', `복원된 종목 #${origId}`).run()
+    restored.push({ old_id: origId, new_id: result.meta.last_row_id })
+  }
+
+  // 현재 합병 종목의 팀을 첫 번째 복원 종목으로 이동 (팀 재배정 필요)
+  if (restored.length > 0) {
+    await db.prepare(`UPDATE teams SET event_id=? WHERE event_id=?`).bind(restored[0].new_id, eid).run()
+  }
+
+  // 합병 종목 삭제
+  await db.prepare(`DELETE FROM standings WHERE event_id=?`).bind(eid).run()
+  await db.prepare(`DELETE FROM matches WHERE event_id=?`).bind(eid).run()
+  await db.prepare(`DELETE FROM events WHERE id=?`).bind(eid).run()
+
+  return c.json({
+    message: `합병이 취소되었습니다. ${restored.length}개 종목이 복원되었습니다. 팀은 첫 번째 종목으로 이동되었으므로 재편성이 필요합니다.`,
+    restored
+  })
+})
+
+// 합병 기준 실시간 변경
+eventRoutes.patch('/:tid/merge-threshold', async (c) => {
+  const tid = c.req.param('tid')
+  const db = c.env.DB
+  const { threshold } = await c.req.json()
+
+  if (!threshold || threshold < 1 || threshold > 50) return c.json({ error: '기준값은 1~50 사이여야 합니다.' }, 400)
+
+  await db.prepare(`UPDATE tournaments SET merge_threshold=?, updated_at=datetime('now') WHERE id=? AND deleted=0`).bind(threshold, tid).run()
+
+  return c.json({ message: `합병 기준이 ${threshold}팀으로 변경되었습니다.`, threshold })
 })
