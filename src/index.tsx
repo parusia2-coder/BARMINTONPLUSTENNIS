@@ -29,6 +29,11 @@ app.route('/api/tournaments', notificationRoutes)
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
+// 인쇄용 페이지 (수기 운영 대비)
+app.get('/print', (c) => {
+  return c.html(getPrintHtml())
+})
+
 // 코트 전용 점수판 페이지
 app.get('/court', (c) => {
   return c.html(getCourtHtml())
@@ -996,3 +1001,505 @@ self.addEventListener('install', function() { self.skipWaiting(); });
 self.addEventListener('activate', function(event) { event.waitUntil(clients.claim()); });
 `
 }
+
+function getPrintHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏸 대회 인쇄 센터 - 수기 운영 대비</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&display=swap');
+  
+  /* ===== 기본 ===== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Noto Sans KR', sans-serif; background: #f3f4f6; color: #1a1a1a; }
+  
+  /* ===== 화면용 컨트롤 패널 ===== */
+  .control-panel {
+    position: sticky; top: 0; z-index: 100;
+    background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+    color: #fff; padding: 16px 24px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .control-panel h1 { font-size: 20px; font-weight: 700; margin-bottom: 12px; }
+  .control-panel h1 i { margin-right: 8px; }
+  .control-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .ctrl-btn {
+    padding: 8px 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 8px;
+    background: rgba(255,255,255,0.1); color: #fff; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .ctrl-btn:hover { background: rgba(255,255,255,0.25); border-color: rgba(255,255,255,0.6); }
+  .ctrl-btn.active { background: #fff; color: #1e3a5f; border-color: #fff; }
+  .ctrl-btn.print-btn { background: #f59e0b; border-color: #f59e0b; color: #000; font-weight: 800; }
+  .ctrl-btn.print-btn:hover { background: #d97706; }
+  .ctrl-label { font-size: 12px; color: rgba(255,255,255,0.7); margin-right: 4px; }
+  .ctrl-select {
+    padding: 6px 12px; border-radius: 6px; border: 2px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.1); color: #fff; font-size: 13px; font-weight: 500;
+  }
+  .ctrl-select option { color: #000; background: #fff; }
+  .loading-msg { text-align: center; padding: 60px; font-size: 18px; color: #666; }
+  .error-msg { text-align: center; padding: 60px; font-size: 16px; color: #dc2626; }
+  
+  /* ===== 인쇄 영역 ===== */
+  .print-area { padding: 20px; max-width: 210mm; margin: 0 auto; }
+  .print-section { display: none; }
+  .print-section.visible { display: block; }
+  
+  /* ===== A4 인쇄 공통 ===== */
+  @page { size: A4; margin: 12mm 15mm; }
+  @media print {
+    body { background: #fff; }
+    .control-panel { display: none !important; }
+    .print-area { padding: 0; max-width: none; }
+    .print-section { display: block !important; }
+    .print-section:not(.visible) { display: none !important; }
+    .page-break { page-break-before: always; break-before: page; }
+  }
+  
+  /* ===== 인쇄용 테이블 ===== */
+  .print-title {
+    font-size: 18px; font-weight: 800; text-align: center; margin: 0 0 2mm 0;
+    padding: 3mm 0; border-bottom: 3px solid #1e3a5f; color: #1e3a5f;
+  }
+  .print-subtitle { font-size: 11px; text-align: center; color: #666; margin-bottom: 4mm; }
+  .print-table {
+    width: 100%; border-collapse: collapse; font-size: 9.5pt; margin-bottom: 5mm;
+  }
+  .print-table th {
+    background: #1e3a5f; color: #fff; padding: 2.5mm 3mm; font-weight: 600;
+    font-size: 8.5pt; text-align: center; border: 0.5px solid #ccc;
+  }
+  .print-table td {
+    padding: 2mm 3mm; border: 0.5px solid #ccc; text-align: center; font-size: 9pt;
+  }
+  .print-table tr:nth-child(even) td { background: #f8f9fa; }
+  .print-table .left { text-align: left; }
+  .print-table .checkbox-cell { width: 12mm; }
+  .print-table .checkbox { display: inline-block; width: 4mm; height: 4mm; border: 1px solid #333; }
+  
+  .section-header {
+    background: #e8edf3; padding: 2mm 4mm; font-weight: 700; font-size: 11pt;
+    border-left: 4px solid #1e3a5f; margin: 4mm 0 2mm 0; color: #1e3a5f;
+  }
+  
+  /* 점수 기록지 */
+  .score-sheet { margin-bottom: 8mm; page-break-inside: avoid; }
+  .score-sheet .match-header {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #1e3a5f; color: #fff; padding: 2mm 4mm; font-size: 10pt; font-weight: 700;
+  }
+  .score-grid { width: 100%; border-collapse: collapse; }
+  .score-grid th, .score-grid td {
+    border: 1px solid #999; padding: 3mm 2mm; text-align: center; font-size: 10pt;
+  }
+  .score-grid th { background: #e8edf3; font-weight: 600; font-size: 9pt; }
+  .score-grid .score-cell { height: 10mm; min-width: 14mm; }
+  .score-grid .sig-cell { height: 14mm; min-width: 30mm; }
+  .score-grid .team-name { text-align: left; padding-left: 3mm; font-weight: 600; min-width: 50mm; }
+  
+  /* 순위표 */
+  .standing-table td.write-cell { height: 8mm; min-width: 12mm; background: #fffef0; }
+  
+  /* 결선 브래킷 */
+  .bracket-container { display: flex; align-items: center; justify-content: center; gap: 5mm; margin: 5mm 0; }
+  .bracket-round { display: flex; flex-direction: column; gap: 3mm; }
+  .bracket-match {
+    border: 1.5px solid #1e3a5f; border-radius: 2mm; overflow: hidden; min-width: 55mm;
+  }
+  .bracket-slot {
+    padding: 2.5mm 3mm; font-size: 9pt; border-bottom: 1px solid #ddd;
+    min-height: 8mm; display: flex; align-items: center;
+  }
+  .bracket-slot:last-child { border-bottom: none; }
+  .bracket-slot .seed { color: #999; font-size: 8pt; margin-right: 2mm; min-width: 5mm; }
+  .bracket-connector { width: 8mm; position: relative; }
+  
+  .info-footer {
+    margin-top: 4mm; padding-top: 2mm; border-top: 1px solid #ddd;
+    font-size: 8pt; color: #999; text-align: center;
+  }
+</style>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="control-panel">
+  <h1><i class="fas fa-print"></i> 대회 인쇄 센터 — 수기 운영 대비</h1>
+  <div class="control-row">
+    <span class="ctrl-label">대회:</span>
+    <select id="tid-select" class="ctrl-select" onchange="loadPrintData()">
+      <option value="">대회를 선택하세요</option>
+    </select>
+    <span style="width:16px"></span>
+    <span class="ctrl-label">인쇄 항목:</span>
+    <button class="ctrl-btn active" data-section="participants" onclick="toggleSection(this)">① 참가자 명단</button>
+    <button class="ctrl-btn active" data-section="teams" onclick="toggleSection(this)">② 팀 편성표</button>
+    <button class="ctrl-btn active" data-section="matches" onclick="toggleSection(this)">③ 대진표</button>
+    <button class="ctrl-btn active" data-section="scoresheet" onclick="toggleSection(this)">④ 점수 기록지</button>
+    <button class="ctrl-btn active" data-section="standings" onclick="toggleSection(this)">⑤ 순위 집계표</button>
+    <button class="ctrl-btn active" data-section="finals" onclick="toggleSection(this)">⑥ 결선 대진표</button>
+    <span style="width:16px"></span>
+    <button class="ctrl-btn print-btn" onclick="window.print()"><i class="fas fa-print"></i> 인쇄 / PDF 저장</button>
+  </div>
+</div>
+
+<div class="print-area" id="print-area">
+  <div class="loading-msg" id="loading-msg">⬆ 상단에서 대회를 선택하세요</div>
+</div>
+
+<script>
+const CATEGORIES = { md: '남자복식', wd: '여자복식', xd: '혼합복식' };
+const LEVELS = { s: 'S', a: 'A', b: 'B', c: 'C', d: 'D', e: 'E' };
+const AGE_LABELS = { open: '오픈', '20': '20대', '30': '30대', '40': '40대', '50': '50대', '55': '55대', '60': '60대' };
+
+let state = { tournament: null, participants: [], events: [], matches: [], teams: {} };
+
+async function api(path) {
+  const res = await fetch('/api/tournaments' + path);
+  if (!res.ok) throw new Error(res.statusText);
+  return res.json();
+}
+
+// 대회 목록 로드
+(async function() {
+  try {
+    const d = await api('');
+    const sel = document.getElementById('tid-select');
+    const list = d.tournaments || d;
+    list.forEach(t => {
+      if (t.deleted) return;
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.name;
+      sel.appendChild(opt);
+    });
+    const params = new URLSearchParams(location.search);
+    if (params.get('tid')) { sel.value = params.get('tid'); loadPrintData(); }
+  } catch(e) { console.error(e); }
+})();
+
+async function loadPrintData() {
+  const tid = document.getElementById('tid-select').value;
+  if (!tid) return;
+  const area = document.getElementById('print-area');
+  area.innerHTML = '<div class="loading-msg"><i class="fas fa-spinner fa-spin"></i> 데이터 로드 중...</div>';
+  
+  try {
+    const [tournamentRes, participantsRes, eventsRes, matchesRes] = await Promise.all([
+      api('/' + tid),
+      api('/' + tid + '/participants'),
+      api('/' + tid + '/events'),
+      api('/' + tid + '/matches')
+    ]);
+    
+    const tournament = tournamentRes.tournament || tournamentRes;
+    const participants = participantsRes.participants || participantsRes;
+    const events = eventsRes.events || eventsRes;
+    const matchesData = matchesRes.matches || matchesRes;
+    
+    state.tournament = tournament;
+    state.participants = (Array.isArray(participants) ? participants : []).filter(p => !p.deleted);
+    state.events = Array.isArray(events) ? events : [];
+    state.matches = Array.isArray(matchesData) ? matchesData : [];
+    
+    // 종목별 팀 로드
+    state.teams = {};
+    for (const ev of state.events) {
+      try {
+        const td = await api('/' + tid + '/events/' + ev.id + '/teams');
+        state.teams[ev.id] = td.teams || td;
+      } catch(e) { state.teams[ev.id] = []; }
+    }
+    
+    renderAll();
+  } catch(e) {
+    area.innerHTML = '<div class="error-msg"><i class="fas fa-exclamation-triangle"></i> 로드 실패: ' + e.message + '</div>';
+  }
+}
+
+function toggleSection(btn) {
+  btn.classList.toggle('active');
+  const sec = btn.dataset.section;
+  document.querySelectorAll('.ps-' + sec).forEach(el => el.classList.toggle('visible'));
+}
+
+function renderAll() {
+  const t = state.tournament;
+  const now = new Date().toLocaleDateString('ko-KR');
+  let html = '';
+  
+  // ============================
+  // ① 참가자 명단
+  // ============================
+  html += '<div class="print-section visible ps-participants">';
+  html += '<div class="print-title">📋 참가자 명단</div>';
+  html += '<div class="print-subtitle">' + t.name + ' | 총 ' + state.participants.length + '명 | 출력일: ' + now + '</div>';
+  
+  // 클럽별 그룹핑
+  const byClub = {};
+  state.participants.forEach(p => {
+    const club = p.club || '무소속';
+    if (!byClub[club]) byClub[club] = [];
+    byClub[club].push(p);
+  });
+  const clubs = Object.keys(byClub).sort();
+  
+  let pNum = 1;
+  clubs.forEach(club => {
+    const members = byClub[club].sort((a,b) => a.name.localeCompare(b.name));
+    html += '<div class="section-header">' + club + ' (' + members.length + '명)</div>';
+    html += '<table class="print-table"><tr><th style="width:7%">번호</th><th style="width:15%">이름</th><th style="width:8%">성별</th><th style="width:10%">출생</th><th style="width:8%">급수</th><th style="width:12%">연락처</th><th class="checkbox-cell">체크인</th><th class="checkbox-cell">참가비</th></tr>';
+    members.forEach(p => {
+      html += '<tr><td>' + (pNum++) + '</td><td class="left"><strong>' + p.name + '</strong></td>';
+      html += '<td>' + (p.gender === 'm' ? '남' : '여') + '</td>';
+      html += '<td>' + (p.birth_year || '-') + '</td>';
+      html += '<td><strong>' + (LEVELS[p.level] || '-') + '</strong>급</td>';
+      html += '<td style="font-size:8pt">' + (p.phone || '-') + '</td>';
+      html += '<td><span class="checkbox"></span></td>';
+      html += '<td><span class="checkbox"></span></td></tr>';
+    });
+    html += '</table>';
+  });
+  html += '<div class="info-footer">※ 체크인/참가비 란에 ✓ 표시하세요. 네트워크 복구 후 시스템에 일괄 입력합니다.</div>';
+  html += '</div>';
+  
+  // ============================
+  // ② 종목별 팀 편성표
+  // ============================
+  html += '<div class="print-section visible ps-teams page-break">';
+  html += '<div class="print-title">👥 종목별 팀 편성표</div>';
+  html += '<div class="print-subtitle">' + t.name + ' | 출력일: ' + now + '</div>';
+  
+  state.events.forEach(ev => {
+    const teams = state.teams[ev.id] || [];
+    if (teams.length === 0) return;
+    
+    html += '<div class="section-header">' + ev.name + ' (' + teams.length + '팀)</div>';
+    
+    // 조별 그룹핑
+    const byGroup = {};
+    teams.forEach(tm => {
+      const g = tm.group_num || 0;
+      if (!byGroup[g]) byGroup[g] = [];
+      byGroup[g].push(tm);
+    });
+    
+    for (const [gNum, gTeams] of Object.entries(byGroup)) {
+      if (gNum !== '0') html += '<div style="font-weight:700; font-size:9.5pt; margin:2mm 0 1mm 2mm; color:#2563eb;">◆ ' + gNum + '조</div>';
+      html += '<table class="print-table"><tr><th style="width:8%">팀번호</th><th style="width:22%">선수1</th><th style="width:8%">급수</th><th style="width:15%">소속</th><th style="width:22%">선수2</th><th style="width:8%">급수</th><th style="width:15%">소속</th></tr>';
+      gTeams.forEach((tm, i) => {
+        html += '<tr><td><strong>' + (i+1) + '</strong></td>';
+        html += '<td class="left">' + (tm.p1_name || '-') + '</td><td>' + (LEVELS[tm.p1_level] || '-') + '</td><td class="left" style="font-size:8pt">' + (tm.p1_club || '-') + '</td>';
+        html += '<td class="left">' + (tm.p2_name || '-') + '</td><td>' + (LEVELS[tm.p2_level] || '-') + '</td><td class="left" style="font-size:8pt">' + (tm.p2_club || '-') + '</td>';
+        html += '</tr>';
+      });
+      html += '</table>';
+    }
+  });
+  html += '</div>';
+  
+  // ============================
+  // ③ 조별 대진표
+  // ============================
+  html += '<div class="print-section visible ps-matches page-break">';
+  html += '<div class="print-title">🏸 조별 대진표</div>';
+  html += '<div class="print-subtitle">' + t.name + ' | 코트 ' + (t.courts || 6) + '면 | 출력일: ' + now + '</div>';
+  
+  // 종목별 > 조별 그룹핑
+  const matchesByEvent = {};
+  state.matches.forEach(m => {
+    if (!matchesByEvent[m.event_id]) matchesByEvent[m.event_id] = [];
+    matchesByEvent[m.event_id].push(m);
+  });
+  
+  state.events.forEach(ev => {
+    const evMatches = matchesByEvent[ev.id] || [];
+    if (evMatches.length === 0) return;
+    
+    // 조별 그룹
+    const byGroup = {};
+    evMatches.forEach(m => {
+      const g = m.group_num || 0;
+      if (!byGroup[g]) byGroup[g] = [];
+      byGroup[g].push(m);
+    });
+    
+    html += '<div class="section-header">' + ev.name + ' (' + evMatches.length + '경기)</div>';
+    
+    for (const [gNum, gMatches] of Object.entries(byGroup)) {
+      gMatches.sort((a,b) => (a.round - b.round) || (a.match_order - b.match_order));
+      if (gNum !== '0') html += '<div style="font-weight:600; font-size:9pt; margin:2mm 0 1mm 2mm; color:#2563eb;">◆ ' + gNum + '조</div>';
+      html += '<table class="print-table"><tr><th style="width:6%">순번</th><th style="width:6%">R</th><th style="width:8%">코트</th><th style="width:32%">팀 A</th><th style="width:6%">vs</th><th style="width:32%">팀 B</th><th style="width:10%">승자</th></tr>';
+      gMatches.forEach((m, i) => {
+        const t1 = m.team1_name || ('팀' + m.team1_id);
+        const t2 = m.team2_name || ('팀' + m.team2_id);
+        html += '<tr><td>' + (i+1) + '</td><td>' + m.round + '</td><td>' + (m.court_number || '-') + '</td>';
+        html += '<td class="left"><strong>' + t1 + '</strong></td><td>vs</td>';
+        html += '<td class="left"><strong>' + t2 + '</strong></td>';
+        html += '<td><span class="checkbox"></span></td></tr>';
+      });
+      html += '</table>';
+    }
+  });
+  html += '<div class="info-footer">※ 승자 란에 A 또는 B를 기입하세요.</div>';
+  html += '</div>';
+  
+  // ============================
+  // ④ 코트별 점수 기록지
+  // ============================
+  html += '<div class="print-section visible ps-scoresheet page-break">';
+  html += '<div class="print-title">📝 점수 기록지</div>';
+  html += '<div class="print-subtitle">' + t.name + ' | 출력일: ' + now + '</div>';
+  
+  // 코트별 그룹핑
+  const matchesByCourt = {};
+  state.matches.forEach(m => {
+    const c = m.court_number || 0;
+    if (!matchesByCourt[c]) matchesByCourt[c] = [];
+    matchesByCourt[c].push(m);
+  });
+  
+  const courts = Object.keys(matchesByCourt).sort((a,b) => a - b);
+  courts.forEach(courtNum => {
+    const courtMatches = matchesByCourt[courtNum];
+    courtMatches.sort((a,b) => (a.round - b.round) || (a.match_order - b.match_order));
+    
+    html += '<div class="section-header" style="margin-top:5mm">🏸 ' + courtNum + '번 코트 (' + courtMatches.length + '경기)</div>';
+    
+    courtMatches.forEach((m, i) => {
+      const evName = (state.events.find(e => e.id === m.event_id) || {}).name || '';
+      const t1 = m.team1_name || ('팀' + m.team1_id);
+      const t2 = m.team2_name || ('팀' + m.team2_id);
+      
+      html += '<div class="score-sheet">';
+      html += '<div class="match-header"><span>' + courtNum + '코트 #' + (i+1) + '</span><span>' + evName + '</span><span>R' + m.round + '</span></div>';
+      html += '<table class="score-grid">';
+      html += '<tr><th style="width:35%">팀</th><th>1세트</th><th>2세트</th><th>3세트</th><th style="width:12%">승</th><th style="width:18%">서명</th></tr>';
+      html += '<tr><td class="team-name">' + t1 + '</td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="sig-cell"></td></tr>';
+      html += '<tr><td class="team-name">' + t2 + '</td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="sig-cell"></td></tr>';
+      html += '</table></div>';
+    });
+  });
+  html += '<div class="info-footer">※ 각 세트 점수와 승자(◯)를 기입하고, 양팀 대표가 서명합니다. 네트워크 복구 후 시스템에 일괄 입력합니다.</div>';
+  html += '</div>';
+  
+  // ============================
+  // ⑤ 조별 순위 집계표
+  // ============================
+  html += '<div class="print-section visible ps-standings page-break">';
+  html += '<div class="print-title">🏆 조별 순위 집계표</div>';
+  html += '<div class="print-subtitle">' + t.name + ' | 출력일: ' + now + '</div>';
+  
+  state.events.forEach(ev => {
+    const teams = state.teams[ev.id] || [];
+    if (teams.length === 0) return;
+    
+    const byGroup = {};
+    teams.forEach(tm => {
+      const g = tm.group_num || 0;
+      if (!byGroup[g]) byGroup[g] = [];
+      byGroup[g].push(tm);
+    });
+    
+    html += '<div class="section-header">' + ev.name + '</div>';
+    
+    for (const [gNum, gTeams] of Object.entries(byGroup)) {
+      const nTeams = gTeams.length;
+      if (gNum !== '0') html += '<div style="font-weight:600; font-size:9pt; margin:2mm 0 1mm 2mm; color:#2563eb;">◆ ' + gNum + '조 (' + nTeams + '팀)</div>';
+      html += '<table class="print-table standing-table"><tr><th style="width:5%">#</th><th style="width:28%">팀명</th><th style="width:9%">승</th><th style="width:9%">패</th><th style="width:10%">승점</th><th style="width:10%">득점</th><th style="width:10%">실점</th><th style="width:10%">득실차</th><th style="width:9%">순위</th></tr>';
+      gTeams.forEach((tm, i) => {
+        const name = tm.team_name || (tm.p1_name + ' · ' + tm.p2_name) || '팀';
+        html += '<tr><td>' + (i+1) + '</td><td class="left"><strong>' + name + '</strong></td>';
+        html += '<td class="write-cell"></td><td class="write-cell"></td><td class="write-cell"></td>';
+        html += '<td class="write-cell"></td><td class="write-cell"></td><td class="write-cell"></td>';
+        html += '<td class="write-cell"></td></tr>';
+      });
+      html += '</table>';
+    }
+  });
+  html += '<div class="info-footer">※ 경기 결과를 기입하여 순위를 집계하세요. 승점: 승리 2점, 패배 0점. 동률 시 득실차 → 득점 순.</div>';
+  html += '</div>';
+  
+  // ============================
+  // ⑥ 결선 토너먼트 대진표 (빈 브래킷)
+  // ============================
+  html += '<div class="print-section visible ps-finals page-break">';
+  html += '<div class="print-title">🥇 결선 토너먼트 대진표</div>';
+  html += '<div class="print-subtitle">' + t.name + ' | 출력일: ' + now + '</div>';
+  
+  state.events.forEach(ev => {
+    const teams = state.teams[ev.id] || [];
+    if (teams.length === 0) return;
+    
+    // 조 수 파악
+    const groupNums = [...new Set(teams.map(t => t.group_num || 0))].filter(g => g > 0);
+    if (groupNums.length === 0) return;
+    
+    // 각 조 상위 2팀 기준 결선 슬롯
+    const slots = groupNums.length * 2;
+    const rounds = Math.ceil(Math.log2(slots));
+    const bracketSize = Math.pow(2, rounds);
+    
+    html += '<div class="section-header">' + ev.name + ' 결선 (각 조 상위 2팀 → ' + bracketSize + '강)</div>';
+    
+    // 시드 배치 슬롯
+    html += '<table class="print-table" style="max-width:160mm">';
+    
+    // 1라운드
+    html += '<tr><th colspan="4" style="background:#2563eb">' + bracketSize + '강 (1라운드)</th><th colspan="3">' + (bracketSize/2) + '강 (2라운드)</th>';
+    if (rounds >= 3) html += '<th colspan="2">준결승</th>';
+    html += '<th>결승</th><th>우승</th></tr>';
+    
+    for (let i = 0; i < bracketSize / 2; i++) {
+      const seedA = i + 1;
+      const seedB = bracketSize - i;
+      html += '<tr>';
+      html += '<td style="width:5%;font-size:8pt;color:#999">' + seedA + '</td>';
+      html += '<td class="left write-cell" style="width:28%;min-width:30mm">____조 ____위</td>';
+      html += '<td style="width:5%">vs</td>';
+      html += '<td class="left write-cell" style="width:28%;min-width:30mm">____조 ____위</td>';
+      
+      if (i % 2 === 0) {
+        html += '<td class="write-cell" rowspan="2" style="width:22%"></td>';
+        html += '<td rowspan="2" style="width:3%">vs</td>';
+        html += '<td class="write-cell" rowspan="2" style="width:22%"></td>';
+      }
+      
+      if (rounds >= 3 && i % 4 === 0) {
+        html += '<td class="write-cell" rowspan="4"></td>';
+        html += '<td class="write-cell" rowspan="4"></td>';
+      }
+      
+      if (i === 0) {
+        html += '<td class="write-cell" rowspan="' + (bracketSize/2) + '" style="background:#fffef0;font-weight:700;font-size:11pt;vertical-align:middle">🥇</td>';
+        html += '<td class="write-cell" rowspan="' + (bracketSize/2) + '" style="vertical-align:middle;font-size:14pt">🏆</td>';
+      }
+      
+      html += '</tr>';
+    }
+    html += '</table>';
+    html += '<div style="font-size:8pt;color:#666;margin:1mm 0 4mm 0">※ 각 조 순위표에서 상위 2팀을 기입하세요. 같은 조 팀이 초반에 만나지 않도록 시드를 배치합니다.</div>';
+  });
+  html += '</div>';
+  
+  document.getElementById('print-area').innerHTML = html;
+  
+  // 현재 토글 상태 반영
+  document.querySelectorAll('.ctrl-btn[data-section]').forEach(btn => {
+    const sec = btn.dataset.section;
+    const isActive = btn.classList.contains('active');
+    document.querySelectorAll('.ps-' + sec).forEach(el => {
+      if (isActive) el.classList.add('visible');
+      else el.classList.remove('visible');
+    });
+  });
+}
+</script>
+</body>
+</html>`
+}
+
