@@ -1392,37 +1392,144 @@ function renderResults() {
     if (!byEvent[key]) byEvent[key] = [];
     byEvent[key].push(s);
   });
+  const eventNames = Object.keys(byEvent);
+  const totalTeams = state.standings.length;
+  const topWinner = state.standings.length > 0 ? state.standings[0] : null;
 
-  return `${renderNav()}
-  <div class="max-w-5xl mx-auto px-4 py-8 fade-in">
-    <button onclick="navigate('tournament')" class="text-gray-500 hover:text-gray-700 mb-6 inline-flex items-center text-sm"><i class="fas fa-arrow-left mr-2"></i>돌아가기</button>
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-      <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-bold text-gray-900"><i class="fas fa-trophy mr-2 text-yellow-500"></i>${t?t.name:''} - 결과</h2>
-        <button onclick="exportToPDF()" class="px-4 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-medium hover:bg-red-100"><i class="fas fa-file-pdf mr-2"></i>PDF 저장</button>
+  return `${renderNav()}${renderOffline()}
+
+  <!-- Hero Banner -->
+  <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-gray-900 relative overflow-hidden">
+    <div class="absolute inset-0 opacity-10">
+      <div class="absolute top-10 left-10 w-32 h-32 rounded-full bg-yellow-400 blur-3xl"></div>
+      <div class="absolute bottom-10 right-20 w-40 h-40 rounded-full bg-purple-400 blur-3xl"></div>
+    </div>
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 relative z-10">
+      <!-- Top Bar -->
+      <div class="flex items-center justify-between mb-5">
+        <button onclick="navigate('tournament')" class="flex items-center gap-2 text-white/60 hover:text-white transition text-sm group">
+          <i class="fas fa-arrow-left group-hover:-translate-x-0.5 transition-transform"></i>대회로 돌아가기
+        </button>
+        <button onclick="exportToPDF()" class="px-3 py-1.5 bg-red-500/20 text-red-300 rounded-lg text-xs hover:bg-red-500/30 transition backdrop-blur border border-red-500/20"><i class="fas fa-file-pdf mr-1.5"></i>PDF 저장</button>
       </div>
-      <div id="results-table">
-      ${Object.entries(byEvent).map(([eventName, standings]) => `
-        <div class="mb-8">
-          <h3 class="text-lg font-bold text-gray-800 mb-3"><i class="fas fa-medal mr-2 text-yellow-500"></i>${eventName}</h3>
-          ${standings.length >= 3 ? `<div class="flex items-end justify-center gap-4 mb-4">
-            <div class="text-center"><div class="w-16 h-20 bg-gray-100 rounded-t-xl flex items-center justify-center text-3xl">🥈</div><div class="bg-gray-200 rounded-b-xl p-1.5"><p class="font-bold text-xs">${standings[1]?.team_name||''}</p></div></div>
-            <div class="text-center -mt-4"><div class="w-20 h-28 bg-yellow-50 rounded-t-xl flex items-center justify-center text-4xl border-2 border-yellow-300">🥇</div><div class="bg-yellow-100 rounded-b-xl p-1.5 border-2 border-t-0 border-yellow-300"><p class="font-bold text-sm">${standings[0]?.team_name||''}</p></div></div>
-            <div class="text-center"><div class="w-16 h-16 bg-orange-50 rounded-t-xl flex items-center justify-center text-3xl">🥉</div><div class="bg-orange-100 rounded-b-xl p-1.5"><p class="font-bold text-xs">${standings[2]?.team_name||''}</p></div></div>
-          </div>` : ''}
-          <table class="w-full rounded-lg overflow-hidden border border-gray-200 mb-2"><thead class="bg-gray-800 text-white"><tr>
-            <th class="px-3 py-2 text-center text-sm">순위</th><th class="px-3 py-2 text-left text-sm">팀</th><th class="px-3 py-2 text-center text-sm">승점</th><th class="px-3 py-2 text-center text-sm">승</th><th class="px-3 py-2 text-center text-sm">패</th><th class="px-3 py-2 text-center text-sm">득실차</th>
-          </tr></thead><tbody class="divide-y divide-gray-100">
-            ${standings.map((s, i) => {
-              const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
-              const bg = i===0?'bg-yellow-50':i===1?'bg-gray-50':i===2?'bg-orange-50':'';
-              return `<tr class="${bg}"><td class="px-3 py-2 text-center font-bold">${medal}</td><td class="px-3 py-2 font-semibold">${s.team_name}</td><td class="px-3 py-2 text-center font-bold text-emerald-700">${s.points}</td><td class="px-3 py-2 text-center text-green-600">${s.wins}</td><td class="px-3 py-2 text-center text-red-500">${s.losses}</td><td class="px-3 py-2 text-center font-bold ${s.goal_difference>0?'text-green-600':s.goal_difference<0?'text-red-500':'text-gray-500'}">${s.goal_difference>0?'+':''}${s.goal_difference}</td></tr>`;
-            }).join('')}
-          </tbody></table>
+      <!-- Title -->
+      <div class="flex items-center gap-4 mb-6">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-xl shadow-yellow-500/20 flex-shrink-0">
+          <i class="fas fa-trophy text-xl text-white"></i>
         </div>
-      `).join('')}
+        <div class="min-w-0">
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight truncate">${t?.name || '결과'}</h1>
+          <div class="flex items-center gap-2 mt-1 flex-wrap">
+            <span class="text-white/50 text-sm">결과 / 순위</span>
+            <span class="text-white/30">·</span>
+            <span class="text-white/50 text-sm">${eventNames.length}개 종목</span>
+          </div>
+        </div>
+      </div>
+      <!-- Stats Cards -->
+      <div class="grid grid-cols-3 gap-3 sm:gap-4">
+        <div class="bg-white/[0.07] backdrop-blur-sm rounded-xl p-3 sm:p-4 text-center border border-white/10">
+          <div class="text-2xl sm:text-3xl font-extrabold text-white">${eventNames.length}</div>
+          <div class="text-[11px] sm:text-xs text-white/50 mt-0.5"><i class="fas fa-layer-group mr-1"></i>종목</div>
+        </div>
+        <div class="bg-white/[0.07] backdrop-blur-sm rounded-xl p-3 sm:p-4 text-center border border-white/10">
+          <div class="text-2xl sm:text-3xl font-extrabold text-white">${totalTeams}</div>
+          <div class="text-[11px] sm:text-xs text-white/50 mt-0.5"><i class="fas fa-users mr-1"></i>참가 팀</div>
+        </div>
+        <div class="bg-white/[0.07] backdrop-blur-sm rounded-xl p-3 sm:p-4 text-center border border-white/10">
+          <div class="text-2xl sm:text-3xl font-extrabold text-yellow-400">${topWinner?.team_name || '-'}</div>
+          <div class="text-[11px] sm:text-xs text-white/50 mt-0.5"><i class="fas fa-crown mr-1"></i>최고 성적</div>
+        </div>
       </div>
     </div>
+    <!-- Wave Divider -->
+    <svg class="w-full h-6 sm:h-8" viewBox="0 0 1440 30" fill="none" preserveAspectRatio="none">
+      <path d="M0,0 C360,30 1080,30 1440,0 L1440,30 L0,30 Z" fill="#f8fafc"/>
+    </svg>
+  </div>
+
+  <div class="bg-slate-50 min-h-screen">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 -mt-1 pb-10 fade-in">
+    <div id="results-table">
+    ${eventNames.length === 0 ? '<div class="text-center py-16 text-gray-400"><i class="fas fa-trophy text-5xl mb-4"></i><p class="text-lg font-medium">아직 결과가 없습니다</p><p class="text-sm mt-1">경기가 완료되면 순위가 표시됩니다</p></div>' : ''}
+    ${Object.entries(byEvent).map(([eventName, standings]) => {
+      const catKey = standings[0]?.category || '';
+      const catIcon = catKey === 'md' ? 'fa-mars' : catKey === 'wd' ? 'fa-venus' : catKey === 'xd' ? 'fa-venus-mars' : 'fa-trophy';
+      const catGrad = catKey === 'md' ? 'from-blue-400 to-blue-600' : catKey === 'wd' ? 'from-pink-400 to-pink-600' : catKey === 'xd' ? 'from-purple-400 to-purple-600' : 'from-yellow-400 to-yellow-600';
+      const catShadow = catKey === 'md' ? 'shadow-blue-500/20' : catKey === 'wd' ? 'shadow-pink-500/20' : catKey === 'xd' ? 'shadow-purple-500/20' : 'shadow-yellow-500/20';
+      return `
+      <div class="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 mb-4 sm:mb-6 shadow-sm hover:shadow-md transition-shadow">
+        <h3 class="text-lg font-bold text-gray-800 mb-5 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br ${catGrad} flex items-center justify-center mr-2.5 shadow-md ${catShadow}"><i class="fas ${catIcon} text-white text-xs"></i></div>${eventName}</h3>
+
+        <!-- 시상대 (3팀 이상일 때) -->
+        ${standings.length >= 3 ? `<div class="flex items-end justify-center gap-3 sm:gap-5 mb-6 px-4">
+          <!-- 2위 -->
+          <div class="text-center flex-shrink-0">
+            <div class="w-16 sm:w-20 h-20 sm:h-24 bg-gradient-to-b from-gray-100 to-gray-200 rounded-t-2xl flex flex-col items-center justify-center border border-gray-300 border-b-0">
+              <span class="text-2xl sm:text-3xl mb-0.5">&#129352;</span>
+              <span class="text-xs font-bold text-gray-500">2nd</span>
+            </div>
+            <div class="bg-gray-200 rounded-b-xl px-2 py-2 border border-gray-300 border-t-0">
+              <p class="font-bold text-xs sm:text-sm text-gray-700 truncate max-w-[80px] sm:max-w-[100px]">${standings[1]?.team_name||''}</p>
+              <p class="text-[10px] text-gray-500 mt-0.5">${standings[1]?.wins||0}승 ${standings[1]?.losses||0}패</p>
+            </div>
+          </div>
+          <!-- 1위 -->
+          <div class="text-center flex-shrink-0 -mt-6">
+            <div class="w-20 sm:w-24 h-28 sm:h-32 bg-gradient-to-b from-yellow-50 to-yellow-100 rounded-t-2xl flex flex-col items-center justify-center border-2 border-yellow-400 border-b-0 relative">
+              <div class="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center shadow-md"><i class="fas fa-crown text-white text-[10px]"></i></div>
+              <span class="text-3xl sm:text-4xl mb-0.5 mt-2">&#129351;</span>
+              <span class="text-xs font-bold text-yellow-600">1st</span>
+            </div>
+            <div class="bg-yellow-100 rounded-b-xl px-2 py-2 border-2 border-yellow-400 border-t-0">
+              <p class="font-bold text-sm sm:text-base text-yellow-800 truncate max-w-[90px] sm:max-w-[120px]">${standings[0]?.team_name||''}</p>
+              <p class="text-[10px] text-yellow-600 mt-0.5">${standings[0]?.wins||0}승 ${standings[0]?.losses||0}패</p>
+            </div>
+          </div>
+          <!-- 3위 -->
+          <div class="text-center flex-shrink-0">
+            <div class="w-16 sm:w-20 h-16 sm:h-20 bg-gradient-to-b from-orange-50 to-orange-100 rounded-t-2xl flex flex-col items-center justify-center border border-orange-300 border-b-0">
+              <span class="text-2xl sm:text-3xl mb-0.5">&#129353;</span>
+              <span class="text-xs font-bold text-orange-500">3rd</span>
+            </div>
+            <div class="bg-orange-100 rounded-b-xl px-2 py-2 border border-orange-300 border-t-0">
+              <p class="font-bold text-xs sm:text-sm text-orange-700 truncate max-w-[80px] sm:max-w-[100px]">${standings[2]?.team_name||''}</p>
+              <p class="text-[10px] text-orange-500 mt-0.5">${standings[2]?.wins||0}승 ${standings[2]?.losses||0}패</p>
+            </div>
+          </div>
+        </div>` : ''}
+
+        <!-- 순위 테이블 -->
+        <div class="overflow-x-auto rounded-xl border border-gray-100">
+          <table class="w-full">
+            <thead class="bg-gray-50 border-b border-gray-200"><tr>
+              <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500 w-14">순위</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">팀</th>
+              <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">승점</th>
+              <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">승</th>
+              <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">패</th>
+              <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">득실차</th>
+            </tr></thead>
+            <tbody class="divide-y divide-gray-100">
+              ${standings.map((s, i) => {
+                const medalHtml = i===0 ? '<span class="text-lg">&#129351;</span>' : i===1 ? '<span class="text-lg">&#129352;</span>' : i===2 ? '<span class="text-lg">&#129353;</span>' : `<span class="w-6 h-6 rounded-full bg-gray-100 inline-flex items-center justify-center text-xs font-bold text-gray-500">${i+1}</span>`;
+                const rowBg = i===0 ? 'bg-yellow-50/50' : i===1 ? 'bg-gray-50/50' : i===2 ? 'bg-orange-50/50' : '';
+                return `<tr class="${rowBg} hover:bg-gray-50 transition-colors">
+                  <td class="px-3 py-3 text-center">${medalHtml}</td>
+                  <td class="px-4 py-3 font-semibold text-gray-800">${s.team_name}</td>
+                  <td class="px-3 py-3 text-center"><span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 font-extrabold text-sm">${s.points}</span></td>
+                  <td class="px-3 py-3 text-center text-green-600 font-bold text-sm">${s.wins}</td>
+                  <td class="px-3 py-3 text-center text-red-500 font-medium text-sm">${s.losses}</td>
+                  <td class="px-3 py-3 text-center"><span class="font-bold text-sm ${s.goal_difference>0?'text-green-600':s.goal_difference<0?'text-red-500':'text-gray-400'}">${s.goal_difference>0?'+':''}${s.goal_difference}</span></td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+    }).join('')}
+    </div>
+  </div>
   </div>`;
 }
 
