@@ -84,6 +84,9 @@
 - 경기 상태 관리: 대기(pending) → 진행(playing) → 완료(completed)
 - 경기 결과 서명 확인 (승/패팀 서명 캔버스)
 - **순위 자동 재계산**: 경기 완료 시 해당 종목 순위 자동 업데이트 (승점→득실차→득점 순)
+- **점수 수정 UI 개선** *(v3.2)*: 완료된 경기 수정 시 경고 배너, 3세트 입력 UI 포함
+- **경기 리셋** *(v3.2)*: 완료된 경기를 대기(pending)로 되돌리기 (점수 초기화, 이중 확인)
+- **코트 재배정** *(v3.2)*: 진행중/대기 경기의 코트 번호 변경 (점수 모달 내 셀렉트 + 전용 API)
 
 ### ✅ 8. 코트 전용 점수판 (`/court`)
 - 전체화면 좌/우 터치 점수판 (태블릿/모니터용)
@@ -127,7 +130,8 @@
 ```
 
 ### ✅ 10. 참가자 페이지 (`/my`)
-- **이름/연락처로 본인 경기 검색** (이름만으로 검색 가능, 동명이인은 연락처로 구분)
+- **이름/연락처로 본인 경기 검색** (이름만으로 검색 가능)
+- **동명이인 처리** *(v3.2)*: 같은 이름 참가자 감지 시 클럽·급수·출생년도 정보로 선택 UI 제공, `my-matches-by-id` API 추가
 - 프로필 정보 (이름, 성별, 급수, 소속, 참가비, 체크인 상태)
 - **전적 요약** (승/패/득실차)
 - 소속 팀 목록 (종목명, 파트너, 조 번호)
@@ -159,6 +163,28 @@
 - 코트 수 기반 라운드 자동 배분
 - 홈페이지에서 코트점수판/통계/내경기 바로가기 링크
 - 대회 상세 헤더에 통계/내경기 버튼
+
+### ✅ 14. 데이터 백업/복원 — v3.2 신규
+- **JSON 내보내기** (`GET /api/tournaments/:id/export`): 대회 전체 데이터(참가자/종목/팀/경기/순위) 일괄 다운로드
+- **JSON 가져오기** (`POST /api/tournaments/:id/import`): 백업 파일 업로드로 데이터 복원 (ID 매핑 자동 처리)
+- 관리자 패널에 **다운로드/업로드 버튼** 추가
+- 파일 미리보기 모달 (참가자 수, 종목 수, 경기 수 표시)
+
+### ✅ 15. 관리자 세션 유지 — v3.2 신규
+- 인증 상태를 **localStorage**에 저장하여 페이지 새로고침 후에도 관리자 모드 유지
+- 대회별 개별 세션 관리
+- 세션 자동 복원 (DOMContentLoaded 시 localStorage 확인)
+
+### ✅ 16. 참가자 검색/필터 — v3.2 신규
+- **텍스트 검색**: 이름·소속으로 실시간 필터링
+- **드롭다운 필터**: 성별·급수·클럽별 필터 조합
+- 필터 결과 카운트 표시
+- 기존 참가자 통계와 통합 UI
+
+### ✅ 17. CDN 로컬 번들링 — v3.2 신규
+- Tailwind CSS, Font Awesome, 웹폰트를 `public/static/vendor/`에 로컬 저장
+- **로컬 우선 로드 → CDN 폴백** 방식으로 사설 IP/오프라인 환경 완벽 지원
+- vendor/ 디렉터리: `tailwind.js` (413KB), `fontawesome.min.css` (102KB), 웹폰트 3종
 
 ### ✅ 13. 인쇄 센터 (`/print`) — v3.1 신규
 - 수기 운영 대비 6종 A4 인쇄물 (참가자명단/팀편성표/대진표/점수기록지/순위표/결선브래킷)
@@ -221,12 +247,18 @@ webapp/
 │   ├── app.js                     # 메인 프론트엔드 SPA (전체 UI + 대시보드 + 참가자 + 결선)
 │   ├── court.js                   # 코트 전용 점수판 프론트엔드
 │   ├── style.css                  # 커스텀 스타일
-│   └── test_participants_100.txt  # 테스트용 참가자 붙여넣기 데이터
+│   ├── manual.html                # A4 인쇄용 현장 운영 매뉴얼
+│   ├── test_participants_100.txt  # 테스트용 참가자 붙여넣기 데이터
+│   └── vendor/                    # CDN 로컬 번들 (v3.2)
+│       ├── tailwind.js            # Tailwind CSS v3.4.1
+│       ├── fontawesome.min.css    # Font Awesome 6.4.0
+│       └── webfonts/              # FA 웹폰트 (woff2)
 ├── migrations/
 │   ├── 0001_initial_schema.sql    # 기본 테이블 (대회/종목/참가자/팀/경기/순위/감사로그)
 │   ├── 0002_add_signatures.sql    # 경기 서명 필드 추가 (winner_signature, loser_signature, signature_at)
 │   ├── 0003_add_mixed_doubles.sql # 참가자 혼합복식 참가 여부 필드 추가
-│   └── 0004_add_club_and_groups.sql # 클럽(소속) 및 조(그룹) 시스템 추가
+│   ├── 0004_add_club_and_groups.sql # 클럽(소속) 및 조(그룹) 시스템 추가
+│   └── 0005_add_push_notifications.sql # 푸시 알림 구독 테이블 추가
 ├── seed.sql                       # 테스트 데이터 (177명 실제 회원, 18개 클럽)
 ├── ecosystem.config.cjs           # PM2 설정
 ├── wrangler.jsonc                 # Cloudflare Workers 설정
@@ -329,6 +361,8 @@ webapp/
 | GET | `/api/tournaments/:tid/matches` | 경기 목록 | `event_id?` (종목 필터) |
 | PUT | `/api/tournaments/:tid/matches/:mid/score` | 점수 입력 | `team1_set1, team2_set1, ..., status, winner_team` |
 | PATCH | `/api/tournaments/:tid/matches/:mid/status` | 경기 상태 변경 | `status` (pending/playing/completed) |
+| POST | `/api/tournaments/:tid/matches/:mid/reset` | 경기 리셋 (→ pending) | - *(v3.2)* |
+| PATCH | `/api/tournaments/:tid/matches/:mid/court` | 코트 재배정 | `court_number` *(v3.2)* |
 | GET | `/api/tournaments/:tid/standings` | 순위표 조회 | `recalculate?` (재계산 플래그) |
 
 ### 코트 관리 (`matches.ts`)
@@ -349,7 +383,10 @@ webapp/
 |--------|------|------|-------------|
 | GET | `/api/tournaments/:tid/dashboard` | 통계 대시보드 데이터 | - |
 | GET | `/api/tournaments/:tid/my-matches` | 참가자 본인 경기 조회 | `name` (필수), `phone` (선택) |
+| GET | `/api/tournaments/:tid/my-matches-by-id/:pid` | 참가자 ID로 경기 조회 *(v3.2)* | - |
 | GET | `/api/tournaments/:tid/audit-logs` | 감사 로그 조회 | - (최근 100건) |
+| GET | `/api/tournaments/:id/export` | 대회 데이터 JSON 내보내기 *(v3.2)* | - |
+| POST | `/api/tournaments/:id/import` | 대회 데이터 JSON 가져오기 *(v3.2)* | `file` (JSON 백업 파일) |
 
 ---
 
@@ -455,6 +492,7 @@ webapp/
 | 0002_add_signatures.sql | matches에 서명 필드 추가 |
 | 0003_add_mixed_doubles.sql | participants에 혼복 참가 필드 추가 |
 | 0004_add_club_and_groups.sql | participants에 club, teams/matches에 group_num 추가 |
+| 0005_add_push_notifications.sql | push_subscriptions 테이블 추가 (웹 푸시 알림) |
 
 ---
 
@@ -766,16 +804,34 @@ npm run deploy
 
 ---
 
+## 변경 이력
+
+| 버전 | 날짜 | 주요 변경 사항 |
+|------|------|---------------|
+| v1.0 | 2026-02-17 | 기본 대회 관리, 참가자, 종목, 경기, 순위 |
+| v2.0 | 2026-02-17 | 코트 점수판, 대시보드, 참가자 페이지 |
+| v2.3 | 2026-02-17 | 웹 푸시 알림 (VAPID), 서비스 워커 |
+| v2.7 | 2026-02-17 | 대회 삭제, 연령대 세분화, 종목 일괄 생성 |
+| v3.0 | 2026-02-18 | 조편성 옵션, 결선 토너먼트, 클럽 회피 시드 |
+| v3.1 | 2026-02-18 | 인쇄 센터 (6종 A4 인쇄물), 운영 매뉴얼 |
+| **v3.2** | **2026-02-18** | **점수 수정 UI 개선, 경기 리셋, 동명이인 처리, 코트 재배정, 데이터 백업/복원, 관리자 세션 유지, 참가자 검색/필터, CDN 로컬 번들링** |
+
+---
+
 ## 미구현 / 향후 개발 계획
-- 🔔 경기 호출 알림 (웹 푸시 또는 카카오톡 연동)
 - 📋 복수 대회 동시 운영
 - 🗄️ 시즌 데이터 누적 관리 (선수별 전적/랭킹)
 - 🔐 역할 기반 권한 (대회장/진행요원/참가자)
 - 📱 PWA 지원 (오프라인 점수 입력)
+- 📊 참가자 수정 UI (개별 수정 폼)
+- ⏱️ 경기 시간 기록 (시작/종료 타임스탬프)
+- 🔄 경기 일시정지 상태 지원
 
 ---
 
 ## 배포 정보
 - **플랫폼**: Cloudflare Pages
-- **상태**: ✅ 로컬 개발 서버 동작중
-- **마지막 업데이트**: 2026-02-18 (v3.1)
+- **프로덕션 URL**: https://badminton-tournament-5ny.pages.dev
+- **상태**: ✅ 프로덕션 배포 완료
+- **마지막 업데이트**: 2026-02-18 (v3.2)
+- **백업**: https://www.genspark.ai/api/files/s/hG8bLbgu (v3.2, ~3.6MB)
