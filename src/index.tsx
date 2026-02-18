@@ -1009,12 +1009,13 @@ function getPrintHtml(): string {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🏸 대회 인쇄 센터 - 수기 운영 대비</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&display=swap');
-  
   /* ===== 기본 ===== */
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Noto Sans KR', sans-serif; background: #f3f4f6; color: #1a1a1a; }
+  body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif; background: #f3f4f6; color: #1a1a1a; }
   
   /* ===== 화면용 컨트롤 패널 ===== */
   .control-panel {
@@ -1123,7 +1124,9 @@ function getPrintHtml(): string {
     font-size: 8pt; color: #999; text-align: center;
   }
 </style>
-<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"></noscript>
 </head>
 <body>
 
@@ -1299,9 +1302,11 @@ function renderAll() {
     matchesByEvent[m.event_id].push(m);
   });
   
+  let hasMatches = false;
   state.events.forEach(ev => {
     const evMatches = matchesByEvent[ev.id] || [];
     if (evMatches.length === 0) return;
+    hasMatches = true;
     
     // 조별 그룹
     const byGroup = {};
@@ -1328,7 +1333,38 @@ function renderAll() {
       html += '</table>';
     }
   });
-  html += '<div class="info-footer">※ 승자 란에 A 또는 B를 기입하세요.</div>';
+  if (!hasMatches) {
+    // 경기 미생성 시 빈 양식 제공
+    state.events.forEach(ev => {
+      const teams = state.teams[ev.id] || [];
+      if (teams.length === 0) return;
+      const byGroup = {};
+      teams.forEach(tm => { const g = tm.group_num || 0; if (!byGroup[g]) byGroup[g] = []; byGroup[g].push(tm); });
+      html += '<div class="section-header">' + ev.name + ' (경기 미생성 - 빈 양식)</div>';
+      for (const [gNum, gTeams] of Object.entries(byGroup)) {
+        if (gNum === '0') continue;
+        const nTeams = gTeams.length;
+        const nMatches = nTeams * (nTeams - 1) / 2;
+        html += '<div style="font-weight:600; font-size:9pt; margin:2mm 0 1mm 2mm; color:#2563eb;">◆ ' + gNum + '조 (' + nTeams + '팀, ' + nMatches + '경기)</div>';
+        html += '<table class="print-table"><tr><th style="width:6%">순번</th><th style="width:8%">코트</th><th style="width:34%">팀 A</th><th style="width:6%">vs</th><th style="width:34%">팀 B</th><th style="width:12%">승자</th></tr>';
+        let mNum = 1;
+        for (let a = 0; a < gTeams.length; a++) {
+          for (let b = a + 1; b < gTeams.length; b++) {
+            const t1 = gTeams[a].team_name || (gTeams[a].p1_name + ' · ' + gTeams[a].p2_name);
+            const t2 = gTeams[b].team_name || (gTeams[b].p1_name + ' · ' + gTeams[b].p2_name);
+            html += '<tr><td>' + (mNum++) + '</td><td class="write-cell"></td>';
+            html += '<td class="left"><strong>' + t1 + '</strong></td><td>vs</td>';
+            html += '<td class="left"><strong>' + t2 + '</strong></td>';
+            html += '<td><span class="checkbox"></span></td></tr>';
+          }
+        }
+        html += '</table>';
+      }
+    });
+    html += '<div class="info-footer" style="color:#dc2626;">⚠ 시스템에서 경기가 아직 생성되지 않았습니다. 위 빈 양식에 직접 코트 배정과 승자를 기입하세요.</div>';
+  } else {
+    html += '<div class="info-footer">※ 승자 란에 A 또는 B를 기입하세요.</div>';
+  }
   html += '</div>';
   
   // ============================
@@ -1347,27 +1383,46 @@ function renderAll() {
   });
   
   const courts = Object.keys(matchesByCourt).sort((a,b) => a - b);
-  courts.forEach(courtNum => {
-    const courtMatches = matchesByCourt[courtNum];
-    courtMatches.sort((a,b) => (a.round - b.round) || (a.match_order - b.match_order));
-    
-    html += '<div class="section-header" style="margin-top:5mm">🏸 ' + courtNum + '번 코트 (' + courtMatches.length + '경기)</div>';
-    
-    courtMatches.forEach((m, i) => {
-      const evName = (state.events.find(e => e.id === m.event_id) || {}).name || '';
-      const t1 = m.team1_name || ('팀' + m.team1_id);
-      const t2 = m.team2_name || ('팀' + m.team2_id);
+  if (courts.length > 0) {
+    courts.forEach(courtNum => {
+      const courtMatches = matchesByCourt[courtNum];
+      courtMatches.sort((a,b) => (a.round - b.round) || (a.match_order - b.match_order));
       
-      html += '<div class="score-sheet">';
-      html += '<div class="match-header"><span>' + courtNum + '코트 #' + (i+1) + '</span><span>' + evName + '</span><span>R' + m.round + '</span></div>';
-      html += '<table class="score-grid">';
-      html += '<tr><th style="width:35%">팀</th><th>1세트</th><th>2세트</th><th>3세트</th><th style="width:12%">승</th><th style="width:18%">서명</th></tr>';
-      html += '<tr><td class="team-name">' + t1 + '</td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="sig-cell"></td></tr>';
-      html += '<tr><td class="team-name">' + t2 + '</td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="sig-cell"></td></tr>';
-      html += '</table></div>';
+      html += '<div class="section-header" style="margin-top:5mm">🏸 ' + courtNum + '번 코트 (' + courtMatches.length + '경기)</div>';
+      
+      courtMatches.forEach((m, i) => {
+        const evName = (state.events.find(e => e.id === m.event_id) || {}).name || '';
+        const t1 = m.team1_name || ('팀' + m.team1_id);
+        const t2 = m.team2_name || ('팀' + m.team2_id);
+        
+        html += '<div class="score-sheet">';
+        html += '<div class="match-header"><span>' + courtNum + '코트 #' + (i+1) + '</span><span>' + evName + '</span><span>R' + m.round + '</span></div>';
+        html += '<table class="score-grid">';
+        html += '<tr><th style="width:35%">팀</th><th>1세트</th><th>2세트</th><th>3세트</th><th style="width:12%">승</th><th style="width:18%">서명</th></tr>';
+        html += '<tr><td class="team-name">' + t1 + '</td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="sig-cell"></td></tr>';
+        html += '<tr><td class="team-name">' + t2 + '</td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="sig-cell"></td></tr>';
+        html += '</table></div>';
+      });
     });
-  });
-  html += '<div class="info-footer">※ 각 세트 점수와 승자(◯)를 기입하고, 양팀 대표가 서명합니다. 네트워크 복구 후 시스템에 일괄 입력합니다.</div>';
+    html += '<div class="info-footer">※ 각 세트 점수와 승자(◯)를 기입하고, 양팀 대표가 서명합니다. 네트워크 복구 후 시스템에 일괄 입력합니다.</div>';
+  } else {
+    // 경기 미생성 시 빈 점수 기록지 양식
+    const numCourts = t.courts || 6;
+    html += '<div style="text-align:center; padding:5mm; color:#666; font-size:10pt;">⚠ 시스템에서 경기가 아직 생성되지 않았습니다. 아래 빈 양식을 사용하세요.</div>';
+    for (let c = 1; c <= numCourts; c++) {
+      html += '<div class="section-header" style="margin-top:5mm">🏸 ' + c + '번 코트</div>';
+      for (let g = 0; g < 5; g++) {
+        html += '<div class="score-sheet">';
+        html += '<div class="match-header"><span>' + c + '코트 #' + (g+1) + '</span><span>종목: ___________</span><span>___조</span></div>';
+        html += '<table class="score-grid">';
+        html += '<tr><th style="width:35%">팀</th><th>1세트</th><th>2세트</th><th>3세트</th><th style="width:12%">승</th><th style="width:18%">서명</th></tr>';
+        html += '<tr><td class="team-name" style="height:10mm"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="sig-cell"></td></tr>';
+        html += '<tr><td class="team-name" style="height:10mm"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="sig-cell"></td></tr>';
+        html += '</table></div>';
+      }
+    }
+    html += '<div class="info-footer" style="color:#dc2626;">⚠ 빈 양식입니다. 팀명을 직접 기입하고 점수와 서명을 받으세요. 양식 부족 시 추가 인쇄하세요.</div>';
+  }
   html += '</div>';
   
   // ============================
