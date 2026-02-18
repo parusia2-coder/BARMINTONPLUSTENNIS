@@ -149,6 +149,48 @@ function getLevelFilter(event: any): string {
   return ''
 }
 
+function getAgeFilter(event: any): string {
+  const ag = event.age_group
+  if (!ag || ag === 'open') return ''
+  const currentYear = new Date().getFullYear()
+  switch (ag) {
+    case '20대': {
+      const maxYear = currentYear - 20
+      const minYear = currentYear - 29
+      return `AND birth_year IS NOT NULL AND birth_year BETWEEN ${minYear} AND ${maxYear}`
+    }
+    case '30대': {
+      const maxYear = currentYear - 30
+      const minYear = currentYear - 39
+      return `AND birth_year IS NOT NULL AND birth_year BETWEEN ${minYear} AND ${maxYear}`
+    }
+    case '40대': {
+      const maxYear = currentYear - 40
+      const minYear = currentYear - 49
+      return `AND birth_year IS NOT NULL AND birth_year BETWEEN ${minYear} AND ${maxYear}`
+    }
+    case '50대': {
+      // 50대 초반: 50~54세
+      const maxYear = currentYear - 50
+      const minYear = currentYear - 54
+      return `AND birth_year IS NOT NULL AND birth_year BETWEEN ${minYear} AND ${maxYear}`
+    }
+    case '55대': {
+      // 50대 후반: 55~59세
+      const maxYear = currentYear - 55
+      const minYear = currentYear - 59
+      return `AND birth_year IS NOT NULL AND birth_year BETWEEN ${minYear} AND ${maxYear}`
+    }
+    case '60대': {
+      // 60세 이상
+      const maxYear = currentYear - 60
+      return `AND birth_year IS NOT NULL AND birth_year <= ${maxYear}`
+    }
+    default:
+      return ''
+  }
+}
+
 // =============================================
 // 팀 편성 옵션 엔진 (핵심!)
 // =============================================
@@ -293,15 +335,16 @@ eventRoutes.post('/:tid/events/:eid/auto-assign', async (c) => {
   if (event.category === 'md') genderFilter = `AND gender='m'`
   else if (event.category === 'wd') genderFilter = `AND gender='f'`
   const levelFilter = getLevelFilter(event)
+  const ageFilter = getAgeFilter(event)
   const teams: { p1: any; p2: any }[] = []
 
   if (event.category === 'xd') {
     // 혼합복식
     const { results: males } = await db.prepare(
-      `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='m' AND mixed_doubles=1 ${levelFilter} ORDER BY level, RANDOM()`
+      `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='m' AND mixed_doubles=1 ${levelFilter} ${ageFilter} ORDER BY level, RANDOM()`
     ).bind(tid).all()
     const { results: females } = await db.prepare(
-      `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='f' AND mixed_doubles=1 ${levelFilter} ORDER BY level, RANDOM()`
+      `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='f' AND mixed_doubles=1 ${levelFilter} ${ageFilter} ORDER BY level, RANDOM()`
     ).bind(tid).all()
 
     if (teamMode === 'club_priority') {
@@ -331,7 +374,7 @@ eventRoutes.post('/:tid/events/:eid/auto-assign', async (c) => {
   } else {
     // 남복/여복
     const { results: players } = await db.prepare(
-      `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 ${genderFilter} ${levelFilter} ORDER BY level, RANDOM()`
+      `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 ${genderFilter} ${levelFilter} ${ageFilter} ORDER BY level, RANDOM()`
     ).bind(tid).all()
     if (players && players.length >= 2) {
       if (teamMode === 'club_priority') teams.push(...pairWithClubPriority(players as any[]))
@@ -381,14 +424,15 @@ eventRoutes.post('/:tid/events/auto-assign-all', async (c) => {
     if (event.category === 'md') genderFilter = `AND gender='m'`
     else if (event.category === 'wd') genderFilter = `AND gender='f'`
     const levelFilter = getLevelFilter(event)
+    const ageFilter = getAgeFilter(event)
     const teams: { p1: any; p2: any }[] = []
 
     if (event.category === 'xd') {
       const { results: males } = await db.prepare(
-        `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='m' AND mixed_doubles=1 ${levelFilter} ORDER BY level, RANDOM()`
+        `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='m' AND mixed_doubles=1 ${levelFilter} ${ageFilter} ORDER BY level, RANDOM()`
       ).bind(tid).all()
       const { results: females } = await db.prepare(
-        `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='f' AND mixed_doubles=1 ${levelFilter} ORDER BY level, RANDOM()`
+        `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='f' AND mixed_doubles=1 ${levelFilter} ${ageFilter} ORDER BY level, RANDOM()`
       ).bind(tid).all()
       if (teamMode === 'club_priority') {
         const usedM = new Set<number>(), usedF = new Set<number>()
@@ -412,7 +456,7 @@ eventRoutes.post('/:tid/events/auto-assign-all', async (c) => {
       }
     } else {
       const { results: players } = await db.prepare(
-        `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 ${genderFilter} ${levelFilter} ORDER BY level, RANDOM()`
+        `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 ${genderFilter} ${levelFilter} ${ageFilter} ORDER BY level, RANDOM()`
       ).bind(tid).all()
       if (players && players.length >= 2) {
         if (teamMode === 'club_priority') teams.push(...pairWithClubPriority(players as any[]))
@@ -553,17 +597,18 @@ eventRoutes.post('/:tid/events/preview-assignment', async (c) => {
     if (event.category === 'md') genderFilter = `AND gender='m'`
     else if (event.category === 'wd') genderFilter = `AND gender='f'`
     const levelFilter = getLevelFilter(event)
+    const ageFilter = getAgeFilter(event)
 
     let playerCount = 0
     let teamCount = 0
 
     if (event.category === 'xd') {
-      const mCount = await db.prepare(`SELECT COUNT(*) as c FROM participants WHERE tournament_id=? AND deleted=0 AND gender='m' AND mixed_doubles=1 ${levelFilter}`).bind(tid).first()
-      const fCount = await db.prepare(`SELECT COUNT(*) as c FROM participants WHERE tournament_id=? AND deleted=0 AND gender='f' AND mixed_doubles=1 ${levelFilter}`).bind(tid).first()
+      const mCount = await db.prepare(`SELECT COUNT(*) as c FROM participants WHERE tournament_id=? AND deleted=0 AND gender='m' AND mixed_doubles=1 ${levelFilter} ${ageFilter}`).bind(tid).first()
+      const fCount = await db.prepare(`SELECT COUNT(*) as c FROM participants WHERE tournament_id=? AND deleted=0 AND gender='f' AND mixed_doubles=1 ${levelFilter} ${ageFilter}`).bind(tid).first()
       playerCount = ((mCount?.c as number) || 0) + ((fCount?.c as number) || 0)
       teamCount = Math.min((mCount?.c as number) || 0, (fCount?.c as number) || 0)
     } else {
-      const pCount = await db.prepare(`SELECT COUNT(*) as c FROM participants WHERE tournament_id=? AND deleted=0 ${genderFilter} ${levelFilter}`).bind(tid).first()
+      const pCount = await db.prepare(`SELECT COUNT(*) as c FROM participants WHERE tournament_id=? AND deleted=0 ${genderFilter} ${levelFilter} ${ageFilter}`).bind(tid).first()
       playerCount = (pCount?.c as number) || 0
       teamCount = Math.floor(playerCount / 2)
     }

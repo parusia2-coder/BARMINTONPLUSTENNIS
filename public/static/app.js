@@ -12,6 +12,18 @@ const AGE_GROUPS = [
   { value: '55대', label: '55대' }, { value: '60대', label: '60대' }
 ];
 
+function getAgeGroup(birthYear) {
+  if (!birthYear) return '-';
+  const age = new Date().getFullYear() - birthYear;
+  if (age >= 60) return '60대';
+  if (age >= 55) return '55대';
+  if (age >= 50) return '50대';
+  if (age >= 40) return '40대';
+  if (age >= 30) return '30대';
+  if (age >= 20) return '20대';
+  return '10대';
+}
+
 // State
 const state = {
   currentPage: 'home', tournaments: [], currentTournament: null,
@@ -383,6 +395,16 @@ function renderParticipantsTab(isAdmin) {
       <span class="badge bg-pink-100 text-pink-700"><i class="fas fa-venus mr-1"></i>여 ${state.participants.filter(p=>p.gender==='f').length}명</span>
       <span class="badge bg-purple-100 text-purple-700"><i class="fas fa-venus-mars mr-1"></i>혼복 ${state.participants.filter(p=>p.mixed_doubles).length}명</span>
     </div>
+    <div class="flex flex-wrap gap-1 mb-2">
+      ${['50대','55대','60대'].map(ag => {
+        const cnt = state.participants.filter(p => getAgeGroup(p.birth_year) === ag).length;
+        return cnt > 0 ? `<span class="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">${ag}: ${cnt}명</span>` : '';
+      }).join('')}
+      ${['40대','30대','20대'].map(ag => {
+        const cnt = state.participants.filter(p => getAgeGroup(p.birth_year) === ag).length;
+        return cnt > 0 ? `<span class="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">${ag}: ${cnt}명</span>` : '';
+      }).join('')}
+    </div>
     ${clubList.length > 1 ? `<div class="flex flex-wrap gap-1 mb-2">
       ${clubList.slice(0, 10).map(([name, count]) => `<span class="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700">${name}: ${count}명</span>`).join('')}
     </div>` : ''}
@@ -392,6 +414,7 @@ function renderParticipantsTab(isAdmin) {
           <th class="px-2 py-3 text-left text-xs font-semibold text-gray-500">#</th>
           <th class="px-2 py-3 text-left text-xs font-semibold text-gray-500">이름</th>
           <th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">성별</th>
+          <th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">연령대</th>
           <th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">급수</th>
           <th class="px-2 py-3 text-left text-xs font-semibold text-gray-500">소속</th>
           <th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">혼복</th>
@@ -400,13 +423,14 @@ function renderParticipantsTab(isAdmin) {
           ${isAdmin ? '<th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">관리</th>' : ''}
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
-          ${state.participants.length === 0 ? `<tr><td colspan="${isAdmin?9:8}" class="px-4 py-8 text-center text-gray-400">등록된 참가자가 없습니다.</td></tr>` : ''}
+          ${state.participants.length === 0 ? `<tr><td colspan="${isAdmin?10:9}" class="px-4 py-8 text-center text-gray-400">등록된 참가자가 없습니다.</td></tr>` : ''}
           ${state.participants.map((p, i) => {
             const lv = LEVEL_COLORS[p.level] || LEVEL_COLORS.c;
             return `<tr class="hover:bg-gray-50">
               <td class="px-2 py-2 text-sm text-gray-400">${i+1}</td>
               <td class="px-2 py-2 font-medium text-gray-900 text-sm">${p.name}</td>
               <td class="px-2 py-2 text-center"><span class="badge text-xs ${p.gender==='m' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender==='m'?'남':'여'}</span></td>
+              <td class="px-2 py-2 text-center"><span class="badge text-xs bg-amber-50 text-amber-700">${getAgeGroup(p.birth_year)}</span></td>
               <td class="px-2 py-2 text-center"><span class="badge text-xs ${lv}">${LEVELS[p.level]||'C'}</span></td>
               <td class="px-2 py-2 text-xs text-gray-500">${p.club || '-'}</td>
               <td class="px-2 py-2 text-center">${isAdmin ? `<button onclick="toggleMixedDoubles(${p.id})" class="text-base ${p.mixed_doubles?'text-purple-500':'text-gray-300'} hover:scale-110">${p.mixed_doubles?'<i class="fas fa-venus-mars"></i>':'<i class="far fa-circle"></i>'}</button>` : (p.mixed_doubles?'<span class="text-purple-500"><i class="fas fa-venus-mars"></i></span>':'<span class="text-gray-300">-</span>')}</td>
