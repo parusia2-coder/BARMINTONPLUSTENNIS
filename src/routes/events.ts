@@ -53,6 +53,57 @@ eventRoutes.post('/:tid/events', async (c) => {
   return c.json({ id: result.meta.last_row_id, name, message: '종목이 생성되었습니다.' }, 201)
 })
 
+// =============================================
+// ★ 종목 일괄 생성 (다중 종목 + 다중 연령대 + 다중 급수) ★
+// =============================================
+eventRoutes.post('/:tid/events/bulk-create', async (c) => {
+  const tid = c.req.param('tid')
+  const db = c.env.DB
+  const body = await c.req.json()
+  const { categories, age_groups, level_groups } = body
+  // categories: ['md','wd','xd'], age_groups: ['50대','55대'], level_groups: ['all'] or ['a','b']
+
+  if (!categories || categories.length === 0) return c.json({ error: '종목을 하나 이상 선택해주세요.' }, 400)
+  if (!age_groups || age_groups.length === 0) return c.json({ error: '연령대를 하나 이상 선택해주세요.' }, 400)
+  const levels = (level_groups && level_groups.length > 0) ? level_groups : ['all']
+
+  const created: any[] = []
+  const skipped: string[] = []
+
+  for (const cat of categories) {
+    for (const age of age_groups) {
+      for (const lv of levels) {
+        const catLabel = CATEGORY_LABELS[cat] || cat
+        const lvLabel = lv === 'all' ? '전체' : (LEVEL_LABELS[lv] || lv) + '급'
+        const ageLabel = age === 'open' ? '오픈' : age
+        const name = `${catLabel} ${ageLabel} ${lvLabel}`
+
+        const existing = await db.prepare(
+          `SELECT id FROM events WHERE tournament_id=? AND category=? AND age_group=? AND level_group=?`
+        ).bind(tid, cat, age, lv).first()
+
+        if (existing) {
+          skipped.push(name)
+          continue
+        }
+
+        const result = await db.prepare(
+          `INSERT INTO events (tournament_id, category, age_group, level_group, name) VALUES (?, ?, ?, ?, ?)`
+        ).bind(tid, cat, age, lv, name).run()
+
+        created.push({ id: result.meta.last_row_id, name, category: cat, age_group: age, level_group: lv })
+      }
+    }
+  }
+
+  return c.json({
+    message: `${created.length}개 종목 생성 완료${skipped.length > 0 ? `, ${skipped.length}개 중복 건너뜀` : ''}`,
+    created,
+    skipped,
+    total_created: created.length
+  }, 201)
+})
+
 // 종목 삭제
 eventRoutes.delete('/:tid/events/:eid', async (c) => {
   const tid = c.req.param('tid')

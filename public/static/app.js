@@ -471,6 +471,7 @@ function renderEventsTab(isAdmin) {
           <select name="level_group" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
             <option value="all">전체</option>${Object.entries(LEVELS).map(([k,v]) => `<option value="${k}">${v}급</option>`).join('')}</select></div>
         <button type="submit" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700"><i class="fas fa-plus mr-1"></i>종목 추가</button>
+        <button type="button" onclick="showBulkEventModal()" class="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700"><i class="fas fa-th-large mr-1"></i>일괄 생성</button>
       </form>
     </div>` : ''}
     ${isAdmin ? `<div class="flex flex-wrap gap-2">
@@ -500,6 +501,203 @@ function renderEventsTab(isAdmin) {
       </div>
     `).join('')}
   </div>`;
+}
+
+// ==========================================
+// ★ 종목 일괄 생성 + 자동 편성 모달 ★
+// ==========================================
+function showBulkEventModal() {
+  // 연령대별 인원 계산
+  const ageCounts = {};
+  AGE_GROUPS.forEach(ag => {
+    if (ag.value === 'open') {
+      ageCounts['open'] = { m: state.participants.filter(p=>p.gender==='m').length, f: state.participants.filter(p=>p.gender==='f').length };
+    } else {
+      ageCounts[ag.value] = {
+        m: state.participants.filter(p=>p.gender==='m' && getAgeGroup(p.birth_year)===ag.value).length,
+        f: state.participants.filter(p=>p.gender==='f' && getAgeGroup(p.birth_year)===ag.value).length
+      };
+    }
+  });
+
+  const modal = document.createElement('div');
+  modal.id = 'bulk-event-modal';
+  modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-overlay';
+  modal.innerHTML = `<div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
+    <div class="p-6 border-b border-gray-200">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-gray-900"><i class="fas fa-th-large mr-2 text-indigo-500"></i>종목 일괄 생성 + 자동 편성</h3>
+        <button onclick="document.getElementById('bulk-event-modal').remove()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100"><i class="fas fa-times text-gray-400"></i></button>
+      </div>
+      <p class="text-sm text-gray-500 mt-1">종목과 연령대를 다중 선택하면 조합별로 종목을 생성하고 자동 팀 편성까지 진행합니다.</p>
+    </div>
+    <div class="p-6 overflow-y-auto flex-1 space-y-5">
+      <!-- 1. 종목 선택 -->
+      <div>
+        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-gamepad mr-1 text-blue-500"></i>1. 종목 선택 (다중 선택)</h4>
+        <div class="grid grid-cols-3 gap-2">
+          <label class="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer hover:bg-blue-50 transition has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+            <input type="checkbox" name="bulk_cat" value="md" checked class="w-4 h-4 text-blue-600 rounded">
+            <div><p class="font-bold text-sm text-blue-700"><i class="fas fa-mars mr-1"></i>남자복식</p></div>
+          </label>
+          <label class="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer hover:bg-pink-50 transition has-[:checked]:border-pink-500 has-[:checked]:bg-pink-50">
+            <input type="checkbox" name="bulk_cat" value="wd" checked class="w-4 h-4 text-pink-600 rounded">
+            <div><p class="font-bold text-sm text-pink-700"><i class="fas fa-venus mr-1"></i>여자복식</p></div>
+          </label>
+          <label class="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer hover:bg-purple-50 transition has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50">
+            <input type="checkbox" name="bulk_cat" value="xd" class="w-4 h-4 text-purple-600 rounded">
+            <div><p class="font-bold text-sm text-purple-700"><i class="fas fa-venus-mars mr-1"></i>혼합복식</p></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- 2. 연령대 선택 -->
+      <div>
+        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-birthday-cake mr-1 text-amber-500"></i>2. 연령대 선택 (다중 선택)</h4>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          ${AGE_GROUPS.map(ag => {
+            const mc = ageCounts[ag.value]?.m || 0;
+            const fc = ageCounts[ag.value]?.f || 0;
+            return `<label class="flex items-start gap-2 p-3 border-2 rounded-xl cursor-pointer hover:bg-amber-50 transition has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
+              <input type="checkbox" name="bulk_age" value="${ag.value}" class="w-4 h-4 text-amber-600 rounded mt-0.5">
+              <div>
+                <p class="font-bold text-sm">${ag.label}</p>
+                <p class="text-xs text-gray-500">남${mc} 여${fc}</p>
+              </div>
+            </label>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- 3. 급수 선택 -->
+      <div>
+        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-signal mr-1 text-green-500"></i>3. 급수 (선택사항)</h4>
+        <div class="flex flex-wrap gap-2">
+          <label class="flex items-center gap-2 px-3 py-2 border-2 rounded-lg cursor-pointer hover:bg-green-50 transition has-[:checked]:border-green-500 has-[:checked]:bg-green-50">
+            <input type="checkbox" name="bulk_level" value="all" checked class="w-4 h-4 text-green-600 rounded">
+            <span class="text-sm font-bold">전체</span>
+          </label>
+          ${Object.entries(LEVELS).map(([k,v]) => `<label class="flex items-center gap-2 px-3 py-2 border-2 rounded-lg cursor-pointer hover:bg-green-50 transition has-[:checked]:border-green-500 has-[:checked]:bg-green-50">
+            <input type="checkbox" name="bulk_level" value="${k}" class="w-4 h-4 text-green-600 rounded">
+            <span class="text-sm font-medium">${v}급</span>
+          </label>`).join('')}
+        </div>
+        <p class="text-xs text-gray-400 mt-1">"전체"를 선택하면 급수 구분 없이 생성됩니다. 개별 급수를 선택하면 급수별 종목이 생성됩니다.</p>
+      </div>
+
+      <!-- 4. 자동 편성 옵션 -->
+      <div class="border-t pt-4">
+        <label class="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer hover:bg-teal-50 transition has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50">
+          <input type="checkbox" id="bulk-auto-assign" checked class="w-5 h-5 text-teal-600 rounded">
+          <div>
+            <p class="font-bold text-sm"><i class="fas fa-users-cog mr-1 text-teal-500"></i>종목 생성 후 자동 팀 편성</p>
+            <p class="text-xs text-gray-500">생성된 종목에 참가자를 자동으로 배정합니다 (같은 클럽 우선)</p>
+          </div>
+        </label>
+        <div id="bulk-assign-options" class="mt-3 pl-4 space-y-2">
+          <div class="flex items-center gap-3">
+            <label class="text-sm font-medium text-gray-700 w-24">팀 편성 방식</label>
+            <select id="bulk-team-mode" class="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+              <option value="club_priority">같은 클럽 우선</option>
+              <option value="level_match">같은 급수 매칭</option>
+              <option value="random">완전 랜덤</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 미리보기 영역 -->
+      <div id="bulk-event-preview" class="hidden bg-gray-50 rounded-xl p-4">
+        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-eye mr-1"></i>생성될 종목 미리보기</h4>
+        <div id="bulk-event-preview-content"></div>
+      </div>
+    </div>
+    <div class="p-6 border-t border-gray-200 flex gap-3">
+      <button onclick="previewBulkEvents()" class="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200"><i class="fas fa-eye mr-1"></i>미리보기</button>
+      <button onclick="executeBulkEvents()" class="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-md"><i class="fas fa-bolt mr-2"></i>일괄 생성 + 편성</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+function getBulkEventSelections() {
+  const categories = [...document.querySelectorAll('input[name="bulk_cat"]:checked')].map(cb => cb.value);
+  const ageGroups = [...document.querySelectorAll('input[name="bulk_age"]:checked')].map(cb => cb.value);
+  const levelChecks = [...document.querySelectorAll('input[name="bulk_level"]:checked')].map(cb => cb.value);
+  // "전체"가 체크되어 있으면 ['all']만 사용
+  const levels = levelChecks.includes('all') ? ['all'] : levelChecks.filter(v => v !== 'all');
+  return { categories, ageGroups, levels: levels.length > 0 ? levels : ['all'] };
+}
+
+function previewBulkEvents() {
+  const { categories, ageGroups, levels } = getBulkEventSelections();
+  if (categories.length === 0) { showToast('종목을 하나 이상 선택하세요.', 'warning'); return; }
+  if (ageGroups.length === 0) { showToast('연령대를 하나 이상 선택하세요.', 'warning'); return; }
+
+  const catLabels = { md: '남자복식', wd: '여자복식', xd: '혼합복식' };
+  const lvLabels = { all: '전체', s: 'S급', a: 'A급', b: 'B급', c: 'C급', d: 'D급', e: 'E급' };
+  const events = [];
+  for (const cat of categories) {
+    for (const age of ageGroups) {
+      for (const lv of levels) {
+        const ageLabel = age === 'open' ? '오픈' : age;
+        events.push({ name: `${catLabels[cat]} ${ageLabel} ${lvLabels[lv]}`, cat, age, lv });
+      }
+    }
+  }
+
+  const previewDiv = document.getElementById('bulk-event-preview');
+  const content = document.getElementById('bulk-event-preview-content');
+  previewDiv.classList.remove('hidden');
+  content.innerHTML = `
+    <p class="text-sm font-bold text-indigo-600 mb-2">총 ${events.length}개 종목 생성 예정</p>
+    <div class="max-h-40 overflow-y-auto space-y-1">
+      ${events.map((e, i) => `<div class="flex items-center gap-2 text-sm py-1 px-2 rounded ${i%2===0?'bg-white':''}">
+        <span class="text-gray-400 w-5">${i+1}</span>
+        <span class="badge ${e.cat==='md'?'bg-blue-100 text-blue-700':e.cat==='wd'?'bg-pink-100 text-pink-700':'bg-purple-100 text-purple-700'} text-xs">${catLabels[e.cat]}</span>
+        <span class="badge bg-amber-50 text-amber-700 text-xs">${e.age==='open'?'오픈':e.age}</span>
+        <span class="badge bg-green-50 text-green-700 text-xs">${lvLabels[e.lv]}</span>
+        <span class="font-medium">${e.name}</span>
+      </div>`).join('')}
+    </div>`;
+  showToast(`${events.length}개 종목 생성 예정`, 'info');
+}
+
+async function executeBulkEvents() {
+  const { categories, ageGroups, levels } = getBulkEventSelections();
+  if (categories.length === 0) { showToast('종목을 하나 이상 선택하세요.', 'warning'); return; }
+  if (ageGroups.length === 0) { showToast('연령대를 하나 이상 선택하세요.', 'warning'); return; }
+
+  const totalEvents = categories.length * ageGroups.length * levels.length;
+  const doAutoAssign = document.getElementById('bulk-auto-assign')?.checked;
+  const teamMode = document.getElementById('bulk-team-mode')?.value || 'club_priority';
+
+  if (!confirm(`${totalEvents}개 종목을 생성${doAutoAssign ? '하고 자동 팀 편성까지 진행' : ''}합니다.\n\n계속하시겠습니까?`)) return;
+
+  const tid = state.currentTournament.id;
+
+  try {
+    // Step 1: 종목 일괄 생성
+    const res = await api(`/tournaments/${tid}/events/bulk-create`, {
+      method: 'POST',
+      body: JSON.stringify({ categories, age_groups: ageGroups, level_groups: levels })
+    });
+    showToast(res.message, 'success');
+
+    // Step 2: 자동 팀 편성 (옵션 선택 시)
+    if (doAutoAssign && res.total_created > 0) {
+      showToast('자동 팀 편성 중...', 'info');
+      const assignRes = await api(`/tournaments/${tid}/events/auto-assign-all`, {
+        method: 'POST',
+        body: JSON.stringify({ team_mode: teamMode })
+      });
+      showToast(`팀 편성 완료! ${assignRes.total_teams}팀 생성`, 'success');
+    }
+
+    document.getElementById('bulk-event-modal')?.remove();
+    await loadEvents(tid);
+    render();
+  } catch(e) {}
 }
 
 // ==========================================
