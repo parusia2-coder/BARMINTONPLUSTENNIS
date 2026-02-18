@@ -1500,7 +1500,7 @@ function renderAll() {
   html += '</div>';
   
   // ============================
-  // ⑥ 결선 토너먼트 대진표 (빈 브래킷)
+  // ⑥ 결선 토너먼트 대진표
   // ============================
   html += '<div class="print-section visible ps-finals page-break">';
   html += '<div class="print-title">🥇 결선 토너먼트 대진표</div>';
@@ -1513,51 +1513,118 @@ function renderAll() {
     // 조 수 파악
     const groupNums = [...new Set(teams.map(t => t.group_num || 0))].filter(g => g > 0);
     if (groupNums.length === 0) return;
+    groupNums.sort((a,b) => a - b);
     
     // 각 조 상위 2팀 기준 결선 슬롯
     const slots = groupNums.length * 2;
     const rounds = Math.ceil(Math.log2(slots));
     const bracketSize = Math.pow(2, rounds);
     
-    html += '<div class="section-header">' + ev.name + ' 결선 (각 조 상위 2팀 → ' + bracketSize + '강)</div>';
-    
-    // 시드 배치 슬롯
-    html += '<table class="print-table" style="max-width:160mm">';
-    
-    // 1라운드
-    html += '<tr><th colspan="4" style="background:#2563eb">' + bracketSize + '강 (1라운드)</th><th colspan="3">' + (bracketSize/2) + '강 (2라운드)</th>';
-    if (rounds >= 3) html += '<th colspan="2">준결승</th>';
-    html += '<th>결승</th><th>우승</th></tr>';
-    
-    for (let i = 0; i < bracketSize / 2; i++) {
-      const seedA = i + 1;
-      const seedB = bracketSize - i;
-      html += '<tr>';
-      html += '<td style="width:5%;font-size:8pt;color:#999">' + seedA + '</td>';
-      html += '<td class="left write-cell" style="width:28%;min-width:30mm">____조 ____위</td>';
-      html += '<td style="width:5%">vs</td>';
-      html += '<td class="left write-cell" style="width:28%;min-width:30mm">____조 ____위</td>';
-      
-      if (i % 2 === 0) {
-        html += '<td class="write-cell" rowspan="2" style="width:22%"></td>';
-        html += '<td rowspan="2" style="width:3%">vs</td>';
-        html += '<td class="write-cell" rowspan="2" style="width:22%"></td>';
+    // 시드 배치: 1조1위 vs 2조2위, 2조1위 vs 1조2위 (같은 조 분리)
+    const seedSlots = [];
+    if (groupNums.length === 2) {
+      // 4강: 크로스 배치
+      seedSlots.push({ label: groupNums[0] + '조 1위', vs: groupNums[1] + '조 2위' });
+      seedSlots.push({ label: groupNums[1] + '조 1위', vs: groupNums[0] + '조 2위' });
+    } else {
+      // 일반: 순번 배치
+      for (let i = 0; i < bracketSize / 2; i++) {
+        const gA = groupNums[i % groupNums.length];
+        const gB = groupNums[(i + Math.floor(groupNums.length / 2)) % groupNums.length];
+        const rankA = i < groupNums.length ? 1 : 2;
+        const rankB = i < groupNums.length ? 2 : 1;
+        seedSlots.push({ label: gA + '조 ' + rankA + '위', vs: gB + '조 ' + rankB + '위' });
       }
-      
-      if (rounds >= 3 && i % 4 === 0) {
-        html += '<td class="write-cell" rowspan="4"></td>';
-        html += '<td class="write-cell" rowspan="4"></td>';
-      }
-      
-      if (i === 0) {
-        html += '<td class="write-cell" rowspan="' + (bracketSize/2) + '" style="background:#fffef0;font-weight:700;font-size:11pt;vertical-align:middle">🥇</td>';
-        html += '<td class="write-cell" rowspan="' + (bracketSize/2) + '" style="vertical-align:middle;font-size:14pt">🏆</td>';
-      }
-      
-      html += '</tr>';
     }
-    html += '</table>';
-    html += '<div style="font-size:8pt;color:#666;margin:1mm 0 4mm 0">※ 각 조 순위표에서 상위 2팀을 기입하세요. 같은 조 팀이 초반에 만나지 않도록 시드를 배치합니다.</div>';
+    
+    const roundNames = [];
+    if (bracketSize === 2) roundNames.push('결승');
+    else if (bracketSize === 4) roundNames.push('준결승 (4강)', '결승');
+    else if (bracketSize === 8) roundNames.push('8강 (1라운드)', '준결승 (4강)', '결승');
+    else if (bracketSize === 16) roundNames.push('16강', '8강', '준결승', '결승');
+    else roundNames.push(bracketSize + '강', (bracketSize/2) + '강', '준결승', '결승');
+    
+    html += '<div class="section-header">' + ev.name + ' 결선 (' + bracketSize + '강)</div>';
+    
+    // CSS 기반 토너먼트 브래킷
+    html += '<div style="overflow-x:auto; padding:3mm 0;">';
+    html += '<div style="display:flex; align-items:center; gap:0; min-width:' + (rounds * 160 + 120) + 'px;">';
+    
+    // 각 라운드별 슬롯 생성
+    let currentSlots = bracketSize;
+    
+    for (let r = 0; r < rounds; r++) {
+      const matchesInRound = currentSlots / 2;
+      const rName = roundNames[r] || ('R' + (r+1));
+      
+      html += '<div style="display:flex; flex-direction:column; gap:0;">';
+      // 라운드 헤더
+      html += '<div style="text-align:center; font-weight:700; font-size:9pt; color:#2563eb; padding:2mm 0; min-width:140px;">' + rName + '</div>';
+      
+      for (let m = 0; m < matchesInRound; m++) {
+        const gap = r === 0 ? '4mm' : (12 * Math.pow(2, r) - 8) + 'mm';
+        const marginTop = r === 0 ? '0' : (6 * (Math.pow(2, r) - 1)) + 'mm';
+        
+        if (m > 0 || r > 0) {
+          html += '<div style="height:' + (r === 0 ? '4mm' : marginTop) + '"></div>';
+        }
+        
+        html += '<div style="border:1.5px solid #1e3a5f; border-radius:3mm; overflow:hidden; min-width:140px; background:#fff;">';
+        
+        if (r === 0) {
+          // 1라운드: 시드 배치 표시
+          const seed = seedSlots[m] || { label: '___조 ___위', vs: '___조 ___위' };
+          html += '<div style="padding:2.5mm 3mm; font-size:9pt; font-weight:600; border-bottom:1px solid #e5e7eb; background:#f0f7ff; display:flex; align-items:center;">';
+          html += '<span style="color:#999; font-size:8pt; margin-right:2mm;">' + (m*2+1) + '</span>';
+          html += '<span>' + seed.label + '</span></div>';
+          html += '<div style="padding:2.5mm 3mm; font-size:9pt; font-weight:600; display:flex; align-items:center;">';
+          html += '<span style="color:#999; font-size:8pt; margin-right:2mm;">' + (m*2+2) + '</span>';
+          html += '<span>' + seed.vs + '</span></div>';
+        } else {
+          // 이후 라운드: 빈 기입란 (이전 라운드 승자)
+          html += '<div style="padding:2.5mm 3mm; font-size:9pt; border-bottom:1px solid #e5e7eb; min-height:9mm; background:#f0f7ff;">';
+          html += '<span style="color:#aaa; font-size:8pt;">← ' + (r === rounds-1 ? '' : '') + '승자</span></div>';
+          html += '<div style="padding:2.5mm 3mm; font-size:9pt; min-height:9mm;">';
+          html += '<span style="color:#aaa; font-size:8pt;">← 승자</span></div>';
+        }
+        
+        html += '</div>'; // match box end
+        
+        // 연결선 (마지막 라운드 제외)
+      }
+      
+      html += '</div>'; // round column end
+      
+      // 라운드 간 연결선 (화살표)
+      if (r < rounds - 1) {
+        html += '<div style="display:flex; flex-direction:column; justify-content:center; align-items:center; width:20px;">';
+        for (let m = 0; m < matchesInRound; m++) {
+          html += '<div style="color:#2563eb; font-size:16px;">→</div>';
+          if (m < matchesInRound - 1) html += '<div style="height:' + (r === 0 ? '20mm' : (20 * Math.pow(2, r)) + 'mm') + '"></div>';
+        }
+        html += '</div>';
+      }
+      
+      currentSlots = currentSlots / 2;
+    }
+    
+    // 우승 표시
+    html += '<div style="display:flex; flex-direction:column; justify-content:center; align-items:center; margin-left:8px;">';
+    html += '<div style="text-align:center; font-weight:700; font-size:9pt; color:#2563eb; padding:2mm 0;">우승</div>';
+    html += '<div style="border:2px solid #f59e0b; border-radius:3mm; padding:4mm 6mm; background:#fffef0; text-align:center;">';
+    html += '<div style="font-size:20pt; margin-bottom:2mm;">🏆</div>';
+    html += '<div style="min-width:35mm; min-height:8mm; border-bottom:1px dashed #999;"></div>';
+    html += '</div></div>';
+    
+    html += '</div></div>'; // flex + overflow end
+    
+    html += '<div style="font-size:8pt; color:#666; margin:2mm 0 5mm 0; line-height:1.5;">';
+    if (groupNums.length === 2) {
+      html += '※ 시드 배치: ' + groupNums[0] + '조 1위 vs ' + groupNums[1] + '조 2위, ' + groupNums[1] + '조 1위 vs ' + groupNums[0] + '조 2위 (같은 조 교차 배치)';
+    } else {
+      html += '※ 각 조 순위표에서 상위 2팀을 기입하세요. 같은 조 팀이 초반에 만나지 않도록 시드를 배치합니다.';
+    }
+    html += '</div>';
   });
   html += '</div>';
   
