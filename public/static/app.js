@@ -183,6 +183,14 @@ function renderHome() {
           <h3 class="text-white font-bold text-sm sm:text-base mb-1">코트 타임라인</h3>
           <p class="text-slate-400 text-xs leading-relaxed hidden sm:block">전체 경기 흐름<br>한눈에 보기</p>
         </a>
+        <!-- Print Center -->
+        <a href="/print" class="glass-card rounded-2xl p-5 sm:p-6 text-center cursor-pointer block fade-in-delay-4">
+          <div class="feature-icon bg-gradient-to-br from-amber-400 to-amber-600 mx-auto shadow-lg shadow-amber-500/20">
+            <i class="fas fa-print text-white"></i>
+          </div>
+          <h3 class="text-white font-bold text-sm sm:text-base mb-1">인쇄 센터</h3>
+          <p class="text-slate-400 text-xs leading-relaxed hidden sm:block">수기 운영 대비<br>인쇄물 출력</p>
+        </a>
       </div>
     </div>
     <!-- Wave Divider -->
@@ -334,6 +342,7 @@ function renderTournament() {
         <button onclick="loadDashboard(${t.id});navigate('dashboard')" class="px-4 py-2 bg-orange-50 text-orange-700 rounded-lg text-sm hover:bg-orange-100 transition"><i class="fas fa-chart-bar mr-1"></i>통계</button>
         <button onclick="navigate('mypage')" class="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm hover:bg-indigo-100 transition"><i class="fas fa-user mr-1"></i>내 경기</button>
         <button onclick="loadStandingsAndNavigate(${t.id})" class="px-4 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm hover:bg-purple-100 transition"><i class="fas fa-medal mr-1"></i>결과</button>
+        <button onclick="window.open('/print?tid='+state.currentTournament.id,'_blank')" class="px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm hover:bg-amber-100 transition"><i class="fas fa-print mr-1"></i>인쇄</button>
         ${isAdmin ? `<button onclick="deleteTournament(${t.id})" class="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm hover:bg-red-100 transition" title="대회 삭제"><i class="fas fa-trash-alt mr-1"></i>대회 삭제</button>` : ''}
       </div>
     </div>
