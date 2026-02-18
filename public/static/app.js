@@ -2091,83 +2091,135 @@ function renderDashboard() {
   const ms = d.match_stats || {};
   const ps = d.participant_stats || {};
   const progress = d.progress || 0;
+  const formatMap = { kdk: 'KDK', league: '풀리그', tournament: '토너먼트' };
 
   return `${renderNav()}${renderOffline()}
-  <div class="max-w-6xl mx-auto px-4 py-6 fade-in">
-    <div class="flex items-center justify-between mb-6">
-      <div class="flex items-center gap-3">
-        <button onclick="navigate('tournament')" class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200"><i class="fas fa-arrow-left text-gray-600"></i></button>
-        <div><h1 class="text-2xl font-bold text-gray-900"><i class="fas fa-chart-bar mr-2 text-blue-500"></i>${t?.name || ''} - 통계</h1></div>
-      </div>
-      <button onclick="loadDashboard(${t?.id})" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"><i class="fas fa-sync-alt mr-1"></i>새로고침</button>
-    </div>
 
-    <!-- 전체 진행률 -->
-    <div class="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-lg font-bold text-gray-800"><i class="fas fa-tasks mr-2 text-emerald-500"></i>대회 진행률</h3>
-        <span class="text-3xl font-extrabold ${progress >= 100 ? 'text-green-600' : progress >= 50 ? 'text-blue-600' : 'text-yellow-600'}">${progress}%</span>
+  <!-- Hero Banner (대회 상세와 동일 구조) -->
+  <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-gray-900 relative overflow-hidden">
+    <div class="absolute inset-0 opacity-10">
+      <div class="absolute top-10 right-20 w-32 h-32 rounded-full bg-orange-400 blur-3xl"></div>
+      <div class="absolute bottom-10 left-10 w-40 h-40 rounded-full bg-blue-400 blur-3xl"></div>
+    </div>
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 relative z-10">
+      <!-- Top Bar -->
+      <div class="flex items-center justify-between mb-5">
+        <button onclick="navigate('tournament')" class="flex items-center gap-2 text-white/60 hover:text-white transition text-sm group">
+          <i class="fas fa-arrow-left group-hover:-translate-x-0.5 transition-transform"></i>대회로 돌아가기
+        </button>
+        <button onclick="loadDashboard(${t?.id})" class="px-3 py-1.5 bg-white/10 text-white/70 rounded-lg text-xs hover:bg-white/20 transition backdrop-blur"><i class="fas fa-sync-alt mr-1.5"></i>새로고침</button>
       </div>
-      <div class="w-full bg-gray-200 rounded-full h-4 mb-3">
-        <div class="h-4 rounded-full transition-all duration-500 ${progress >= 100 ? 'bg-green-500' : progress >= 50 ? 'bg-blue-500' : 'bg-yellow-500'}" style="width:${progress}%"></div>
+      <!-- Title -->
+      <div class="flex items-center gap-4 mb-6">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shadow-xl shadow-orange-500/20 flex-shrink-0">
+          <i class="fas fa-chart-bar text-xl text-white"></i>
+        </div>
+        <div class="min-w-0">
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight truncate">${t?.name || '통계'}</h1>
+          <div class="flex items-center gap-2 mt-1 flex-wrap">
+            <span class="text-white/50 text-sm">통계 대시보드</span>
+            ${t?.format ? `<span class="text-white/30">·</span><span class="text-white/50 text-sm">${formatMap[t.format] || t.format}</span>` : ''}
+            ${t?.courts ? `<span class="text-white/30">·</span><span class="text-white/50 text-sm">${t.courts}코트</span>` : ''}
+          </div>
+        </div>
       </div>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div class="bg-gray-50 rounded-xl p-4 text-center">
-          <div class="text-2xl font-extrabold text-gray-900">${ms.total || 0}</div>
-          <div class="text-xs text-gray-500 mt-1">전체 경기</div>
+      <!-- Stats Cards (대회 상세와 동일한 4대 카드) -->
+      <div class="grid grid-cols-4 gap-3 sm:gap-4 mb-4">
+        <div class="bg-white/[0.07] backdrop-blur-sm rounded-xl p-3 sm:p-4 text-center border border-white/10">
+          <div class="text-2xl sm:text-3xl font-extrabold text-white">${ps.total || 0}</div>
+          <div class="text-[11px] sm:text-xs text-white/50 mt-0.5"><i class="fas fa-users mr-1"></i>참가자</div>
         </div>
-        <div class="bg-green-50 rounded-xl p-4 text-center">
-          <div class="text-2xl font-extrabold text-green-600">${ms.playing || 0}</div>
-          <div class="text-xs text-gray-500 mt-1"><span class="w-2 h-2 inline-block rounded-full bg-green-500 pulse-live mr-1"></span>진행중</div>
+        <div class="bg-white/[0.07] backdrop-blur-sm rounded-xl p-3 sm:p-4 text-center border border-white/10">
+          <div class="text-2xl sm:text-3xl font-extrabold text-white">${(d.event_stats || []).length}</div>
+          <div class="text-[11px] sm:text-xs text-white/50 mt-0.5"><i class="fas fa-layer-group mr-1"></i>종목</div>
         </div>
-        <div class="bg-yellow-50 rounded-xl p-4 text-center">
-          <div class="text-2xl font-extrabold text-yellow-600">${ms.pending || 0}</div>
-          <div class="text-xs text-gray-500 mt-1">대기중</div>
+        <div class="bg-white/[0.07] backdrop-blur-sm rounded-xl p-3 sm:p-4 text-center border border-white/10">
+          <div class="text-2xl sm:text-3xl font-extrabold text-white">${ms.total || 0}</div>
+          <div class="text-[11px] sm:text-xs text-white/50 mt-0.5">${(ms.playing||0) > 0 ? `<span class="w-1.5 h-1.5 inline-block rounded-full bg-green-400 pulse-live mr-0.5"></span>${ms.playing}진행중 ` : ''}<i class="fas fa-gamepad mr-0.5"></i>경기</div>
         </div>
-        <div class="bg-blue-50 rounded-xl p-4 text-center">
-          <div class="text-2xl font-extrabold text-blue-600">${ms.completed || 0}</div>
-          <div class="text-xs text-gray-500 mt-1">완료</div>
+        <div class="bg-white/[0.07] backdrop-blur-sm rounded-xl p-3 sm:p-4 text-center border border-white/10">
+          <div class="text-2xl sm:text-3xl font-extrabold ${progress >= 100 ? 'text-emerald-400' : progress >= 50 ? 'text-blue-400' : 'text-white'}">${progress}<span class="text-lg">%</span></div>
+          <div class="text-[11px] sm:text-xs text-white/50 mt-0.5"><i class="fas fa-chart-pie mr-1"></i>진행률</div>
+          ${(ms.total||0) > 0 ? `<div class="mt-1.5 w-full bg-white/10 rounded-full h-1"><div class="h-1 rounded-full transition-all ${progress >= 100 ? 'bg-emerald-400' : progress >= 50 ? 'bg-blue-400' : 'bg-yellow-400'}" style="width:${progress}%"></div></div>` : ''}
+        </div>
+      </div>
+      <!-- 경기 상세 현황 바 -->
+      <div class="bg-white/[0.07] backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-white/60 text-sm font-medium"><i class="fas fa-tasks mr-1.5"></i>경기 진행 현황</span>
+          <span class="text-2xl font-extrabold ${progress >= 100 ? 'text-emerald-400' : progress >= 50 ? 'text-blue-400' : 'text-yellow-400'}">${ms.completed||0}<span class="text-sm text-white/40">/${ms.total||0}</span></span>
+        </div>
+        <div class="w-full bg-white/10 rounded-full h-2.5 mb-3">
+          <div class="h-2.5 rounded-full transition-all duration-500 ${progress >= 100 ? 'bg-emerald-400' : progress >= 50 ? 'bg-blue-400' : 'bg-yellow-400'}" style="width:${progress}%"></div>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div class="flex items-center gap-2 justify-center">
+            <span class="w-2 h-2 rounded-full bg-green-400 pulse-live"></span>
+            <span class="text-white/60 text-xs">진행중</span>
+            <span class="text-green-400 font-extrabold text-lg">${ms.playing || 0}</span>
+          </div>
+          <div class="flex items-center gap-2 justify-center">
+            <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+            <span class="text-white/60 text-xs">대기중</span>
+            <span class="text-yellow-400 font-extrabold text-lg">${ms.pending || 0}</span>
+          </div>
+          <div class="flex items-center gap-2 justify-center">
+            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+            <span class="text-white/60 text-xs">완료</span>
+            <span class="text-blue-400 font-extrabold text-lg">${ms.completed || 0}</span>
+          </div>
         </div>
       </div>
     </div>
+    <!-- Wave Divider -->
+    <svg class="w-full h-6 sm:h-8" viewBox="0 0 1440 30" fill="none" preserveAspectRatio="none">
+      <path d="M0,0 C360,30 1080,30 1440,0 L1440,30 L0,30 Z" fill="#f8fafc"/>
+    </svg>
+  </div>
 
-    <!-- 참가자 통계 -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-      <div class="bg-white rounded-2xl border border-gray-200 p-6">
-        <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-users mr-2 text-indigo-500"></i>참가자 현황</h3>
+  <div class="bg-slate-50 min-h-screen">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 -mt-1 pb-10 fade-in">
+
+    <!-- 참가자 통계 + 급수 분포 (2열 그리드) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+      <!-- 참가자 현황 카드 -->
+      <div class="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+        <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center mr-2.5 shadow-md shadow-indigo-500/20"><i class="fas fa-users text-white text-xs"></i></div>참가자 현황</h3>
         <div class="grid grid-cols-3 gap-3 mb-4">
-          <div class="text-center bg-gray-50 rounded-xl p-3"><div class="text-xl font-bold">${ps.total || 0}</div><div class="text-xs text-gray-500">총 참가자</div></div>
-          <div class="text-center bg-blue-50 rounded-xl p-3"><div class="text-xl font-bold text-blue-600">${ps.male || 0}</div><div class="text-xs text-gray-500">남자</div></div>
-          <div class="text-center bg-pink-50 rounded-xl p-3"><div class="text-xl font-bold text-pink-600">${ps.female || 0}</div><div class="text-xs text-gray-500">여자</div></div>
+          <div class="text-center bg-gray-50 rounded-xl p-3 border border-gray-100 hover:border-gray-300 transition"><div class="text-xl font-extrabold">${ps.total || 0}</div><div class="text-xs text-gray-500">총 참가자</div></div>
+          <div class="text-center bg-blue-50 rounded-xl p-3 border border-blue-100 hover:border-blue-300 transition"><div class="text-xl font-extrabold text-blue-600">${ps.male || 0}</div><div class="text-xs text-gray-500">남자</div></div>
+          <div class="text-center bg-pink-50 rounded-xl p-3 border border-pink-100 hover:border-pink-300 transition"><div class="text-xl font-extrabold text-pink-600">${ps.female || 0}</div><div class="text-xs text-gray-500">여자</div></div>
         </div>
-        <div class="space-y-2">
+        <div class="space-y-3">
           <div class="flex items-center justify-between text-sm">
-            <span class="text-gray-600"><i class="fas fa-won-sign mr-1 text-green-500"></i>참가비 완납</span>
-            <div class="flex items-center gap-2"><div class="w-32 bg-gray-200 rounded-full h-2"><div class="bg-green-500 h-2 rounded-full" style="width:${ps.total ? Math.round((ps.paid||0)/ps.total*100) : 0}%"></div></div><span class="font-bold">${ps.paid||0}/${ps.total||0}</span></div>
+            <span class="text-gray-600"><i class="fas fa-won-sign mr-1.5 text-green-500"></i>참가비 완납</span>
+            <div class="flex items-center gap-2"><div class="w-28 bg-gray-200 rounded-full h-2"><div class="bg-green-500 h-2 rounded-full transition-all" style="width:${ps.total ? Math.round((ps.paid||0)/ps.total*100) : 0}%"></div></div><span class="font-bold text-sm">${ps.paid||0}<span class="text-gray-400 font-normal">/${ps.total||0}</span></span></div>
           </div>
           <div class="flex items-center justify-between text-sm">
-            <span class="text-gray-600"><i class="fas fa-check-circle mr-1 text-blue-500"></i>체크인</span>
-            <div class="flex items-center gap-2"><div class="w-32 bg-gray-200 rounded-full h-2"><div class="bg-blue-500 h-2 rounded-full" style="width:${ps.total ? Math.round((ps.checked_in||0)/ps.total*100) : 0}%"></div></div><span class="font-bold">${ps.checked_in||0}/${ps.total||0}</span></div>
+            <span class="text-gray-600"><i class="fas fa-check-circle mr-1.5 text-blue-500"></i>체크인</span>
+            <div class="flex items-center gap-2"><div class="w-28 bg-gray-200 rounded-full h-2"><div class="bg-blue-500 h-2 rounded-full transition-all" style="width:${ps.total ? Math.round((ps.checked_in||0)/ps.total*100) : 0}%"></div></div><span class="font-bold text-sm">${ps.checked_in||0}<span class="text-gray-400 font-normal">/${ps.total||0}</span></span></div>
           </div>
           <div class="flex items-center justify-between text-sm">
-            <span class="text-gray-600"><i class="fas fa-venus-mars mr-1 text-purple-500"></i>혼합복식</span>
-            <span class="font-bold">${ps.mixed_doubles||0}명</span>
+            <span class="text-gray-600"><i class="fas fa-venus-mars mr-1.5 text-purple-500"></i>혼합복식 참가</span>
+            <span class="font-bold text-purple-600">${ps.mixed_doubles||0}<span class="text-gray-400 font-normal text-xs ml-0.5">명</span></span>
           </div>
         </div>
       </div>
 
-      <!-- 급수 분포 -->
-      <div class="bg-white rounded-2xl border border-gray-200 p-6">
-        <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-signal mr-2 text-orange-500"></i>급수 분포</h3>
-        <div class="space-y-2">
+      <!-- 급수 분포 카드 -->
+      <div class="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+        <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center mr-2.5 shadow-md shadow-orange-500/20"><i class="fas fa-signal text-white text-xs"></i></div>급수 분포</h3>
+        <div class="space-y-2.5">
           ${(d.level_distribution || []).map(l => {
             const pct = ps.total ? Math.round((l.count / ps.total) * 100) : 0;
             const colors = { s: 'bg-red-500', a: 'bg-orange-500', b: 'bg-yellow-500', c: 'bg-green-500', d: 'bg-blue-500', e: 'bg-gray-400' };
+            const bgColors = { s: 'bg-red-50', a: 'bg-orange-50', b: 'bg-yellow-50', c: 'bg-green-50', d: 'bg-blue-50', e: 'bg-gray-50' };
+            const textColors = { s: 'text-red-700', a: 'text-orange-700', b: 'text-yellow-700', c: 'text-green-700', d: 'text-blue-700', e: 'text-gray-600' };
             const labels = { s: 'S급', a: 'A급', b: 'B급', c: 'C급', d: 'D급', e: 'E급' };
             return `<div class="flex items-center gap-3">
-              <span class="w-8 text-sm font-bold text-gray-700">${labels[l.level] || l.level}</span>
-              <div class="flex-1 bg-gray-100 rounded-full h-5"><div class="${colors[l.level] || 'bg-gray-400'} h-5 rounded-full flex items-center justify-end pr-2" style="width:${Math.max(pct, 8)}%"><span class="text-white text-xs font-bold">${l.count}</span></div></div>
-              <span class="text-xs text-gray-500 w-10 text-right">${pct}%</span>
+              <span class="w-10 text-xs font-bold ${textColors[l.level] || 'text-gray-700'} ${bgColors[l.level] || 'bg-gray-50'} rounded-md px-1.5 py-0.5 text-center border">${labels[l.level] || l.level}</span>
+              <div class="flex-1 bg-gray-100 rounded-full h-5"><div class="${colors[l.level] || 'bg-gray-400'} h-5 rounded-full flex items-center justify-end pr-2 transition-all" style="width:${Math.max(pct, 8)}%"><span class="text-white text-xs font-bold">${l.count}</span></div></div>
+              <span class="text-xs text-gray-500 w-10 text-right font-medium">${pct}%</span>
             </div>`;
           }).join('')}
         </div>
@@ -2175,80 +2227,90 @@ function renderDashboard() {
     </div>
 
     <!-- 종목별 경기 현황 -->
-    <div class="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-      <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-layer-group mr-2 text-emerald-500"></i>종목별 현황</h3>
-      <div class="overflow-x-auto">
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 mb-4 sm:mb-6 shadow-sm hover:shadow-md transition-shadow">
+      <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center mr-2.5 shadow-md shadow-emerald-500/20"><i class="fas fa-layer-group text-white text-xs"></i></div>종목별 현황</h3>
+      ${(d.event_stats || []).length > 0 ? `<div class="overflow-x-auto rounded-xl border border-gray-100">
         <table class="w-full">
-          <thead class="bg-gray-50"><tr>
-            <th class="px-3 py-2 text-left text-sm font-semibold text-gray-600">종목</th>
-            <th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">팀 수</th>
-            <th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">전체</th>
-            <th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">진행중</th>
-            <th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">완료</th>
-            <th class="px-3 py-2 text-left text-sm font-semibold text-gray-600">진행률</th>
+          <thead class="bg-gray-50 border-b border-gray-200"><tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">종목</th>
+            <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">팀</th>
+            <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">전체</th>
+            <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">진행</th>
+            <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">완료</th>
+            <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 w-36">진행률</th>
           </tr></thead>
           <tbody class="divide-y divide-gray-100">
             ${(d.event_stats || []).map(ev => {
               const evPct = ev.total_matches > 0 ? Math.round(ev.completed_matches / ev.total_matches * 100) : 0;
-              const catColors = { md: 'text-blue-600', wd: 'text-pink-600', xd: 'text-purple-600' };
-              return `<tr class="hover:bg-gray-50">
-                <td class="px-3 py-2 font-medium ${catColors[ev.category] || ''}">${ev.name}</td>
-                <td class="px-3 py-2 text-center font-bold">${ev.team_count}</td>
-                <td class="px-3 py-2 text-center">${ev.total_matches}</td>
-                <td class="px-3 py-2 text-center text-green-600 font-bold">${ev.playing_matches}</td>
-                <td class="px-3 py-2 text-center text-blue-600">${ev.completed_matches}</td>
-                <td class="px-3 py-2"><div class="flex items-center gap-2"><div class="flex-1 bg-gray-200 rounded-full h-2"><div class="${evPct >= 100 ? 'bg-green-500' : 'bg-blue-500'} h-2 rounded-full" style="width:${evPct}%"></div></div><span class="text-xs font-bold ${evPct >= 100 ? 'text-green-600' : ''}">${evPct}%</span></div></td>
+              const catIcons = { md: 'fa-mars text-blue-500', wd: 'fa-venus text-pink-500', xd: 'fa-venus-mars text-purple-500' };
+              const catBg = { md: 'bg-blue-50 border-blue-200', wd: 'bg-pink-50 border-pink-200', xd: 'bg-purple-50 border-purple-200' };
+              const catText = { md: 'text-blue-700', wd: 'text-pink-700', xd: 'text-purple-700' };
+              return `<tr class="hover:bg-gray-50 transition-colors">
+                <td class="px-4 py-3"><div class="flex items-center gap-2"><span class="w-6 h-6 rounded-md ${catBg[ev.category] || 'bg-gray-50 border-gray-200'} border flex items-center justify-center flex-shrink-0"><i class="fas ${catIcons[ev.category] || 'fa-trophy text-gray-500'} text-xs"></i></span><span class="font-semibold ${catText[ev.category] || 'text-gray-700'} text-sm">${ev.name}</span></div></td>
+                <td class="px-3 py-3 text-center font-bold text-sm">${ev.team_count}</td>
+                <td class="px-3 py-3 text-center text-sm text-gray-600">${ev.total_matches}</td>
+                <td class="px-3 py-3 text-center text-sm"><span class="${ev.playing_matches > 0 ? 'text-green-600 font-bold' : 'text-gray-400'}">${ev.playing_matches}</span></td>
+                <td class="px-3 py-3 text-center text-sm text-blue-600 font-medium">${ev.completed_matches}</td>
+                <td class="px-3 py-3"><div class="flex items-center gap-2"><div class="flex-1 bg-gray-200 rounded-full h-2"><div class="${evPct >= 100 ? 'bg-emerald-500' : 'bg-blue-500'} h-2 rounded-full transition-all" style="width:${evPct}%"></div></div><span class="text-xs font-bold w-9 text-right ${evPct >= 100 ? 'text-emerald-600' : 'text-gray-600'}">${evPct}%</span></div></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>` : '<div class="text-center py-8 text-gray-400"><i class="fas fa-inbox text-3xl mb-2"></i><p class="text-sm">등록된 종목이 없습니다</p></div>'}
+    </div>
+
+    <!-- 코트별 현황 -->
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 mb-4 sm:mb-6 shadow-sm hover:shadow-md transition-shadow">
+      <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center mr-2.5 shadow-md shadow-green-500/20"><i class="fas fa-th-large text-white text-xs"></i></div>코트별 현황</h3>
+      ${(d.court_stats || []).length > 0 ? `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+        ${(d.court_stats || []).map(ct => `
+          <div class="rounded-xl border-2 ${ct.playing > 0 ? 'border-green-300 bg-gradient-to-b from-green-50 to-white' : 'border-gray-200 bg-gradient-to-b from-gray-50 to-white'} p-4 text-center hover:shadow-md transition-all cursor-default">
+            <div class="w-10 h-10 rounded-xl ${ct.playing > 0 ? 'bg-gradient-to-br from-green-400 to-green-600' : 'bg-gradient-to-br from-gray-300 to-gray-400'} mx-auto mb-2 flex items-center justify-center shadow-md">
+              <span class="text-white font-extrabold text-sm">${ct.court_number}</span>
+            </div>
+            <div class="text-xs font-medium text-gray-500 mb-2">${ct.court_number}번 코트</div>
+            ${ct.playing > 0 ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-bold border border-green-200"><span class="w-1.5 h-1.5 rounded-full bg-green-500 pulse-live"></span>경기중</span>' : '<span class="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs font-medium border border-gray-200">대기</span>'}
+            <div class="flex items-center justify-center gap-3 text-xs text-gray-500 mt-2">
+              <span><i class="fas fa-clock mr-0.5 text-yellow-500"></i>${ct.pending}</span>
+              <span><i class="fas fa-check mr-0.5 text-blue-500"></i>${ct.completed}</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>` : '<div class="text-center py-8 text-gray-400"><i class="fas fa-th-large text-3xl mb-2"></i><p class="text-sm">코트 정보가 없습니다</p></div>'}
+    </div>
+
+    <!-- 클럽별 성적 -->
+    ${(d.club_stats || []).length > 0 ? `
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 mb-4 sm:mb-6 shadow-sm hover:shadow-md transition-shadow">
+      <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center mr-2.5 shadow-md shadow-teal-500/20"><i class="fas fa-building text-white text-xs"></i></div>클럽별 성적</h3>
+      <div class="overflow-x-auto rounded-xl border border-gray-100">
+        <table class="w-full">
+          <thead class="bg-gray-50 border-b border-gray-200"><tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">클럽</th>
+            <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">선수</th>
+            <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">팀</th>
+            <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">승</th>
+            <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">패</th>
+            <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500">승률</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+            ${(d.club_stats || []).sort((a,b) => b.win_rate - a.win_rate).map((cl, i) => {
+              const medalBg = i === 0 ? 'bg-yellow-50' : i === 1 ? 'bg-gray-50' : i === 2 ? 'bg-orange-50' : '';
+              return `<tr class="hover:bg-gray-50 transition-colors ${medalBg}">
+                <td class="px-4 py-3"><div class="flex items-center gap-2">${i < 3 ? `<span class="text-lg">${['&#129351;','&#129352;','&#129353;'][i]}</span>` : `<span class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">${i+1}</span>`}<span class="font-semibold text-teal-700">${cl.club}</span></div></td>
+                <td class="px-3 py-3 text-center text-sm">${cl.player_count}</td>
+                <td class="px-3 py-3 text-center text-sm">${cl.team_count}</td>
+                <td class="px-3 py-3 text-center text-sm text-green-600 font-bold">${cl.wins}</td>
+                <td class="px-3 py-3 text-center text-sm text-red-500 font-medium">${cl.losses}</td>
+                <td class="px-3 py-3 text-center"><div class="inline-flex items-center gap-1.5"><div class="w-12 bg-gray-200 rounded-full h-1.5"><div class="${cl.win_rate >= 60 ? 'bg-green-500' : cl.win_rate >= 40 ? 'bg-blue-500' : 'bg-gray-400'} h-1.5 rounded-full" style="width:${cl.win_rate}%"></div></div><span class="font-bold text-sm ${cl.win_rate >= 60 ? 'text-green-600' : cl.win_rate >= 40 ? 'text-blue-600' : 'text-gray-600'}">${cl.win_rate}%</span></div></td>
               </tr>`;
             }).join('')}
           </tbody>
         </table>
       </div>
-    </div>
-
-    <!-- 코트별 현황 -->
-    <div class="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-      <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-th-large mr-2 text-green-500"></i>코트별 현황</h3>
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-        ${(d.court_stats || []).map(ct => `
-          <div class="rounded-xl border ${ct.playing > 0 ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-gray-50'} p-4 text-center">
-            <div class="text-2xl font-extrabold ${ct.playing > 0 ? 'text-green-600' : 'text-gray-400'} mb-1">${ct.court_number}</div>
-            <div class="text-xs text-gray-500 mb-2">${ct.court_number}코트</div>
-            ${ct.playing > 0 ? '<span class="badge bg-green-100 text-green-700 text-xs"><span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block mr-1 pulse-live"></span>진행중</span>' : ''}
-            <div class="text-xs text-gray-500 mt-1">대기 ${ct.pending} · 완료 ${ct.completed}</div>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-
-    <!-- 클럽별 성적 -->
-    ${(d.club_stats || []).length > 0 ? `
-    <div class="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-      <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-building mr-2 text-teal-500"></i>클럽별 성적</h3>
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="bg-gray-50"><tr>
-            <th class="px-3 py-2 text-left text-sm font-semibold text-gray-600">클럽</th>
-            <th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">선수</th>
-            <th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">팀</th>
-            <th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">승</th>
-            <th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">패</th>
-            <th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">승률</th>
-          </tr></thead>
-          <tbody class="divide-y divide-gray-100">
-            ${(d.club_stats || []).sort((a,b) => b.win_rate - a.win_rate).map((cl, i) => `
-              <tr class="hover:bg-gray-50">
-                <td class="px-3 py-2 font-medium text-teal-700">${i < 3 ? ['🥇','🥈','🥉'][i] + ' ' : ''}${cl.club}</td>
-                <td class="px-3 py-2 text-center">${cl.player_count}</td>
-                <td class="px-3 py-2 text-center">${cl.team_count}</td>
-                <td class="px-3 py-2 text-center text-green-600 font-bold">${cl.wins}</td>
-                <td class="px-3 py-2 text-center text-red-500">${cl.losses}</td>
-                <td class="px-3 py-2 text-center"><span class="font-bold ${cl.win_rate >= 60 ? 'text-green-600' : cl.win_rate >= 40 ? 'text-blue-600' : 'text-gray-600'}">${cl.win_rate}%</span></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
     </div>` : ''}
+
+  </div>
   </div>`;
 }
 
