@@ -478,6 +478,8 @@ function renderEventsTab(isAdmin) {
       <button onclick="showTeamAssignModal()" class="px-4 py-2.5 bg-teal-500 text-white rounded-lg text-sm font-semibold hover:bg-teal-600 shadow-sm"><i class="fas fa-users-cog mr-1"></i>조편성 옵션</button>
       <button onclick="showBracketOptionsModal()" class="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-lg text-sm font-semibold shadow-md hover:shadow-lg"><i class="fas fa-magic mr-1"></i>대진표 옵션</button>
       <button onclick="checkMerge()" class="px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-100"><i class="fas fa-compress-arrows-alt mr-1"></i>급수합병 체크</button>
+      <button onclick="bulkDeleteAssignments()" class="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 border border-red-200"><i class="fas fa-eraser mr-1"></i>조편성 일괄삭제</button>
+      <button onclick="bulkDeleteEverything()" class="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600"><i class="fas fa-trash-alt mr-1"></i>종목 전체삭제</button>
     </div>` : ''}
     <div id="merge-result"></div>
     ${state.events.length === 0 ? '<div class="text-center py-12 text-gray-400"><i class="fas fa-layer-group text-4xl mb-3"></i><p>등록된 종목이 없습니다.</p></div>' : ''}
@@ -501,6 +503,36 @@ function renderEventsTab(isAdmin) {
       </div>
     `).join('')}
   </div>`;
+}
+
+// ==========================================
+// ★ 조편성 일괄 삭제 / 종목 전체 삭제 ★
+// ==========================================
+async function bulkDeleteAssignments() {
+  const tid = state.currentTournament;
+  if (!tid) return;
+  const teamTotal = state.events.reduce((s, e) => s + (e.team_count || 0), 0);
+  if (teamTotal === 0) return toast('삭제할 조편성 데이터가 없습니다.', 'warning');
+  if (!confirm(`모든 종목의 팀/경기/순위를 일괄 삭제합니다.\n(종목 ${state.events.length}개의 팀 ${teamTotal}개가 삭제됩니다)\n\n종목 자체는 유지됩니다. 계속하시겠습니까?`)) return;
+  if (!confirm('정말로 모든 조편성을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+  try {
+    const res = await api('DELETE', `/tournaments/${tid}/events/all/assignments`);
+    toast(`조편성 일괄 삭제 완료! (팀 ${res.deleted.teams}개, 경기 ${res.deleted.matches}개, 순위 ${res.deleted.standings}개 삭제)`, 'success');
+    await loadTournamentDetail(tid);
+  } catch (e) { toast('조편성 삭제 실패: ' + e.message, 'error'); }
+}
+
+async function bulkDeleteEverything() {
+  const tid = state.currentTournament;
+  if (!tid) return;
+  if (state.events.length === 0) return toast('삭제할 종목이 없습니다.', 'warning');
+  if (!confirm(`모든 종목과 팀/경기/순위를 완전히 삭제합니다.\n(종목 ${state.events.length}개가 모두 삭제됩니다)\n\n계속하시겠습니까?`)) return;
+  if (!confirm('⚠️ 정말로 모든 종목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다!')) return;
+  try {
+    const res = await api('DELETE', `/tournaments/${tid}/events/all/everything`);
+    toast(`전체 삭제 완료! (종목 ${res.deleted.events}개, 팀 ${res.deleted.teams}개, 경기 ${res.deleted.matches}개 삭제)`, 'success');
+    await loadTournamentDetail(tid);
+  } catch (e) { toast('전체 삭제 실패: ' + e.message, 'error'); }
 }
 
 // ==========================================

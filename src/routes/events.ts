@@ -104,6 +104,75 @@ eventRoutes.post('/:tid/events/bulk-create', async (c) => {
   }, 201)
 })
 
+// 조편성 일괄 삭제 (모든 종목의 팀/경기/순위 삭제, 종목은 유지)
+eventRoutes.delete('/:tid/events/all/assignments', async (c) => {
+  const tid = c.req.param('tid')
+  const db = c.env.DB
+
+  const { results: events } = await db.prepare(
+    `SELECT id FROM events WHERE tournament_id=?`
+  ).bind(tid).all()
+
+  let deletedTeams = 0
+  let deletedMatches = 0
+  let deletedStandings = 0
+
+  for (const ev of (events || [])) {
+    const teamCount = await db.prepare(`SELECT COUNT(*) as c FROM teams WHERE event_id=?`).bind(ev.id).first() as any
+    const matchCount = await db.prepare(`SELECT COUNT(*) as c FROM matches WHERE event_id=?`).bind(ev.id).first() as any
+    const standingCount = await db.prepare(`SELECT COUNT(*) as c FROM standings WHERE event_id=?`).bind(ev.id).first() as any
+
+    deletedTeams += teamCount?.c || 0
+    deletedMatches += matchCount?.c || 0
+    deletedStandings += standingCount?.c || 0
+
+    await db.prepare(`DELETE FROM standings WHERE event_id=?`).bind(ev.id).run()
+    await db.prepare(`DELETE FROM matches WHERE event_id=?`).bind(ev.id).run()
+    await db.prepare(`DELETE FROM teams WHERE event_id=?`).bind(ev.id).run()
+  }
+
+  return c.json({
+    message: '모든 조편성이 삭제되었습니다.',
+    deleted: { teams: deletedTeams, matches: deletedMatches, standings: deletedStandings },
+    events_count: events?.length || 0
+  })
+})
+
+// 종목 일괄 삭제 (모든 종목 + 팀/경기/순위 전부 삭제)
+eventRoutes.delete('/:tid/events/all/everything', async (c) => {
+  const tid = c.req.param('tid')
+  const db = c.env.DB
+
+  const { results: events } = await db.prepare(
+    `SELECT id FROM events WHERE tournament_id=?`
+  ).bind(tid).all()
+
+  let deletedTeams = 0
+  let deletedMatches = 0
+  let deletedStandings = 0
+
+  for (const ev of (events || [])) {
+    const teamCount = await db.prepare(`SELECT COUNT(*) as c FROM teams WHERE event_id=?`).bind(ev.id).first() as any
+    const matchCount = await db.prepare(`SELECT COUNT(*) as c FROM matches WHERE event_id=?`).bind(ev.id).first() as any
+    const standingCount = await db.prepare(`SELECT COUNT(*) as c FROM standings WHERE event_id=?`).bind(ev.id).first() as any
+
+    deletedTeams += teamCount?.c || 0
+    deletedMatches += matchCount?.c || 0
+    deletedStandings += standingCount?.c || 0
+
+    await db.prepare(`DELETE FROM standings WHERE event_id=?`).bind(ev.id).run()
+    await db.prepare(`DELETE FROM matches WHERE event_id=?`).bind(ev.id).run()
+    await db.prepare(`DELETE FROM teams WHERE event_id=?`).bind(ev.id).run()
+  }
+
+  await db.prepare(`DELETE FROM events WHERE tournament_id=?`).bind(tid).run()
+
+  return c.json({
+    message: '모든 종목과 조편성이 삭제되었습니다.',
+    deleted: { events: events?.length || 0, teams: deletedTeams, matches: deletedMatches, standings: deletedStandings }
+  })
+})
+
 // 종목 삭제
 eventRoutes.delete('/:tid/events/:eid', async (c) => {
   const tid = c.req.param('tid')
