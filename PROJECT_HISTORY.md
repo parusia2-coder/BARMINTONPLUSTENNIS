@@ -1,7 +1,7 @@
 # 배드민턴 대회 운영 시스템 - 프로젝트 히스토리
 
 > 세션이 끊어졌을 때 이 파일을 읽으면 프로젝트 전체 맥락을 복원할 수 있습니다.
-> 마지막 업데이트: 2026-02-18
+> 마지막 업데이트: 2026-02-18 (v2.8.1)
 
 ---
 
@@ -14,7 +14,7 @@
 - **포트**: 3000
 - **PM2 프로세스명**: `badminton`
 - **관리자 테스트 비밀번호**: `admin123`
-- **프로젝트 아카이브**: https://www.genspark.ai/api/files/s/1yoMLy6k (≈1.5 MB, v2.7)
+- **프로젝트 아카이브**: https://www.genspark.ai/api/files/s/8GMd9OIh (≈1.9 MB, v2.8.1)
 - **배포 URL**: https://badminton-tournament-5ny.pages.dev
 
 ### 기기별 역할
@@ -28,24 +28,24 @@
 
 ---
 
-## 2. 파일 구조 (총 8,309줄)
+## 2. 파일 구조 (총 8,902줄)
 
 ```
 /home/user/webapp/
 ├── src/
-│   ├── index.tsx                 (972줄) 메인 Hono 앱, 라우팅, HTML 템플릿, /court /dashboard /my /timeline 페이지, SW 라우트
+│   ├── index.tsx                 (998줄) 메인 Hono 앱, 라우팅, HTML 템플릿, /court /dashboard /my /timeline 페이지, SW 라우트
 │   └── routes/
-│       ├── tournaments.ts        (148줄) 대회 CRUD, 인증, 통계
+│       ├── tournaments.ts        (148줄) 대회 CRUD, 인증, 통계, merge_threshold PATCH
 │       ├── participants.ts       (200줄) 참가자 등록/수정/삭제, 일괄등록, 클럽 정보
-│       ├── events.ts             (698줄) 종목 관리, 팀 등록, 자동팀편성, 급수합병, 조 배정
-│       ├── matches.ts            (763줄) 경기/점수/순위, 코트 점수판 API, 서명, 대시보드, 내경기, 타임라인, 알림연동
-│       ├── notifications.ts      (406줄) 푸시 알림 시스템 (VAPID JWT, ECE 암호화, Web Push)
+│       ├── events.ts             (1,030줄) 종목 관리, 팀 등록, 자동팀편성, 급수합병(수동/자동/취소), 조 배정, 일괄삭제
+│       ├── matches.ts            (775줄) 경기/점수/순위, 코트 점수판 API, 서명, 대시보드, 내경기, 타임라인, 알림연동
+│       ├── notifications.ts      (126줄) 푸시 알림 시스템 (VAPID JWT, ECE 암호화, Web Push)
 │       └── brackets.ts           (668줄) 대진표 생성 (KDK/풀리그/토너먼트), 결선 토너먼트
 ├── public/static/
-│   ├── app.js                    (1,832줄) 메인 프론트엔드 SPA (Sport Command Center 테마)
+│   ├── app.js                    (2,244줄) 메인 프론트엔드 SPA (Sport Command Center 테마)
 │   ├── court.js                  (1,471줄) 코트 전용 점수판 프론트엔드
 │   ├── style.css                          커스텀 스타일
-│   ├── manual.html               (1,074줄) A4 인쇄용 현장 운영 매뉴얼
+│   ├── manual.html               (1,242줄) A4 인쇄용 현장 운영 매뉴얼 (v2.7)
 │   └── test_participants_100.txt          테스트 데이터 100명
 ├── public/
 │   └── sw.js                     (77줄) Service Worker (푸시 알림 수신/클릭 처리)
@@ -222,7 +222,10 @@
 | POST | `/api/tournaments/:tid/events/:eid/auto-assign` | 단일 종목 자동 팀편성 |
 | POST | `/api/tournaments/:tid/events/auto-assign-all` | 전체 자동 팀편성 |
 | POST | `/api/tournaments/:tid/events/check-merge` | 급수합병 체크 |
-| POST | `/api/tournaments/:tid/events/execute-merge` | 급수합병 실행 |
+| POST | `/api/tournaments/:tid/events/execute-merge` | 급수합병 실행 (급수균형 재조합 + 조 재편성) |
+| POST | `/api/tournaments/:tid/events/:eid/unmerge` | 합병 취소 (되돌리기) |
+| DELETE | `/api/tournaments/:tid/events/all/assignments` | 조편성 일괄 삭제 (팀/경기/순위, 종목 유지) |
+| DELETE | `/api/tournaments/:tid/events/all/everything` | 종목 전체 삭제 (팀/경기/순위/종목 모두) |
 | POST | `/api/tournaments/:tid/events/:eid/assign-groups` | 단일 종목 조 배정 |
 
 ### 경기/점수/순위 (matches.ts)
@@ -285,11 +288,17 @@
 - 혼복: 남 1명 + 여 1명 조합, 이미 사용된 선수도 가능 (중복 참가 허용)
 - 급수 순서로 정렬 후 인접한 2명씩 묶음
 
-### 급수합병 로직 (events.ts check-merge / execute-merge)
-- 같은 종류+연령대 내에서 팀 수가 merge_threshold(기본 4) 미만인 종목 탐지
+### 급수합병 로직 (events.ts check-merge / execute-merge / unmerge)
+- **자동 합병**: 같은 종류+연령대 내에서 팀 수가 merge_threshold 미만인 종목 탐지
 - 인접 급수끼리 순차 합병 (S→A→B→C→D→E)
 - 합산 팀수가 threshold 이상이 될 때까지 계속 합병
 - 예: A(1팀) + B(1팀) + C(2팀) → "A+B+C급" (4팀)
+- **수동 합병**: 관리자가 체크박스로 자유 선택 (카테고리/연령대 제한 없음), 커스텀 이름 지정 가능
+- **연령대 간 합병**: 서로 다른 연령대도 합병 허용 (예: 50대 A급 + 55대 A급)
+- **실시간 threshold 변경**: PATCH /tournaments/:id → merge_threshold 즉시 수정, 슬라이더 UI
+- **합병 취소(되돌리기)**: merged_from JSON에서 원본 종목 복원, 팀은 첫 번째 원본 종목에 재배치
+- **합병 후 급수균형 재조합**: 기존 팀 해체 → 전체 선수 급수 정렬 → 상위+하위 페어링 (A+E, A+D, B+C 등)
+- **합병 후 자동 조 재편성**: 재조합된 팀으로 랜덤 셔플 + 클럽 회피 조 배정
 
 ### 대진표 생성 (brackets.ts)
 - **KDK**: 모든 팀 대결 조합 중 랜덤 선택, 팀당 games_per_player 만큼 배정
@@ -463,6 +472,40 @@ ce5b7ac 2026-02-18 fix: 연령대 라벨에서 '55세 이상', '60세 이상' �
   - Cloudflare Pages 배포 완료
 ```
 
+### Phase 12: 조편성/종목 일괄 삭제 (2026-02-18)
+```
+fd065f1 2026-02-18 feat: 조편성 일괄삭제 + 종목 전체삭제 기능 추가 (이중 확인, 삭제 건수 표시)
+25dca89 2026-02-18 fix: toast → showToast 함수명 수정 (ReferenceError 해결)
+bd472d2 2026-02-18 fix: api() 호출 시그니처 수정 - method를 options 객체로 전달
+1318f41 2026-02-18 fix: 일괄삭제 함수 수정 - currentTournament.id 사용 + loadEvents로 갱신
+  - DELETE /events/all/assignments: 모든 팀/경기/순위 삭제 (종목 유지)
+  - DELETE /events/all/everything: 종목 포함 전체 삭제
+  - 관리자 전용 버튼 (이중 확인 대화상자)
+  - 삭제 건수 표시 (예: "42팀, 214경기, 116순위 삭제")
+```
+
+### Phase 13: 급수합병 유연화 (2026-02-18)
+```
+523394a 2026-02-18 feat: 급수합병 유연화 - 수동합병 모달, 연령대 간 합병 허용, threshold 실시간 변경, 합병 취소(되돌리기)
+6ad4f64 2026-02-18 feat: 합병 후 자동 조 재편성 (랜덤 셔플, 클럽 회피)
+9cdd338 2026-02-18 feat: 합병 시 팀 해체→급수균형 재조합 (상위급수+하위급수 페어링) + 조 재편성
+  - 수동 합병 모달: 체크박스로 종목 자유 선택, 카테고리/연령대 제한 없음
+  - 연령대 간 합병: 50대 A급 + 55대 A급 등 서로 다른 연령대 합병 가능
+  - 실시간 threshold 변경: 슬라이더(2~20) + PATCH API → 즉시 재체크
+  - 합병 취소(되돌리기): merged_from 복원, 팀 재배치
+  - 급수균형 재조합: 팀 해체 → 급수 정렬 → 상위+하위 페어링 (A+E, A+D, B+C)
+  - 자동 조 재편성: 재조합된 팀으로 5팀/조, 클럽 회피 + 랜덤 셔플
+```
+
+### Phase 14: 합병 후 팀원 이름 미표시 버그 수정 (2026-02-18)
+```
+f39ecf4 2026-02-18 fix: 합병 시 teams INSERT에 tournament_id 추가 (NOT NULL constraint 해결)
+f62be92 2026-02-18 fix: 합병 후 팀원 이름 미표시 버그 수정 - INSERT에 team_name 추가 + 프론트엔드 fallback
+  - 원인: 합병 시 재조합 INSERT에서 team_name 컬럼 누락 → 빈 문자열
+  - 백엔드: INSERT에 team_name = "선수1 · 선수2" 추가
+  - 프론트엔드: team_name 비어있을 때 p1_name · p2_name fallback 표시 (이중 안전장치)
+```
+
 ---
 
 ## 7. 샘플 데이터 현황
@@ -544,7 +587,7 @@ npm run db:seed           # 시드 데이터
 
 ## 10. 현재 상태 & 남은 작업
 
-### ✅ 완료된 기능 (28개)
+### ✅ 완료된 기능 (35개)
 - [x] 대회 CRUD (생성/수정/삭제/상태변경)
 - [x] **대회 삭제 버튼** — 관리자 전용, 이중 확인 대화상자
 - [x] 참가자 관리 (개별/일괄 등록, 참가비, 체크인, 클럽)
@@ -573,6 +616,13 @@ npm run db:seed           # 시드 데이터
 - [x] **푸시 알림** (Web Push API, VAPID JWT, ECE 암호화, Service Worker)
 - [x] **인앱 알림** (15초 폴링, 배너+진동+소리, 상태 변경 감지)
 - [x] **Cloudflare Pages 배포** — https://badminton-tournament-5ny.pages.dev
+- [x] **조편성 일괄 삭제** — 모든 팀/경기/순위 삭제 (종목 유지), 이중 확인
+- [x] **종목 전체 삭제** — 종목 포함 전체 삭제, 삭제 건수 표시
+- [x] **수동 합병 모달** — 체크박스로 종목 자유 선택, 커스텀 이름 지정
+- [x] **연령대 간 합병** — 서로 다른 연령대 합병 허용
+- [x] **실시간 합병 기준 변경** — 슬라이더 UI + PATCH API
+- [x] **합병 취소(되돌리기)** — merged_from 복원, 팀 재배치
+- [x] **합병 후 급수균형 재조합** — 팀 해체 → 급수 정렬 → 상위+하위 페어링
 
 ### 🔮 향후 개선 가능 사항
 - [x] ~~Cloudflare Pages 실 배포~~ ✅ 완료
