@@ -112,7 +112,7 @@ function renderCourtSelect() {
         <div class="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center"><svg viewBox="0 0 32 32" fill="white" width="22" height="22"><ellipse cx="16" cy="8" rx="5" ry="6"/><path d="M11 12c0 0-3 4-3 10 0 2 1.5 4 4 5l4 1 4-1c2.5-1 4-3 4-5 0-6-3-10-3-10" fill="white" opacity="0.85"/><line x1="13" y1="14" x2="13" y2="26" stroke="white" stroke-width="0.5" opacity="0.4"/><line x1="16" y1="12" x2="16" y2="28" stroke="white" stroke-width="0.5" opacity="0.4"/><line x1="19" y1="14" x2="19" y2="26" stroke="white" stroke-width="0.5" opacity="0.4"/></svg></div>
         <div><h1 class="text-xl font-bold">코트 점수판</h1><p class="text-xs text-gray-400">Court Scoreboard</p></div>
       </div>
-      <a href="/" class="text-sm text-gray-400 hover:text-white"><i class="fas fa-home mr-1"></i>메인으로</a>
+      <a href="/" class="text-sm text-gray-400 hover:text-white"><i class="fas fa-home mr-1"></i>메인</a>
     </div>
     <div class="flex-1 flex items-center justify-center p-6">
       <div class="w-full max-w-lg">
@@ -157,9 +157,12 @@ function renderCourtPicker() {
       <div class="col-span-2 text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin text-2xl"></i></div>
     </div>
     <button onclick="courtState.tournamentId=null;courtState.tournament=null;renderCourt();loadTournamentList()" 
-            class="w-full mt-6 py-3 bg-white/5 text-gray-400 rounded-xl text-sm hover:bg-white/10">
+            class="w-full mt-4 py-3 bg-white/5 text-gray-400 rounded-xl text-sm hover:bg-white/10">
       <i class="fas fa-arrow-left mr-2"></i>대회 다시 선택
     </button>
+    <a href="/" class="block w-full mt-2 py-3 text-center text-gray-500 rounded-xl text-xs hover:text-gray-300 hover:bg-white/5 transition">
+      <i class="fas fa-home mr-1"></i>메인으로
+    </a>
   </div>`;
 }
 
@@ -182,7 +185,7 @@ function renderSideSelect() {
         <span class="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">${courtState.courtNumber}코트</span>
         <span class="text-xs text-gray-400">#${m.match_order} ${m.event_name || ''}</span>
       </div>
-      ${courtState.locked ? '' : '<button onclick="exitCourt()" class="text-gray-500 hover:text-white text-sm"><i class="fas fa-times mr-1"></i>나가기</button>'}
+      ${courtState.locked ? '' : '<button onclick="goBackFromSideSelect()" class="text-gray-500 hover:text-white text-sm"><i class="fas fa-arrow-left mr-1"></i>돌아가기</button>'}
     </div>
 
     <!-- 메인 -->
@@ -303,7 +306,7 @@ function renderCourtScoreboard() {
           <i class="fas fa-exchange-alt mr-0.5"></i>${swapInfo}
         </span>
         <span class="text-xs px-2 py-0.5 rounded-full font-bold ${getProgressClass()}">${getProgressLabel()}</span>
-        ${courtState.locked ? '<span class="text-xs text-yellow-500"><i class="fas fa-lock"></i></span>' : '<button onclick="exitCourt()" class="text-gray-500 hover:text-white text-sm px-1.5 ml-1"><i class="fas fa-times"></i></button>'}
+        ${courtState.locked ? '<span class="text-xs text-yellow-500"><i class="fas fa-lock"></i></span>' : '<button onclick="exitCourt()" class="text-gray-500 hover:text-white text-sm px-1.5 ml-1" title="코트 선택으로"><i class="fas fa-arrow-left"></i></button>'}
       </div>
     </div>
 
@@ -376,7 +379,7 @@ function renderCourtScoreboard() {
     <div class="bg-black/50 border-t border-white/10 px-3 py-2 shrink-0" style="min-height:52px;">
       <div class="flex items-center justify-center gap-3">
         <span class="text-xs text-gray-500"><i class="fas fa-eye mr-1"></i>관람 전용 모드</span>
-        ${!courtState.locked ? '<button onclick="exitCourt()" class="px-4 py-2 bg-white/10 rounded-xl text-xs text-gray-400 hover:bg-white/20"><i class="fas fa-sign-out-alt mr-1"></i>나가기</button>' : ''}
+        ${!courtState.locked ? '<button onclick="exitCourt()" class="px-4 py-2 bg-white/10 rounded-xl text-xs text-gray-400 hover:bg-white/20"><i class="fas fa-arrow-left mr-1"></i>코트 선택</button>' : ''}
       </div>
     </div>` : `
     <div class="bg-black/50 border-t border-white/10 px-3 py-2 shrink-0" style="min-height:52px;">
@@ -534,7 +537,7 @@ function renderWaitingScreen() {
       </div>
       <div class="flex items-center gap-2">
         <button onclick="refreshCourtData()" class="px-3 py-1.5 bg-white/10 rounded-lg text-sm hover:bg-white/20"><i class="fas fa-sync-alt mr-1"></i>새로고침</button>
-        ${courtState.locked ? '' : '<button onclick="exitCourt()" class="px-3 py-1.5 bg-white/10 rounded-lg text-sm hover:bg-white/20"><i class="fas fa-sign-out-alt"></i></button>'}
+        ${courtState.locked ? '' : '<button onclick="exitCourt()" class="px-3 py-1.5 bg-white/10 rounded-lg text-sm hover:bg-white/20" title="코트 선택으로"><i class="fas fa-arrow-left mr-1"></i>코트 선택</button>'}
       </div>
     </div>
     <div class="flex-1 flex flex-col items-center justify-center px-6">
@@ -1403,6 +1406,7 @@ function exitCourt() {
     if (!confirm('진행중인 경기가 있습니다. 나가시겠습니까? (점수는 저장됩니다)')) return;
     saveCurrentScore();
   }
+  // 코트 선택 화면으로 돌아가기 (대회는 유지)
   courtState.courtNumber = null;
   courtState.currentMatch = null;
   courtState.score = { left: 0, right: 0 };
@@ -1419,6 +1423,41 @@ function exitCourt() {
   window.history.pushState({}, '', url);
   renderCourt();
   loadCourtGrid();
+}
+
+// 대회 선택 화면으로 완전히 돌아가기
+function exitToHome() {
+  if (courtState.locked) {
+    showCourtToast('이 코트는 잠금 모드입니다.', 'warning');
+    return;
+  }
+  courtState.tournamentId = null;
+  courtState.tournament = null;
+  courtState.courtNumber = null;
+  courtState.currentMatch = null;
+  courtState.score = { left: 0, right: 0 };
+  courtState.leftTeam = 1;
+  courtState.rightTeam = 2;
+  courtState.swapped = false;
+  courtState.swapDone = false;
+  courtState.swapPending = false;
+  courtState.page = 'select';
+  actionHistory = [];
+  
+  const url = new URL(window.location);
+  url.searchParams.delete('court');
+  url.searchParams.delete('tid');
+  window.history.pushState({}, '', url);
+  renderCourt();
+  loadTournamentList();
+}
+
+// 사이드 선택에서 코트 대기화면으로 돌아가기
+function goBackFromSideSelect() {
+  courtState.page = 'court';
+  courtState.leftTeam = 1;
+  courtState.rightTeam = 2;
+  renderCourt();
 }
 
 // ==========================================
