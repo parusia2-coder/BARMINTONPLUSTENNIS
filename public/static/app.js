@@ -337,32 +337,151 @@ function renderTournament() {
   if (!t) return `<div class="text-center py-20"><i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i></div>`;
   const isAdmin = state.adminAuth[t.id];
 
+  // 통계 계산
+  const totalMatches = state.matches.length;
+  const completedMatches = state.matches.filter(m => m.status === 'completed').length;
+  const playingMatches = state.matches.filter(m => m.status === 'playing').length;
+  const progress = totalMatches > 0 ? Math.round(completedMatches / totalMatches * 100) : 0;
+  const statusMap = {
+    draft: { label: '준비중', color: 'bg-gray-500', icon: 'fa-pencil-alt' },
+    open: { label: '접수중', color: 'bg-yellow-500', icon: 'fa-door-open' },
+    in_progress: { label: '진행중', color: 'bg-green-500', icon: 'fa-play-circle' },
+    completed: { label: '완료', color: 'bg-blue-500', icon: 'fa-check-circle' },
+    cancelled: { label: '취소됨', color: 'bg-red-500', icon: 'fa-ban' }
+  };
+  const st = statusMap[t.status] || statusMap.draft;
+  const formatMap = { kdk: 'KDK (랜덤 대진)', league: '풀리그', tournament: '토너먼트' };
+
   return `${renderNav()}${renderOffline()}
-  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 fade-in">
-    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
-      <div class="flex items-center gap-3">
-        <button onclick="navigate('home')" class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition group"><i class="fas fa-arrow-left text-gray-600 group-hover:-translate-x-0.5 transition-transform"></i></button>
-        <div><h1 class="text-2xl font-bold text-gray-900">${t.name}</h1><p class="text-sm text-gray-500">${{ kdk: 'KDK', league: '풀리그', tournament: '토너먼트' }[t.format]} · ${t.courts}코트</p></div>
+
+  <!-- Hero Banner -->
+  <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-gray-900 relative overflow-hidden">
+    <div class="absolute inset-0 opacity-10">
+      <div class="absolute top-10 left-10 w-32 h-32 rounded-full bg-emerald-400 blur-3xl"></div>
+      <div class="absolute bottom-10 right-10 w-40 h-40 rounded-full bg-blue-400 blur-3xl"></div>
+    </div>
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 relative z-10">
+      <!-- Top Bar -->
+      <div class="flex items-center justify-between mb-5">
+        <button onclick="navigate('home')" class="flex items-center gap-2 text-white/60 hover:text-white transition text-sm group">
+          <i class="fas fa-arrow-left group-hover:-translate-x-0.5 transition-transform"></i>대회 목록
+        </button>
+        <div class="flex items-center gap-2">
+          ${!isAdmin ? `<button onclick="showAuthModal(${t.id})" class="px-3 py-1.5 bg-white/10 text-white/70 rounded-lg text-xs hover:bg-white/20 transition backdrop-blur"><i class="fas fa-lock mr-1.5"></i>관리자</button>` : `<span class="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-xs border border-emerald-500/30"><i class="fas fa-shield-alt mr-1.5"></i>관리자 모드</span>`}
+        </div>
       </div>
-      <div class="flex items-center gap-2 flex-wrap">
-        ${!isAdmin ? `<button onclick="showAuthModal(${t.id})" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition"><i class="fas fa-lock mr-1"></i>관리자</button>` : `<span class="badge bg-emerald-50 text-emerald-700 border border-emerald-200"><i class="fas fa-shield-alt mr-1"></i>관리자</span>`}
-        <button onclick="navigate('scoreboard')" class="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm hover:bg-blue-100 transition"><i class="fas fa-tv mr-1"></i>스코어보드</button>
-        <button onclick="window.open('/court?tid='+state.currentTournament.id,'_blank')" class="px-4 py-2 bg-green-50 text-green-700 rounded-lg text-sm hover:bg-green-100 transition"><i class="fas fa-tablet-alt mr-1"></i>코트 점수판</button>
-        <button onclick="loadDashboard(${t.id});navigate('dashboard')" class="px-4 py-2 bg-orange-50 text-orange-700 rounded-lg text-sm hover:bg-orange-100 transition"><i class="fas fa-chart-bar mr-1"></i>통계</button>
-        <button onclick="navigate('mypage')" class="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm hover:bg-indigo-100 transition"><i class="fas fa-user mr-1"></i>내 경기</button>
-        <button onclick="loadStandingsAndNavigate(${t.id})" class="px-4 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm hover:bg-purple-100 transition"><i class="fas fa-medal mr-1"></i>결과</button>
-        <button onclick="window.open('/print?tid='+state.currentTournament.id,'_blank')" class="px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm hover:bg-amber-100 transition"><i class="fas fa-print mr-1"></i>인쇄</button>
-        ${isAdmin ? `<button onclick="deleteTournament(${t.id})" class="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm hover:bg-red-100 transition" title="대회 삭제"><i class="fas fa-trash-alt mr-1"></i>대회 삭제</button>` : ''}
+      <!-- Title -->
+      <div class="flex items-center gap-4 mb-6">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-xl shadow-emerald-500/20 flex-shrink-0">
+          <i class="fas fa-shuttlecock text-xl text-white"></i>
+        </div>
+        <div class="min-w-0">
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight truncate">${t.name}</h1>
+          <div class="flex items-center gap-2 mt-1 flex-wrap">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 ${st.color} text-white rounded-full text-xs font-bold"><i class="fas ${st.icon} text-[10px]"></i>${st.label}</span>
+            <span class="text-white/50 text-sm">${formatMap[t.format] || t.format}</span>
+            <span class="text-white/30">·</span>
+            <span class="text-white/50 text-sm">${t.courts}코트</span>
+          </div>
+        </div>
+      </div>
+      <!-- Stats Cards -->
+      <div class="grid grid-cols-4 gap-3 sm:gap-4">
+        <div class="bg-white/[0.07] backdrop-blur-sm rounded-xl p-3 sm:p-4 text-center border border-white/10">
+          <div class="text-2xl sm:text-3xl font-extrabold text-white">${state.participants.length}</div>
+          <div class="text-[11px] sm:text-xs text-white/50 mt-0.5"><i class="fas fa-users mr-1"></i>참가자</div>
+        </div>
+        <div class="bg-white/[0.07] backdrop-blur-sm rounded-xl p-3 sm:p-4 text-center border border-white/10">
+          <div class="text-2xl sm:text-3xl font-extrabold text-white">${state.events.length}</div>
+          <div class="text-[11px] sm:text-xs text-white/50 mt-0.5"><i class="fas fa-layer-group mr-1"></i>종목</div>
+        </div>
+        <div class="bg-white/[0.07] backdrop-blur-sm rounded-xl p-3 sm:p-4 text-center border border-white/10">
+          <div class="text-2xl sm:text-3xl font-extrabold text-white">${totalMatches}</div>
+          <div class="text-[11px] sm:text-xs text-white/50 mt-0.5">${playingMatches > 0 ? `<span class="w-1.5 h-1.5 inline-block rounded-full bg-green-400 pulse-live mr-0.5"></span>${playingMatches}진행중 ` : ''}<i class="fas fa-gamepad mr-0.5"></i>경기</div>
+        </div>
+        <div class="bg-white/[0.07] backdrop-blur-sm rounded-xl p-3 sm:p-4 text-center border border-white/10">
+          <div class="text-2xl sm:text-3xl font-extrabold ${progress >= 100 ? 'text-emerald-400' : progress >= 50 ? 'text-blue-400' : 'text-white'}">${progress}<span class="text-lg">%</span></div>
+          <div class="text-[11px] sm:text-xs text-white/50 mt-0.5"><i class="fas fa-chart-pie mr-1"></i>진행률</div>
+          ${totalMatches > 0 ? `<div class="mt-1.5 w-full bg-white/10 rounded-full h-1"><div class="h-1 rounded-full transition-all ${progress >= 100 ? 'bg-emerald-400' : progress >= 50 ? 'bg-blue-400' : 'bg-yellow-400'}" style="width:${progress}%"></div></div>` : ''}
+        </div>
       </div>
     </div>
+    <!-- Wave Divider -->
+    <svg class="w-full h-6 sm:h-8" viewBox="0 0 1440 30" fill="none" preserveAspectRatio="none">
+      <path d="M0,0 C360,30 1080,30 1440,0 L1440,30 L0,30 Z" fill="#f8fafc"/>
+    </svg>
+  </div>
+
+  <div class="bg-slate-50 min-h-screen">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 -mt-1 pb-10 fade-in">
+
+    <!-- Quick Access Grid -->
+    <div class="mb-6">
+      <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3">
+        <button onclick="window.open('/court?tid='+state.currentTournament.id,'_blank')" class="group rounded-xl border border-gray-200 bg-white p-3 sm:p-4 text-center cursor-pointer hover:shadow-lg hover:border-green-300 transition-all">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-green-400 to-green-600 mx-auto mb-1.5 sm:mb-2 flex items-center justify-center shadow-md shadow-green-500/20">
+            <i class="fas fa-tablet-alt text-white text-sm"></i>
+          </div>
+          <span class="font-bold text-gray-800 text-xs group-hover:text-green-600 transition">코트 점수판</span>
+        </button>
+        <button onclick="loadDashboard(${t.id});navigate('dashboard')" class="group rounded-xl border border-gray-200 bg-white p-3 sm:p-4 text-center cursor-pointer hover:shadow-lg hover:border-orange-300 transition-all">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 mx-auto mb-1.5 sm:mb-2 flex items-center justify-center shadow-md shadow-orange-500/20">
+            <i class="fas fa-chart-bar text-white text-sm"></i>
+          </div>
+          <span class="font-bold text-gray-800 text-xs group-hover:text-orange-600 transition">통계</span>
+        </button>
+        <button onclick="navigate('mypage')" class="group rounded-xl border border-gray-200 bg-white p-3 sm:p-4 text-center cursor-pointer hover:shadow-lg hover:border-indigo-300 transition-all">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-indigo-400 to-indigo-600 mx-auto mb-1.5 sm:mb-2 flex items-center justify-center shadow-md shadow-indigo-500/20">
+            <i class="fas fa-user text-white text-sm"></i>
+          </div>
+          <span class="font-bold text-gray-800 text-xs group-hover:text-indigo-600 transition">내 경기</span>
+        </button>
+        <button onclick="loadStandingsAndNavigate(${t.id})" class="group rounded-xl border border-gray-200 bg-white p-3 sm:p-4 text-center cursor-pointer hover:shadow-lg hover:border-purple-300 transition-all">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-purple-400 to-purple-600 mx-auto mb-1.5 sm:mb-2 flex items-center justify-center shadow-md shadow-purple-500/20">
+            <i class="fas fa-medal text-white text-sm"></i>
+          </div>
+          <span class="font-bold text-gray-800 text-xs group-hover:text-purple-600 transition">결과/순위</span>
+        </button>
+        <button onclick="window.open('/print?tid='+state.currentTournament.id,'_blank')" class="group rounded-xl border border-gray-200 bg-white p-3 sm:p-4 text-center cursor-pointer hover:shadow-lg hover:border-amber-300 transition-all">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 mx-auto mb-1.5 sm:mb-2 flex items-center justify-center shadow-md shadow-amber-500/20">
+            <i class="fas fa-print text-white text-sm"></i>
+          </div>
+          <span class="font-bold text-gray-800 text-xs group-hover:text-amber-600 transition">인쇄센터</span>
+        </button>
+        <button onclick="window.open('/timeline?tid='+state.currentTournament.id,'_blank')" class="group rounded-xl border border-gray-200 bg-white p-3 sm:p-4 text-center cursor-pointer hover:shadow-lg hover:border-cyan-300 transition-all">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-cyan-400 to-cyan-600 mx-auto mb-1.5 sm:mb-2 flex items-center justify-center shadow-md shadow-cyan-500/20">
+            <i class="fas fa-stream text-white text-sm"></i>
+          </div>
+          <span class="font-bold text-gray-800 text-xs group-hover:text-cyan-600 transition">타임라인</span>
+        </button>
+      </div>
+    </div>
+
+    ${isAdmin ? `
+    <!-- Admin Actions (Collapsible) -->
+    <div class="mb-6">
+      <button onclick="toggleAdminPanel()" id="admin-panel-toggle" class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition mb-2">
+        <i class="fas fa-chevron-right text-xs transition-transform" id="admin-panel-arrow"></i>
+        <i class="fas fa-cog text-gray-400"></i>관리자 메뉴
+      </button>
+      <div id="admin-panel" class="hidden">
+        <div class="flex flex-wrap gap-2 p-3 bg-white rounded-xl border border-gray-200">
+          <button onclick="navigate('scoreboard')" class="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 transition"><i class="fas fa-tv mr-1"></i>스코어보드</button>
+          <button onclick="deleteTournament(${t.id})" class="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition"><i class="fas fa-trash-alt mr-1"></i>대회 삭제</button>
+        </div>
+      </div>
+    </div>` : ''}
+
     <!-- Tabs -->
-    <div class="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl">
-      <button onclick="switchTab('participants')" id="tab-participants" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='participants' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}"><i class="fas fa-users mr-1"></i>참가자 (${state.participants.length})</button>
-      <button onclick="switchTab('events')" id="tab-events" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='events' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}"><i class="fas fa-layer-group mr-1"></i>종목/팀 (${state.events.length})</button>
-      <button onclick="switchTab('matches')" id="tab-matches" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='matches' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}">🏸 경기</button>
+    <div class="flex gap-1 mb-6 bg-white p-1 rounded-xl shadow-sm border border-gray-200">
+      <button onclick="switchTab('participants')" id="tab-participants" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='participants' ? 'bg-emerald-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}"><i class="fas fa-users mr-1"></i>참가자 <span class="hidden sm:inline">(${state.participants.length})</span></button>
+      <button onclick="switchTab('events')" id="tab-events" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='events' ? 'bg-emerald-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}"><i class="fas fa-layer-group mr-1"></i>종목/팀 <span class="hidden sm:inline">(${state.events.length})</span></button>
+      <button onclick="switchTab('matches')" id="tab-matches" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='matches' ? 'bg-emerald-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}"><i class="fas fa-shuttlecock mr-1"></i>경기</button>
     </div>
     <div id="tab-content">${state.activeTab==='participants' ? renderParticipantsTab(isAdmin) : state.activeTab==='events' ? renderEventsTab(isAdmin) : renderMatchesTab(isAdmin)}</div>
   </div>
+  </div>
+
   <!-- Auth Modal -->
   <div id="auth-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
     <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
@@ -371,6 +490,32 @@ function renderTournament() {
       <div class="flex gap-2"><button onclick="closeAuthModal()" class="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition">취소</button><button onclick="authenticate()" class="flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-medium hover:from-emerald-400 hover:to-emerald-500 transition-all">확인</button></div>
     </div>
   </div>`;
+}
+
+// ---- ADMIN PANEL TOGGLE ----
+function toggleAdminPanel() {
+  const panel = document.getElementById('admin-panel');
+  const arrow = document.getElementById('admin-panel-arrow');
+  if (panel) {
+    panel.classList.toggle('hidden');
+    if (arrow) arrow.style.transform = panel.classList.contains('hidden') ? '' : 'rotate(90deg)';
+  }
+}
+function toggleParticipantForm() {
+  const panel = document.getElementById('participant-form-panel');
+  const arrow = document.getElementById('pform-arrow');
+  if (panel) {
+    panel.classList.toggle('hidden');
+    if (arrow) arrow.style.transform = panel.classList.contains('hidden') ? '' : 'rotate(180deg)';
+  }
+}
+function toggleEventForm() {
+  const panel = document.getElementById('event-form-panel');
+  const arrow = document.getElementById('eform-arrow');
+  if (panel) {
+    panel.classList.toggle('hidden');
+    if (arrow) arrow.style.transform = panel.classList.contains('hidden') ? '' : 'rotate(180deg)';
+  }
 }
 
 // ---- PARTICIPANTS TAB ----
@@ -384,51 +529,79 @@ function renderParticipantsTab(isAdmin) {
   });
   const clubList = Object.entries(clubs).sort((a, b) => b[1] - a[1]);
 
+  const maleCount = state.participants.filter(p=>p.gender==='m').length;
+  const femaleCount = state.participants.filter(p=>p.gender==='f').length;
+  const mixedCount = state.participants.filter(p=>p.mixed_doubles).length;
+  const paidCount = state.participants.filter(p=>p.paid).length;
+  const checkinCount = state.participants.filter(p=>p.checked_in).length;
+
   return `<div class="space-y-4">
-    ${isAdmin ? `<div class="bg-white rounded-xl border border-gray-200 p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold text-gray-800"><i class="fas fa-user-plus mr-2 text-emerald-500"></i>참가자 등록</h3>
-        <button onclick="showBulkModal()" class="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-100"><i class="fas fa-file-import mr-1"></i>일괄 등록</button>
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div class="bg-white rounded-xl border border-gray-200 p-3 text-center">
+        <div class="text-xl font-extrabold text-gray-900">${state.participants.length}</div>
+        <div class="text-xs text-gray-500"><i class="fas fa-users mr-1"></i>총 참가자</div>
       </div>
-      <form id="add-participant-form" class="flex flex-wrap gap-3">
-        <input name="name" required placeholder="이름" class="flex-1 min-w-[80px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
-        <input name="phone" placeholder="연락처" class="flex-1 min-w-[90px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
-        <select name="gender" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"><option value="m">남</option><option value="f">여</option></select>
-        <input name="birth_year" type="number" placeholder="출생년도" min="1950" max="2010" class="w-[90px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
-        <select name="level" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
-          ${Object.entries(LEVELS).map(([k,v]) => `<option value="${k}" ${k==='c'?'selected':''}>${v}급</option>`).join('')}
-        </select>
-        <input name="club" placeholder="소속 클럽" class="flex-1 min-w-[80px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
-        <label class="flex items-center gap-1.5 px-3 py-2.5 border rounded-lg cursor-pointer hover:bg-purple-50 transition" title="혼합복식 참가 희망">
-          <input type="checkbox" name="mixed_doubles" value="1" class="w-4 h-4 text-purple-600 rounded focus:ring-purple-500">
-          <span class="text-sm font-medium text-purple-700"><i class="fas fa-venus-mars mr-0.5"></i>혼복</span>
-        </label>
-        <button type="submit" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700"><i class="fas fa-plus mr-1"></i>등록</button>
-      </form>
-    </div>` : ''}
-    <!-- 참가자 통계 -->
-    <div class="flex flex-wrap gap-2 mb-2">
-      <span class="badge bg-gray-100 text-gray-700"><i class="fas fa-users mr-1"></i>총 ${state.participants.length}명</span>
-      <span class="badge bg-blue-100 text-blue-700"><i class="fas fa-mars mr-1"></i>남 ${state.participants.filter(p=>p.gender==='m').length}명</span>
-      <span class="badge bg-pink-100 text-pink-700"><i class="fas fa-venus mr-1"></i>여 ${state.participants.filter(p=>p.gender==='f').length}명</span>
-      <span class="badge bg-purple-100 text-purple-700"><i class="fas fa-venus-mars mr-1"></i>혼복 ${state.participants.filter(p=>p.mixed_doubles).length}명</span>
+      <div class="bg-white rounded-xl border border-gray-200 p-3 text-center">
+        <div class="text-xl font-extrabold text-blue-600">${maleCount}</div>
+        <div class="text-xs text-gray-500"><i class="fas fa-mars mr-1 text-blue-400"></i>남자</div>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 p-3 text-center">
+        <div class="text-xl font-extrabold text-pink-600">${femaleCount}</div>
+        <div class="text-xs text-gray-500"><i class="fas fa-venus mr-1 text-pink-400"></i>여자</div>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 p-3 text-center">
+        <div class="text-xl font-extrabold text-green-600">${paidCount}<span class="text-sm text-gray-400 font-normal">/${state.participants.length}</span></div>
+        <div class="text-xs text-gray-500"><i class="fas fa-won-sign mr-1 text-green-400"></i>참가비</div>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 p-3 text-center">
+        <div class="text-xl font-extrabold text-indigo-600">${checkinCount}<span class="text-sm text-gray-400 font-normal">/${state.participants.length}</span></div>
+        <div class="text-xs text-gray-500"><i class="fas fa-check-circle mr-1 text-indigo-400"></i>체크인</div>
+      </div>
     </div>
-    <div class="flex flex-wrap gap-1 mb-2">
-      ${['50대','55대','60대'].map(ag => {
+    <!-- Detail Badges -->
+    <div class="flex flex-wrap gap-1.5">
+      ${mixedCount > 0 ? `<span class="text-xs px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200"><i class="fas fa-venus-mars mr-1"></i>혼복 ${mixedCount}명</span>` : ''}
+      ${['20대','30대','40대','50대','55대','60대'].map(ag => {
         const cnt = state.participants.filter(p => getAgeGroup(p.birth_year) === ag).length;
-        return cnt > 0 ? `<span class="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">${ag}: ${cnt}명</span>` : '';
+        return cnt > 0 ? `<span class="text-xs px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">${ag} ${cnt}명</span>` : '';
       }).join('')}
-      ${['40대','30대','20대'].map(ag => {
-        const cnt = state.participants.filter(p => getAgeGroup(p.birth_year) === ag).length;
-        return cnt > 0 ? `<span class="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">${ag}: ${cnt}명</span>` : '';
-      }).join('')}
+      ${clubList.length > 1 ? clubList.slice(0, 8).map(([name, count]) => `<span class="text-xs px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200">${name} ${count}</span>`).join('') : ''}
     </div>
-    ${clubList.length > 1 ? `<div class="flex flex-wrap gap-1 mb-2">
-      ${clubList.slice(0, 10).map(([name, count]) => `<span class="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700">${name}: ${count}명</span>`).join('')}
+
+    ${isAdmin ? `
+    <!-- Admin Registration (Collapsible) -->
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <button onclick="toggleParticipantForm()" class="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition">
+        <h3 class="font-semibold text-gray-800 flex items-center"><i class="fas fa-user-plus mr-2 text-emerald-500"></i>참가자 등록</h3>
+        <div class="flex items-center gap-2">
+          <button onclick="event.stopPropagation();showBulkModal()" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-100"><i class="fas fa-file-import mr-1"></i>일괄 등록</button>
+          <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform" id="pform-arrow"></i>
+        </div>
+      </button>
+      <div id="participant-form-panel" class="hidden border-t border-gray-100 p-4">
+        <form id="add-participant-form" class="flex flex-wrap gap-3">
+          <input name="name" required placeholder="이름" class="flex-1 min-w-[80px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+          <input name="phone" placeholder="연락처" class="flex-1 min-w-[90px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+          <select name="gender" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"><option value="m">남</option><option value="f">여</option></select>
+          <input name="birth_year" type="number" placeholder="출생년도" min="1950" max="2010" class="w-[90px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+          <select name="level" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+            ${Object.entries(LEVELS).map(([k,v]) => `<option value="${k}" ${k==='c'?'selected':''}>${v}급</option>`).join('')}
+          </select>
+          <input name="club" placeholder="소속 클럽" class="flex-1 min-w-[80px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+          <label class="flex items-center gap-1.5 px-3 py-2.5 border rounded-lg cursor-pointer hover:bg-purple-50 transition" title="혼합복식 참가 희망">
+            <input type="checkbox" name="mixed_doubles" value="1" class="w-4 h-4 text-purple-600 rounded focus:ring-purple-500">
+            <span class="text-sm font-medium text-purple-700"><i class="fas fa-venus-mars mr-0.5"></i>혼복</span>
+          </label>
+          <button type="submit" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700"><i class="fas fa-plus mr-1"></i>등록</button>
+        </form>
+      </div>
     </div>` : ''}
-    <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+
+    <!-- Participant Table -->
+    <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto shadow-sm">
       <table class="w-full">
-        <thead class="bg-gray-50"><tr>
+        <thead class="bg-gray-50 border-b border-gray-200"><tr>
           <th class="px-2 py-3 text-left text-xs font-semibold text-gray-500">#</th>
           <th class="px-2 py-3 text-left text-xs font-semibold text-gray-500">이름</th>
           <th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">성별</th>
@@ -471,28 +644,34 @@ function renderEventsTab(isAdmin) {
   const mixedFemales = state.participants.filter(p => p.gender === 'f' && p.mixed_doubles);
 
   return `<div class="space-y-4">
-    ${isAdmin ? `<div class="bg-white rounded-xl border border-gray-200 p-4">
-      <h3 class="font-semibold text-gray-800 mb-3"><i class="fas fa-plus-circle mr-2 text-emerald-500"></i>종목 추가</h3>
-      <div class="mb-3 flex flex-wrap gap-2 text-xs">
-        <span class="badge bg-blue-50 text-blue-600"><i class="fas fa-mars mr-1"></i>남자 ${maleP.length}명</span>
-        <span class="badge bg-pink-50 text-pink-600"><i class="fas fa-venus mr-1"></i>여자 ${femaleP.length}명</span>
-        <span class="badge bg-purple-50 text-purple-600"><i class="fas fa-venus-mars mr-1"></i>혼복 남${mixedMales.length}/여${mixedFemales.length}명 → 최대 ${Math.min(mixedMales.length, mixedFemales.length)}팀</span>
+    ${isAdmin ? `
+    <!-- Admin Event Management (Collapsible) -->
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <button onclick="toggleEventForm()" class="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition">
+        <h3 class="font-semibold text-gray-800 flex items-center"><i class="fas fa-plus-circle mr-2 text-emerald-500"></i>종목 추가</h3>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-400"><i class="fas fa-mars mr-1 text-blue-400"></i>${maleP.length} <i class="fas fa-venus mr-1 ml-1 text-pink-400"></i>${femaleP.length} <i class="fas fa-venus-mars mr-1 ml-1 text-purple-400"></i>${Math.min(mixedMales.length, mixedFemales.length)}팀</span>
+          <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform" id="eform-arrow"></i>
+        </div>
+      </button>
+      <div id="event-form-panel" class="hidden border-t border-gray-100 p-4 space-y-4">
+        <form id="add-event-form" class="flex flex-wrap gap-3 items-end">
+          <div><label class="block text-xs font-semibold text-gray-500 mb-1">종류</label>
+            <select name="category" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="md">남자복식</option><option value="wd">여자복식</option><option value="xd">혼합복식</option></select></div>
+          <div><label class="block text-xs font-semibold text-gray-500 mb-1">연령대</label>
+            <select name="age_group" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+              ${AGE_GROUPS.map(a => `<option value="${a.value}">${a.label}</option>`).join('')}</select></div>
+          <div><label class="block text-xs font-semibold text-gray-500 mb-1">급수</label>
+            <select name="level_group" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="all">전체</option>${Object.entries(LEVELS).map(([k,v]) => `<option value="${k}">${v}급</option>`).join('')}</select></div>
+          <button type="submit" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700"><i class="fas fa-plus mr-1"></i>종목 추가</button>
+          <button type="button" onclick="showBulkEventModal()" class="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700"><i class="fas fa-th-large mr-1"></i>일괄 생성</button>
+        </form>
       </div>
-      <form id="add-event-form" class="flex flex-wrap gap-3 items-end">
-        <div><label class="block text-xs font-semibold text-gray-500 mb-1">종류</label>
-          <select name="category" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
-            <option value="md">남자복식</option><option value="wd">여자복식</option><option value="xd">혼합복식</option></select></div>
-        <div><label class="block text-xs font-semibold text-gray-500 mb-1">연령대</label>
-          <select name="age_group" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
-            ${AGE_GROUPS.map(a => `<option value="${a.value}">${a.label}</option>`).join('')}</select></div>
-        <div><label class="block text-xs font-semibold text-gray-500 mb-1">급수</label>
-          <select name="level_group" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
-            <option value="all">전체</option>${Object.entries(LEVELS).map(([k,v]) => `<option value="${k}">${v}급</option>`).join('')}</select></div>
-        <button type="submit" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700"><i class="fas fa-plus mr-1"></i>종목 추가</button>
-        <button type="button" onclick="showBulkEventModal()" class="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700"><i class="fas fa-th-large mr-1"></i>일괄 생성</button>
-      </form>
-    </div>` : ''}
-    ${isAdmin ? `<div class="flex flex-wrap gap-2">
+    </div>
+    <!-- Admin Action Buttons -->
+    <div class="flex flex-wrap gap-2">
       <button onclick="showTeamAssignModal()" class="px-4 py-2.5 bg-teal-500 text-white rounded-lg text-sm font-semibold hover:bg-teal-600 shadow-sm"><i class="fas fa-users-cog mr-1"></i>조편성 옵션</button>
       <button onclick="showBracketOptionsModal()" class="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-lg text-sm font-semibold shadow-md hover:shadow-lg"><i class="fas fa-magic mr-1"></i>대진표 옵션</button>
       <button onclick="checkMerge()" class="px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-100"><i class="fas fa-compress-arrows-alt mr-1"></i>급수합병 체크</button>
@@ -501,14 +680,17 @@ function renderEventsTab(isAdmin) {
       <button onclick="bulkDeleteEverything()" class="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600"><i class="fas fa-trash-alt mr-1"></i>종목 전체삭제</button>
     </div>` : ''}
     <div id="merge-result"></div>
-    ${state.events.length === 0 ? '<div class="text-center py-12 text-gray-400"><i class="fas fa-layer-group text-4xl mb-3"></i><p>등록된 종목이 없습니다.</p></div>' : ''}
-    ${state.events.map(ev => `
-      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div class="flex items-center justify-between px-4 py-3 bg-gray-50 border-b">
-          <div class="flex items-center gap-2">
-            <span class="badge ${ev.category==='md'?'bg-blue-100 text-blue-700':ev.category==='wd'?'bg-pink-100 text-pink-700':'bg-purple-100 text-purple-700'}">${CATEGORIES[ev.category]}</span>
-            <h4 class="font-semibold text-gray-800">${ev.name}</h4>
-            <span class="text-xs text-gray-400">${ev.team_count || 0}팀</span>
+    ${state.events.length === 0 ? '<div class="text-center py-12 text-gray-400"><i class="fas fa-layer-group text-4xl mb-3 block"></i><p>등록된 종목이 없습니다.</p></div>' : ''}
+    ${state.events.map(ev => {
+      const catStyle = ev.category==='md' ? 'border-l-blue-500 from-blue-50' : ev.category==='wd' ? 'border-l-pink-500 from-pink-50' : 'border-l-purple-500 from-purple-50';
+      const catBadge = ev.category==='md'?'bg-blue-100 text-blue-700':ev.category==='wd'?'bg-pink-100 text-pink-700':'bg-purple-100 text-purple-700';
+      return `
+      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden border-l-4 ${catStyle} shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between px-4 py-3">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="badge ${catBadge}">${CATEGORIES[ev.category]}</span>
+            <h4 class="font-bold text-gray-900">${ev.name}</h4>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">${ev.team_count || 0}팀</span>
             ${ev.merged_from ? '<span class="badge bg-amber-100 text-amber-700 text-xs"><i class="fas fa-compress-arrows-alt mr-1"></i>합병</span>' : ''}
           </div>
           <div class="flex items-center gap-2">
@@ -517,11 +699,11 @@ function renderEventsTab(isAdmin) {
             ${isAdmin ? `<button onclick="deleteEvent(${ev.id})" class="text-red-400 hover:text-red-600 text-sm"><i class="fas fa-trash-alt"></i></button>` : ''}
           </div>
         </div>
-        <div id="teams-${ev.id}" class="p-3">
+        <div id="teams-${ev.id}" class="px-4 py-2 border-t border-gray-100">
           <button onclick="loadTeams(${ev.id})" class="text-sm text-emerald-600 hover:text-emerald-800"><i class="fas fa-eye mr-1"></i>팀 목록 보기</button>
         </div>
       </div>
-    `).join('')}
+    `;}).join('')}
   </div>`;
 }
 
@@ -1047,8 +1229,8 @@ async function executeBracketGeneration() {
 // ---- MATCHES TAB ----
 function renderMatchesTab(isAdmin) {
   const matches = state.matches;
-  if (matches.length === 0) return `<div class="text-center py-12 text-gray-400"><i class="fas fa-clipboard-list text-4xl mb-3"></i><p>대진표가 아직 생성되지 않았습니다.</p>
-    ${isAdmin ? `<button onclick="showBracketOptionsModal()" class="mt-4 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-xl font-semibold shadow-md"><i class="fas fa-magic mr-2"></i>대진표 생성하기</button>` : ''}
+  if (matches.length === 0) return `<div class="text-center py-16 text-gray-400 bg-white rounded-xl border border-gray-200"><i class="fas fa-clipboard-list text-5xl mb-4 block text-gray-300"></i><p class="text-lg font-medium text-gray-500 mb-1">대진표가 아직 생성되지 않았습니다.</p><p class="text-sm text-gray-400 mb-4">종목/팀 탭에서 조편성 후 대진표를 생성하세요.</p>
+    ${isAdmin ? `<button onclick="showBracketOptionsModal()" class="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition"><i class="fas fa-magic mr-2"></i>대진표 생성하기</button>` : ''}
   </div>`;
 
   // 결선 토너먼트 존재 여부 확인
@@ -1137,18 +1319,19 @@ function renderMatchesTab(isAdmin) {
 }
 
 function renderMatchCard(m, isAdmin) {
-  const st = { pending: { l: '대기', c: 'bg-gray-100 text-gray-600' }, playing: { l: '진행중', c: 'bg-green-100 text-green-700' }, completed: { l: '완료', c: 'bg-blue-100 text-blue-700' } };
+  const st = { pending: { l: '대기', c: 'bg-gray-100 text-gray-600', bc: 'border-gray-200' }, playing: { l: '진행중', c: 'bg-green-100 text-green-700', bc: 'border-green-300 ring-2 ring-green-100' }, completed: { l: '완료', c: 'bg-blue-100 text-blue-700', bc: 'border-gray-200' } };
   const s = st[m.status] || st.pending;
   const t1 = m.team1_name || 'BYE', t2 = m.team2_name || 'BYE';
   const t1T = m.team1_set1||0, t2T = m.team2_set1||0;
-  return `<div class="bg-white rounded-xl border ${m.status==='playing'?'border-green-300 ring-2 ring-green-100':'border-gray-200'} p-3">
+  return `<div class="bg-white rounded-xl border ${s.bc} p-3 shadow-sm hover:shadow-md transition-shadow">
     <div class="flex items-center justify-between mb-2">
-      <div class="flex items-center gap-1.5"><span class="text-xs text-gray-400">#${m.match_order}</span>${m.court_number?`<span class="badge bg-yellow-50 text-yellow-700 text-xs">${m.court_number}코트</span>`:''} ${m.group_num ? `<span class="badge bg-indigo-50 text-indigo-600 text-xs">${m.group_num}조</span>` : ''}</div>
+      <div class="flex items-center gap-1.5"><span class="text-xs text-gray-400 font-mono">#${m.match_order}</span>${m.court_number?`<span class="badge bg-yellow-50 text-yellow-700 text-xs border border-yellow-200">${m.court_number}코트</span>`:''} ${m.group_num ? `<span class="badge bg-indigo-50 text-indigo-600 text-xs border border-indigo-200">${m.group_num}조</span>` : ''}</div>
       <div class="flex items-center gap-1">${m.status==='playing'?'<span class="w-2 h-2 rounded-full bg-green-500 pulse-live"></span>':''}<span class="badge ${s.c} text-xs">${s.l}</span></div>
     </div>
-    <div class="space-y-1">
-      <div class="flex items-center justify-between ${m.winner_team===1?'font-bold text-emerald-700':''}"><span class="text-sm">${m.winner_team===1?'🏆 ':''}${t1}</span><span class="scoreboard-num text-lg font-bold">${t1T}</span></div>
-      <div class="flex items-center justify-between ${m.winner_team===2?'font-bold text-emerald-700':''}"><span class="text-sm">${m.winner_team===2?'🏆 ':''}${t2}</span><span class="scoreboard-num text-lg font-bold">${t2T}</span></div>
+    <div class="space-y-1.5">
+      <div class="flex items-center justify-between ${m.winner_team===1?'font-bold text-emerald-700':''}"><span class="text-sm truncate mr-2">${m.winner_team===1?'🏆 ':''}${t1}</span><span class="scoreboard-num text-lg font-bold">${t1T}</span></div>
+      <div class="h-px bg-gray-100"></div>
+      <div class="flex items-center justify-between ${m.winner_team===2?'font-bold text-emerald-700':''}"><span class="text-sm truncate mr-2">${m.winner_team===2?'🏆 ':''}${t2}</span><span class="scoreboard-num text-lg font-bold">${t2T}</span></div>
     </div>
     ${isAdmin && m.status!=='cancelled' ? `<div class="mt-2 pt-2 border-t border-gray-100 flex gap-2">
       ${m.status==='pending'?`<button onclick="startMatch(${m.id})" class="flex-1 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100"><i class="fas fa-play mr-1"></i>시작</button>`:''}
