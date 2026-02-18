@@ -509,7 +509,7 @@ function renderEventsTab(isAdmin) {
 // ★ 조편성 일괄 삭제 / 종목 전체 삭제 ★
 // ==========================================
 async function bulkDeleteAssignments() {
-  const tid = state.currentTournament;
+  const tid = state.currentTournament?.id;
   if (!tid) return;
   const teamTotal = state.events.reduce((s, e) => s + (e.team_count || 0), 0);
   if (teamTotal === 0) return showToast('삭제할 조편성 데이터가 없습니다.', 'warning');
@@ -518,12 +518,12 @@ async function bulkDeleteAssignments() {
   try {
     const res = await api(`/tournaments/${tid}/events/all/assignments`, { method: 'DELETE' });
     showToast(`조편성 일괄 삭제 완료! (팀 ${res.deleted.teams}개, 경기 ${res.deleted.matches}개, 순위 ${res.deleted.standings}개 삭제)`, 'success');
-    await loadTournamentDetail(tid);
+    await loadEvents(tid); navigate('tournament');
   } catch (e) { showToast('조편성 삭제 실패: ' + e.message, 'error'); }
 }
 
 async function bulkDeleteEverything() {
-  const tid = state.currentTournament;
+  const tid = state.currentTournament?.id;
   if (!tid) return;
   if (state.events.length === 0) return showToast('삭제할 종목이 없습니다.', 'warning');
   if (!confirm(`모든 종목과 팀/경기/순위를 완전히 삭제합니다.\n(종목 ${state.events.length}개가 모두 삭제됩니다)\n\n계속하시겠습니까?`)) return;
@@ -531,7 +531,7 @@ async function bulkDeleteEverything() {
   try {
     const res = await api(`/tournaments/${tid}/events/all/everything`, { method: 'DELETE' });
     showToast(`전체 삭제 완료! (종목 ${res.deleted.events}개, 팀 ${res.deleted.teams}개, 경기 ${res.deleted.matches}개 삭제)`, 'success');
-    await loadTournamentDetail(tid);
+    await loadEvents(tid); navigate('tournament');
   } catch (e) { showToast('전체 삭제 실패: ' + e.message, 'error'); }
 }
 
