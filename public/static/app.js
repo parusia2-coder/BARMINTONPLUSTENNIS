@@ -9,7 +9,7 @@ const AGE_GROUPS = [
   { value: 'open', label: '오픈 (전연령)' },
   { value: '20대', label: '20대' }, { value: '30대', label: '30대' },
   { value: '40대', label: '40대' }, { value: '50대', label: '50대' },
-  { value: '55대', label: '55대 (55세 이상)' }, { value: '60대', label: '60대 (60세 이상)' }
+  { value: '55대', label: '55대' }, { value: '60대', label: '60대' }
 ];
 
 // State
