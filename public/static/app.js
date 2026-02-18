@@ -512,27 +512,27 @@ async function bulkDeleteAssignments() {
   const tid = state.currentTournament;
   if (!tid) return;
   const teamTotal = state.events.reduce((s, e) => s + (e.team_count || 0), 0);
-  if (teamTotal === 0) return toast('삭제할 조편성 데이터가 없습니다.', 'warning');
+  if (teamTotal === 0) return showToast('삭제할 조편성 데이터가 없습니다.', 'warning');
   if (!confirm(`모든 종목의 팀/경기/순위를 일괄 삭제합니다.\n(종목 ${state.events.length}개의 팀 ${teamTotal}개가 삭제됩니다)\n\n종목 자체는 유지됩니다. 계속하시겠습니까?`)) return;
   if (!confirm('정말로 모든 조편성을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
   try {
     const res = await api('DELETE', `/tournaments/${tid}/events/all/assignments`);
-    toast(`조편성 일괄 삭제 완료! (팀 ${res.deleted.teams}개, 경기 ${res.deleted.matches}개, 순위 ${res.deleted.standings}개 삭제)`, 'success');
+    showToast(`조편성 일괄 삭제 완료! (팀 ${res.deleted.teams}개, 경기 ${res.deleted.matches}개, 순위 ${res.deleted.standings}개 삭제)`, 'success');
     await loadTournamentDetail(tid);
-  } catch (e) { toast('조편성 삭제 실패: ' + e.message, 'error'); }
+  } catch (e) { showToast('조편성 삭제 실패: ' + e.message, 'error'); }
 }
 
 async function bulkDeleteEverything() {
   const tid = state.currentTournament;
   if (!tid) return;
-  if (state.events.length === 0) return toast('삭제할 종목이 없습니다.', 'warning');
+  if (state.events.length === 0) return showToast('삭제할 종목이 없습니다.', 'warning');
   if (!confirm(`모든 종목과 팀/경기/순위를 완전히 삭제합니다.\n(종목 ${state.events.length}개가 모두 삭제됩니다)\n\n계속하시겠습니까?`)) return;
   if (!confirm('⚠️ 정말로 모든 종목을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다!')) return;
   try {
     const res = await api('DELETE', `/tournaments/${tid}/events/all/everything`);
-    toast(`전체 삭제 완료! (종목 ${res.deleted.events}개, 팀 ${res.deleted.teams}개, 경기 ${res.deleted.matches}개 삭제)`, 'success');
+    showToast(`전체 삭제 완료! (종목 ${res.deleted.events}개, 팀 ${res.deleted.teams}개, 경기 ${res.deleted.matches}개 삭제)`, 'success');
     await loadTournamentDetail(tid);
-  } catch (e) { toast('전체 삭제 실패: ' + e.message, 'error'); }
+  } catch (e) { showToast('전체 삭제 실패: ' + e.message, 'error'); }
 }
 
 // ==========================================
