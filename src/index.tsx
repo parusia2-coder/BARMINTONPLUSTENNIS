@@ -1030,12 +1030,15 @@ function getPrintHtml(): string {
   .ctrl-btn {
     padding: 8px 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 8px;
     background: rgba(255,255,255,0.1); color: #fff; font-size: 13px; font-weight: 600;
-    cursor: pointer; transition: all 0.2s;
+    cursor: pointer; transition: all 0.2s; position: relative;
   }
   .ctrl-btn:hover { background: rgba(255,255,255,0.25); border-color: rgba(255,255,255,0.6); }
   .ctrl-btn.active { background: #fff; color: #1e3a5f; border-color: #fff; }
+  .ctrl-btn:not(.active) { opacity: 0.6; text-decoration: line-through; }
+  .ctrl-btn.disabled { pointer-events: none; opacity: 0.3; }
   .ctrl-btn.print-btn { background: #f59e0b; border-color: #f59e0b; color: #000; font-weight: 800; }
   .ctrl-btn.print-btn:hover { background: #d97706; }
+  .ctrl-btn.print-btn:not(.active) { opacity: 1; text-decoration: none; }
   .ctrl-label { font-size: 12px; color: rgba(255,255,255,0.7); margin-right: 4px; }
   .ctrl-select {
     padding: 6px 12px; border-radius: 6px; border: 2px solid rgba(255,255,255,0.3);
@@ -1139,12 +1142,13 @@ function getPrintHtml(): string {
     </select>
     <span style="width:16px"></span>
     <span class="ctrl-label">인쇄 항목:</span>
-    <button class="ctrl-btn active" data-section="participants" onclick="toggleSection(this)">① 참가자 명단</button>
-    <button class="ctrl-btn active" data-section="teams" onclick="toggleSection(this)">② 팀 편성표</button>
-    <button class="ctrl-btn active" data-section="matches" onclick="toggleSection(this)">③ 대진표</button>
-    <button class="ctrl-btn active" data-section="scoresheet" onclick="toggleSection(this)">④ 점수 기록지</button>
-    <button class="ctrl-btn active" data-section="standings" onclick="toggleSection(this)">⑤ 순위 집계표</button>
-    <button class="ctrl-btn active" data-section="finals" onclick="toggleSection(this)">⑥ 결선 대진표</button>
+    <button class="ctrl-btn active disabled" data-section="participants" onclick="toggleSection(this)">① 참가자 명단</button>
+    <button class="ctrl-btn active disabled" data-section="teams" onclick="toggleSection(this)">② 팀 편성표</button>
+    <button class="ctrl-btn active disabled" data-section="matches" onclick="toggleSection(this)">③ 대진표</button>
+    <button class="ctrl-btn active disabled" data-section="scoresheet" onclick="toggleSection(this)">④ 점수 기록지</button>
+    <button class="ctrl-btn active disabled" data-section="standings" onclick="toggleSection(this)">⑤ 순위 집계표</button>
+    <button class="ctrl-btn active disabled" data-section="finals" onclick="toggleSection(this)">⑥ 결선 대진표</button>
+    <span id="toggle-status" style="font-size:11px; color:rgba(255,255,255,0.6); margin-left:4px;"></span>
     <span style="width:16px"></span>
     <button class="ctrl-btn print-btn" onclick="window.print()"><i class="fas fa-print"></i> 인쇄 / PDF 저장</button>
   </div>
@@ -1191,6 +1195,9 @@ async function loadPrintData() {
   const area = document.getElementById('print-area');
   area.innerHTML = '<div class="loading-msg"><i class="fas fa-spinner fa-spin"></i> 데이터 로드 중...</div>';
   
+  // 로딩 중 버튼 비활성화
+  document.querySelectorAll('.ctrl-btn[data-section]').forEach(b => b.classList.add('disabled'));
+  
   try {
     // 통합 API 1회 호출로 모든 데이터 로드
     const d = await api('/' + tid + '/print-data');
@@ -1202,15 +1209,45 @@ async function loadPrintData() {
     state.teams = d.teamsByEvent || {};
     
     renderAll();
+    
+    // 로딩 완료 - 버튼 활성화
+    document.querySelectorAll('.ctrl-btn[data-section]').forEach(b => b.classList.remove('disabled'));
+    updateToggleStatus();
   } catch(e) {
     area.innerHTML = '<div class="error-msg"><i class="fas fa-exclamation-triangle"></i> 로드 실패: ' + e.message + '</div>';
+    document.querySelectorAll('.ctrl-btn[data-section]').forEach(b => b.classList.remove('disabled'));
   }
 }
 
 function toggleSection(btn) {
+  // 데이터 로딩 전이면 무시
+  if (btn.classList.contains('disabled')) return;
+  
   btn.classList.toggle('active');
   const sec = btn.dataset.section;
-  document.querySelectorAll('.ps-' + sec).forEach(el => el.classList.toggle('visible'));
+  const sections = document.querySelectorAll('.ps-' + sec);
+  const isActive = btn.classList.contains('active');
+  
+  sections.forEach(el => {
+    if (isActive) el.classList.add('visible');
+    else el.classList.remove('visible');
+  });
+  
+  // 활성화 시 해당 섹션으로 스크롤
+  if (isActive && sections.length > 0) {
+    setTimeout(() => sections[0].scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  }
+  
+  updateToggleStatus();
+}
+
+function updateToggleStatus() {
+  const btns = document.querySelectorAll('.ctrl-btn[data-section]');
+  const total = btns.length;
+  let active = 0;
+  btns.forEach(b => { if (b.classList.contains('active')) active++; });
+  const statusEl = document.getElementById('toggle-status');
+  if (statusEl) statusEl.textContent = active + '/' + total + '개 선택됨';
 }
 
 function renderAll() {
