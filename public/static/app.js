@@ -1337,6 +1337,7 @@ function renderMatchCard(m, isAdmin) {
       ${m.status==='pending'?`<button onclick="startMatch(${m.id})" class="flex-1 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100"><i class="fas fa-play mr-1"></i>시작</button>`:''}
       ${m.status==='playing'?`<button onclick="showScoreModal(${m.id})" class="flex-1 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-100"><i class="fas fa-edit mr-1"></i>점수</button>`:''}
       ${m.status==='completed'?`<button onclick="showScoreModal(${m.id})" class="flex-1 py-1.5 bg-gray-50 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-100"><i class="fas fa-edit mr-1"></i>수정</button>`:''}
+      ${m.status!=='playing'?`<button onclick="showCourtChangeModal(${m.id})" class="py-1.5 px-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-100" title="코트 변경"><i class="fas fa-exchange-alt"></i></button>`:''}
     </div>` : ''}
   </div>`;
 }
@@ -2011,20 +2012,29 @@ async function startMatch(mid) { const tid = state.currentTournament.id; try { a
 function showScoreModal(mid) {
   const m = state.matches.find(x => x.id === mid); if (!m) return;
   const target = state.targetScore;
+  const isCompleted = m.status === 'completed';
+  const courts = state.currentTournament?.courts || 6;
   const modal = document.createElement('div'); modal.id = 'score-modal';
   modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-overlay';
-  modal.innerHTML = `<div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-    <h3 class="text-lg font-bold mb-2"><i class="fas fa-edit mr-2 text-emerald-500"></i>점수 입력</h3>
+  modal.innerHTML = `<div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-lg font-bold"><i class="fas fa-edit mr-2 text-emerald-500"></i>${isCompleted ? '점수 수정' : '점수 입력'}</h3>
+      <div class="flex items-center gap-2">
+        ${m.court_number ? `<span class="text-xs px-2 py-1 bg-yellow-50 text-yellow-700 rounded-lg border border-yellow-200">${m.court_number}코트</span>` : ''}
+        <span class="text-xs px-2 py-1 rounded-lg ${isCompleted ? 'bg-blue-50 text-blue-600' : m.status==='playing' ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-500'}">${isCompleted ? '완료' : m.status==='playing' ? '진행중' : '대기'}</span>
+      </div>
+    </div>
+    ${isCompleted ? '<div class="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700"><i class="fas fa-exclamation-triangle mr-1"></i>완료된 경기를 수정하면 순위가 재계산됩니다.</div>' : ''}
     <div class="text-center mb-4"><span class="font-semibold text-emerald-700">${m.team1_name||'팀1'}</span><span class="mx-2 text-gray-400">vs</span><span class="font-semibold text-red-600">${m.team2_name||'팀2'}</span></div>
     <div class="flex items-center gap-3">
       <div class="flex-1 text-center">
         <label class="block text-sm font-medium text-emerald-700 mb-2">${m.team1_name||'팀1'}</label>
-        <input id="t1s1" type="number" min="0" max="${target+10}" value="${m.team1_set1||0}" class="w-full px-3 py-4 border-2 rounded-xl text-center text-3xl font-black outline-none focus:ring-2 focus:ring-emerald-500">
+        <input id="t1s1" type="number" min="0" max="${target+10}" value="${m.team1_set1||0}" class="w-full px-3 py-4 border-2 rounded-xl text-center text-3xl font-black outline-none focus:ring-2 focus:ring-emerald-500" inputmode="numeric">
       </div>
       <span class="text-3xl text-gray-300 font-bold mt-6">:</span>
       <div class="flex-1 text-center">
         <label class="block text-sm font-medium text-red-600 mb-2">${m.team2_name||'팀2'}</label>
-        <input id="t2s1" type="number" min="0" max="${target+10}" value="${m.team2_set1||0}" class="w-full px-3 py-4 border-2 rounded-xl text-center text-3xl font-black outline-none focus:ring-2 focus:ring-red-500">
+        <input id="t2s1" type="number" min="0" max="${target+10}" value="${m.team2_set1||0}" class="w-full px-3 py-4 border-2 rounded-xl text-center text-3xl font-black outline-none focus:ring-2 focus:ring-red-500" inputmode="numeric">
       </div>
     </div>
     <div class="mt-4"><label class="block text-sm font-semibold text-gray-700 mb-2">승자</label>
@@ -2032,7 +2042,19 @@ function showScoreModal(mid) {
         <button onclick="document.getElementById('winner-val').value=1;this.classList.add('ring-2','ring-emerald-500');this.nextElementSibling.classList.remove('ring-2','ring-emerald-500')" class="flex-1 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium ${m.winner_team===1?'ring-2 ring-emerald-500':''}">${m.team1_name||'팀1'}</button>
         <button onclick="document.getElementById('winner-val').value=2;this.classList.add('ring-2','ring-emerald-500');this.previousElementSibling.classList.remove('ring-2','ring-emerald-500')" class="flex-1 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-medium ${m.winner_team===2?'ring-2 ring-emerald-500':''}">${m.team2_name||'팀2'}</button>
       </div><input type="hidden" id="winner-val" value="${m.winner_team||''}"></div>
-    <div class="flex gap-2 mt-5"><button onclick="document.getElementById('score-modal').remove()" class="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium">취소</button><button onclick="submitScore(${mid})" class="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-medium">저장</button></div>
+    <!-- 코트 변경 -->
+    <div class="mt-4">
+      <label class="block text-sm font-semibold text-gray-700 mb-2"><i class="fas fa-exchange-alt mr-1 text-indigo-500"></i>코트 변경</label>
+      <select id="court-change-val" class="w-full px-3 py-2 border-2 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400">
+        <option value="">변경 안 함</option>
+        ${Array.from({length: courts}, (_, i) => i+1).map(n => `<option value="${n}" ${m.court_number===n?'selected':''}>${n}코트</option>`).join('')}
+      </select>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button onclick="document.getElementById('score-modal').remove()" class="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium">취소</button>
+      ${isCompleted ? `<button onclick="resetMatch(${mid})" class="py-2.5 px-4 bg-red-50 text-red-600 rounded-xl font-medium text-sm hover:bg-red-100"><i class="fas fa-undo mr-1"></i>리셋</button>` : ''}
+      <button onclick="submitScore(${mid})" class="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-medium">저장</button>
+    </div>
   </div>`;
   document.body.appendChild(modal);
 }
@@ -2043,7 +2065,59 @@ async function submitScore(mid) {
   const w = document.getElementById('winner-val').value;
   data.status = w ? 'completed' : 'playing'; data.winner_team = w ? parseInt(w) : null;
   const tid = state.currentTournament.id;
+  // 코트 변경 처리
+  const courtVal = document.getElementById('court-change-val')?.value;
+  const m = state.matches.find(x => x.id === mid);
+  if (courtVal && m && parseInt(courtVal) !== m.court_number && m.status !== 'playing') {
+    try { await api(`/tournaments/${tid}/matches/${mid}/court`, { method: 'PATCH', body: JSON.stringify({ court_number: parseInt(courtVal) }) }); } catch(e){}
+  }
   try { await api(`/tournaments/${tid}/matches/${mid}/score`, { method: 'PUT', body: JSON.stringify(data) }); document.getElementById('score-modal').remove(); showToast('점수 저장!', 'success'); await loadMatches(tid); switchTab('matches'); } catch(e){}
+}
+
+async function resetMatch(mid) {
+  if (!confirm('경기를 초기화하시겠습니까?\n점수와 승자가 모두 초기화되고 대기 상태로 돌아갑니다.')) return;
+  if (!confirm('정말 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+  const tid = state.currentTournament.id;
+  try {
+    await api(`/tournaments/${tid}/matches/${mid}/reset`, { method: 'POST' });
+    const modal = document.getElementById('score-modal'); if (modal) modal.remove();
+    showToast('경기가 초기화되었습니다.', 'success');
+    await loadMatches(tid); switchTab('matches');
+  } catch(e) {}
+}
+
+async function showCourtChangeModal(mid) {
+  const m = state.matches.find(x => x.id === mid); if (!m) return;
+  const courts = state.currentTournament?.courts || 6;
+  const modal = document.createElement('div'); modal.id = 'court-modal';
+  modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-overlay';
+  modal.innerHTML = `<div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
+    <h3 class="text-lg font-bold mb-4"><i class="fas fa-exchange-alt mr-2 text-indigo-500"></i>코트 변경</h3>
+    <p class="text-sm text-gray-600 mb-3">${m.team1_name||'팀1'} vs ${m.team2_name||'팀2'}</p>
+    <p class="text-xs text-gray-400 mb-3">현재: ${m.court_number || '미배정'}코트</p>
+    <div class="grid grid-cols-3 gap-2 mb-5">
+      ${Array.from({length: courts}, (_, i) => i+1).map(n =>
+        `<button onclick="document.querySelectorAll('#court-modal .court-btn').forEach(b=>b.classList.remove('ring-2','ring-indigo-500'));this.classList.add('ring-2','ring-indigo-500');document.getElementById('new-court-val').value=${n}" class="court-btn py-3 rounded-xl text-sm font-bold ${m.court_number===n ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-500' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">${n}코트</button>`
+      ).join('')}
+    </div>
+    <input type="hidden" id="new-court-val" value="${m.court_number||1}">
+    <div class="flex gap-2">
+      <button onclick="document.getElementById('court-modal').remove()" class="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium">취소</button>
+      <button onclick="submitCourtChange(${mid})" class="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-medium">변경</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+async function submitCourtChange(mid) {
+  const courtNum = parseInt(document.getElementById('new-court-val').value);
+  const tid = state.currentTournament.id;
+  try {
+    await api(`/tournaments/${tid}/matches/${mid}/court`, { method: 'PATCH', body: JSON.stringify({ court_number: courtNum }) });
+    document.getElementById('court-modal').remove();
+    showToast(`코트 ${courtNum}으로 변경!`, 'success');
+    await loadMatches(tid); switchTab('matches');
+  } catch(e) {}
 }
 
 async function refreshScoreboard() { if (state.currentTournament) { await loadMatches(state.currentTournament.id); render(); } }
@@ -2670,8 +2744,59 @@ async function searchMyMatches() {
 
   try {
     const data = await api(`/tournaments/${tid}/my-matches?name=${encodeURIComponent(name)}${phone ? '&phone=' + encodeURIComponent(phone) : ''}`);
-    resultEl.innerHTML = renderMyResult(data);
+    // 동명이인 처리
+    if (data.duplicates) {
+      resultEl.innerHTML = renderDuplicateSelection(data);
+    } else {
+      resultEl.innerHTML = renderMyResult(data);
+    }
   } catch(e) {
     resultEl.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-user-slash text-3xl mb-2"></i><p>참가자를 찾을 수 없습니다. 이름을 확인해주세요.</p></div>';
+  }
+}
+
+function renderDuplicateSelection(data) {
+  const CATS = { md: '남복', wd: '여복', xd: '혼복' };
+  const LVLS = { s: 'S', a: 'A', b: 'B', c: 'C', d: 'D', e: 'E' };
+  return `<div class="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
+    <div class="bg-amber-50 px-5 py-4 border-b border-amber-200">
+      <h3 class="font-bold text-amber-800"><i class="fas fa-users mr-2"></i>${data.message}</h3>
+      <p class="text-xs text-amber-600 mt-1">본인을 선택해주세요.</p>
+    </div>
+    <div class="p-4 space-y-3">
+      ${data.participants.map(p => `
+        <button onclick="selectDuplicate(${p.id})" class="w-full text-left p-4 bg-gray-50 rounded-xl border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 hover:shadow-md transition group">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${p.gender==='m'?'bg-blue-500':'bg-pink-500'}">
+                <i class="fas ${p.gender==='m'?'fa-mars':'fa-venus'}"></i>
+              </div>
+              <div>
+                <span class="font-bold text-gray-800">${p.name}</span>
+                <div class="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
+                  ${p.club ? `<span><i class="fas fa-building mr-0.5"></i>${p.club}</span>` : ''}
+                  ${p.level ? `<span class="px-1.5 py-0.5 rounded bg-gray-100">${LVLS[p.level]||p.level}급</span>` : ''}
+                  ${p.birth_year ? `<span>${p.birth_year}년생</span>` : ''}
+                  ${p.phone ? `<span>끝자리 ${p.phone}</span>` : ''}
+                </div>
+              </div>
+            </div>
+            <i class="fas fa-chevron-right text-gray-300 group-hover:text-indigo-500 transition"></i>
+          </div>
+        </button>
+      `).join('')}
+    </div>
+  </div>`;
+}
+
+async function selectDuplicate(pid) {
+  const tid = state.currentTournament.id;
+  const resultEl = document.getElementById('my-result');
+  resultEl.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i></div>';
+  try {
+    const data = await api(`/tournaments/${tid}/my-matches-by-id/${pid}`);
+    resultEl.innerHTML = renderMyResult(data);
+  } catch(e) {
+    resultEl.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-exclamation-circle text-3xl mb-2"></i><p>조회에 실패했습니다.</p></div>';
   }
 }

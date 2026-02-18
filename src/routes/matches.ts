@@ -83,11 +83,101 @@ matchRoutes.put('/:tid/matches/:mid/score', async (c) => {
     JSON.stringify({ team1: [team1_set1 || 0, team1_set2 || 0, team1_set3 || 0], team2: [team2_set1 || 0, team2_set2 || 0, team2_set3 || 0] })
   ).run()
 
-  if (status === 'completed' && winner_team) {
+  // 상태가 completed로 바뀌거나 이미 completed인 경기 수정 시 순위 재계산
+  if ((status === 'completed' && winner_team) || oldMatch.status === 'completed') {
     await recalculateStandings(db, parseInt(tid), oldMatch.event_id as number)
   }
 
   return c.json({ message: '점수가 업데이트되었습니다.' })
+})
+
+// 🔴 경기 리셋 (completed → pending, 점수 초기화)
+matchRoutes.post('/:tid/matches/:mid/reset', async (c) => {
+  const tid = c.req.param('tid')
+  const mid = c.req.param('mid')
+  const db = c.env.DB
+
+  const match = await db.prepare(
+    `SELECT * FROM matches WHERE id=? AND tournament_id=?`
+  ).bind(mid, tid).first() as any
+  if (!match) return c.json({ error: '경기를 찾을 수 없습니다.' }, 404)
+
+  // 감사 로그 (리셋 전 상태 기록)
+  await db.prepare(
+    `INSERT INTO audit_logs (tournament_id, match_id, action, old_value, updated_by)
+     VALUES (?, ?, 'RESET_MATCH', ?, 'admin')`
+  ).bind(
+    tid, mid,
+    JSON.stringify({ status: match.status, winner: match.winner_team, score: [match.team1_set1, match.team2_set1] })
+  ).run()
+
+  await db.prepare(
+    `UPDATE matches SET status='pending', winner_team=NULL,
+      team1_set1=0, team1_set2=0, team1_set3=0,
+      team2_set1=0, team2_set2=0, team2_set3=0,
+      winner_signature=NULL, loser_signature=NULL, signature_at=NULL,
+      updated_at=datetime('now') WHERE id=? AND tournament_id=?`
+  ).bind(mid, tid).run()
+
+  // 순위 재계산
+  await recalculateStandings(db, parseInt(tid), match.event_id)
+
+  return c.json({ message: '경기가 초기화되었습니다.' })
+})
+
+// 🔴 코트 재배정
+matchRoutes.patch('/:tid/matches/:mid/court', async (c) => {
+  const tid = c.req.param('tid')
+  const mid = c.req.param('mid')
+  const db = c.env.DB
+  const { court_number } = await c.req.json()
+
+  if (!court_number || court_number < 1) return c.json({ error: '유효한 코트 번호를 입력해주세요.' }, 400)
+
+  const match = await db.prepare(
+    `SELECT * FROM matches WHERE id=? AND tournament_id=?`
+  ).bind(mid, tid).first() as any
+  if (!match) return c.json({ error: '경기를 찾을 수 없습니다.' }, 404)
+  if (match.status === 'playing') return c.json({ error: '진행 중인 경기는 코트를 변경할 수 없습니다.' }, 400)
+
+  const oldCourt = match.court_number
+
+  await db.prepare(
+    `UPDATE matches SET court_number=?, updated_at=datetime('now') WHERE id=? AND tournament_id=?`
+  ).bind(court_number, mid, tid).run()
+
+  // 감사 로그
+  await db.prepare(
+    `INSERT INTO audit_logs (tournament_id, match_id, action, old_value, new_value, updated_by)
+     VALUES (?, ?, 'CHANGE_COURT', ?, ?, 'admin')`
+  ).bind(tid, mid, `코트 ${oldCourt}`, `코트 ${court_number}`).run()
+
+  return c.json({ message: `코트 ${oldCourt} → ${court_number}로 변경되었습니다.` })
+})
+
+// 🔴 일괄 코트 재배정 (여러 경기)
+matchRoutes.post('/:tid/matches/reassign-courts', async (c) => {
+  const tid = c.req.param('tid')
+  const db = c.env.DB
+  const { assignments } = await c.req.json()
+  // assignments: [{ match_id, court_number }]
+
+  if (!assignments || !Array.isArray(assignments)) return c.json({ error: '배정 데이터가 필요합니다.' }, 400)
+
+  let changed = 0
+  for (const a of assignments) {
+    const match = await db.prepare(
+      `SELECT status, court_number FROM matches WHERE id=? AND tournament_id=?`
+    ).bind(a.match_id, tid).first() as any
+    if (!match || match.status === 'playing') continue
+
+    await db.prepare(
+      `UPDATE matches SET court_number=?, updated_at=datetime('now') WHERE id=? AND tournament_id=?`
+    ).bind(a.court_number, a.match_id, tid).run()
+    changed++
+  }
+
+  return c.json({ message: `${changed}개 경기 코트 변경 완료` })
 })
 
 // 경기 상태 변경
@@ -541,7 +631,7 @@ matchRoutes.get('/:tid/my-matches', async (c) => {
 
   if (!name) return c.json({ error: '이름을 입력해주세요.' }, 400)
 
-  // 참가자 검색
+  // 🔴 동명이인 처리: 같은 이름 참가자가 여러 명이면 목록 반환
   let participant: any
   if (phone) {
     participant = await db.prepare(
@@ -549,9 +639,26 @@ matchRoutes.get('/:tid/my-matches', async (c) => {
     ).bind(tid, name, phone).first()
   }
   if (!participant) {
-    participant = await db.prepare(
+    // 이름으로만 검색 - 동명이인 확인
+    const { results: nameMatches } = await db.prepare(
       `SELECT * FROM participants WHERE tournament_id=? AND name=? AND deleted=0`
-    ).bind(tid, name).first()
+    ).bind(tid, name).all()
+
+    if (!nameMatches || nameMatches.length === 0) {
+      return c.json({ error: '참가자를 찾을 수 없습니다.' }, 404)
+    }
+    if (nameMatches.length > 1) {
+      // 동명이인 발견 → 목록 반환하여 선택하도록
+      return c.json({
+        duplicates: true,
+        participants: nameMatches.map((p: any) => ({
+          id: p.id, name: p.name, club: p.club, gender: p.gender,
+          level: p.level, birth_year: p.birth_year, phone: p.phone ? p.phone.slice(-4) : ''
+        })),
+        message: `동명이인이 ${nameMatches.length}명 있습니다. 선택해주세요.`
+      })
+    }
+    participant = nameMatches[0]
   }
   if (!participant) return c.json({ error: '참가자를 찾을 수 없습니다.' }, 404)
 
@@ -606,6 +713,70 @@ matchRoutes.get('/:tid/my-matches', async (c) => {
       birth_year: participant.birth_year,
       paid: participant.paid,
       checked_in: participant.checked_in
+    },
+    teams: teams || [],
+    matches,
+    record: { wins, losses, total_score: totalScore, total_lost: totalLost },
+    total_matches: matches.length,
+    completed_matches: matches.filter((m: any) => m.status === 'completed').length,
+    upcoming_matches: matches.filter((m: any) => m.status === 'pending' || m.status === 'playing')
+  })
+})
+
+// 🔴 참가자 ID로 직접 경기 조회 (동명이인 선택 후)
+matchRoutes.get('/:tid/my-matches-by-id/:pid', async (c) => {
+  const tid = c.req.param('tid')
+  const pid = c.req.param('pid')
+  const db = c.env.DB
+
+  const participant = await db.prepare(
+    `SELECT * FROM participants WHERE id=? AND tournament_id=? AND deleted=0`
+  ).bind(pid, tid).first() as any
+  if (!participant) return c.json({ error: '참가자를 찾을 수 없습니다.' }, 404)
+
+  const { results: teams } = await db.prepare(`
+    SELECT t.*, e.name as event_name, e.category, e.level_group, t.group_num,
+      p1.name as p1_name, p2.name as p2_name
+    FROM teams t
+    JOIN events e ON t.event_id = e.id
+    JOIN participants p1 ON t.player1_id = p1.id
+    JOIN participants p2 ON t.player2_id = p2.id
+    WHERE (t.player1_id=? OR t.player2_id=?) AND t.tournament_id=?
+  `).bind(pid, pid, tid).all()
+
+  const teamIds = (teams || []).map((t: any) => t.id)
+  let matches: any[] = []
+  if (teamIds.length > 0) {
+    const placeholders = teamIds.map(() => '?').join(',')
+    const { results } = await db.prepare(`
+      SELECT m.*, e.name as event_name,
+        t1.team_name as team1_name, t2.team_name as team2_name
+      FROM matches m
+      JOIN events e ON m.event_id = e.id
+      LEFT JOIN teams t1 ON m.team1_id = t1.id
+      LEFT JOIN teams t2 ON m.team2_id = t2.id
+      WHERE (m.team1_id IN (${placeholders}) OR m.team2_id IN (${placeholders}))
+      ORDER BY m.event_id, m.round, m.match_order
+    `).bind(...teamIds, ...teamIds).all()
+    matches = results || []
+  }
+
+  let wins = 0, losses = 0, totalScore = 0, totalLost = 0
+  for (const m of matches) {
+    const match = m as any
+    if (match.status !== 'completed') continue
+    const isTeam1 = teamIds.includes(match.team1_id)
+    if ((isTeam1 && match.winner_team === 1) || (!isTeam1 && match.winner_team === 2)) wins++
+    else losses++
+    totalScore += isTeam1 ? (match.team1_set1 || 0) : (match.team2_set1 || 0)
+    totalLost += isTeam1 ? (match.team2_set1 || 0) : (match.team1_set1 || 0)
+  }
+
+  return c.json({
+    participant: {
+      id: participant.id, name: participant.name, gender: participant.gender,
+      level: participant.level, club: participant.club, birth_year: participant.birth_year,
+      paid: participant.paid, checked_in: participant.checked_in
     },
     teams: teams || [],
     matches,
