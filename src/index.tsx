@@ -1189,31 +1189,14 @@ async function loadPrintData() {
   area.innerHTML = '<div class="loading-msg"><i class="fas fa-spinner fa-spin"></i> 데이터 로드 중...</div>';
   
   try {
-    const [tournamentRes, participantsRes, eventsRes, matchesRes] = await Promise.all([
-      api('/' + tid),
-      api('/' + tid + '/participants'),
-      api('/' + tid + '/events'),
-      api('/' + tid + '/matches')
-    ]);
+    // 통합 API 1회 호출로 모든 데이터 로드
+    const d = await api('/' + tid + '/print-data');
     
-    const tournament = tournamentRes.tournament || tournamentRes;
-    const participants = participantsRes.participants || participantsRes;
-    const events = eventsRes.events || eventsRes;
-    const matchesData = matchesRes.matches || matchesRes;
-    
-    state.tournament = tournament;
-    state.participants = (Array.isArray(participants) ? participants : []).filter(p => !p.deleted);
-    state.events = Array.isArray(events) ? events : [];
-    state.matches = Array.isArray(matchesData) ? matchesData : [];
-    
-    // 종목별 팀 로드
-    state.teams = {};
-    for (const ev of state.events) {
-      try {
-        const td = await api('/' + tid + '/events/' + ev.id + '/teams');
-        state.teams[ev.id] = td.teams || td;
-      } catch(e) { state.teams[ev.id] = []; }
-    }
+    state.tournament = d.tournament;
+    state.participants = (d.participants || []).filter(p => !p.deleted);
+    state.events = d.events || [];
+    state.matches = d.matches || [];
+    state.teams = d.teamsByEvent || {};
     
     renderAll();
   } catch(e) {

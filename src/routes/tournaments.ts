@@ -146,3 +146,61 @@ tournamentRoutes.get('/:id/stats', async (c) => {
     matches: matchStats || { total: 0, completed: 0, playing: 0, pending: 0 }
   })
 })
+
+// =============================================
+// 인쇄 전용 통합 API (1회 호출로 모든 데이터 반환)
+// =============================================
+tournamentRoutes.get('/:id/print-data', async (c) => {
+  const tid = c.req.param('id')
+  const db = c.env.DB
+
+  // 모든 쿼리를 병렬 실행
+  const [tournament, participants, events, matches, teams] = await Promise.all([
+    // 대회 정보
+    db.prepare(`SELECT * FROM tournaments WHERE id=? AND deleted=0`).bind(tid).first(),
+    // 참가자 전체
+    db.prepare(`SELECT * FROM participants WHERE tournament_id=? AND deleted=0 ORDER BY club, name`).bind(tid).all(),
+    // 종목 전체
+    db.prepare(`SELECT * FROM events WHERE tournament_id=? ORDER BY category, age_group, level_group`).bind(tid).all(),
+    // 경기 전체 (팀명 JOIN)
+    db.prepare(`
+      SELECT m.*, e.name as event_name, e.category,
+        t1.team_name as team1_name, t2.team_name as team2_name
+      FROM matches m
+      JOIN events e ON m.event_id = e.id
+      LEFT JOIN teams t1 ON m.team1_id = t1.id
+      LEFT JOIN teams t2 ON m.team2_id = t2.id
+      WHERE m.tournament_id=?
+      ORDER BY m.court_number, m.round, m.match_order
+    `).bind(tid).all(),
+    // 팀 전체 (선수 정보 JOIN)
+    db.prepare(`
+      SELECT t.*, t.group_num,
+        p1.name as p1_name, p1.level as p1_level, p1.gender as p1_gender, p1.birth_year as p1_birth_year, p1.club as p1_club,
+        p2.name as p2_name, p2.level as p2_level, p2.gender as p2_gender, p2.birth_year as p2_birth_year, p2.club as p2_club
+      FROM teams t
+      LEFT JOIN participants p1 ON t.player1_id = p1.id
+      LEFT JOIN participants p2 ON t.player2_id = p2.id
+      WHERE t.tournament_id=?
+      ORDER BY t.event_id, t.group_num, t.created_at
+    `).bind(tid).all()
+  ])
+
+  if (!tournament) return c.json({ error: '대회를 찾을 수 없습니다.' }, 404)
+
+  // 팀을 종목별로 그룹핑
+  const teamsByEvent: Record<number, any[]> = {}
+  for (const t of (teams.results || [])) {
+    const eid = t.event_id as number
+    if (!teamsByEvent[eid]) teamsByEvent[eid] = []
+    teamsByEvent[eid].push(t)
+  }
+
+  return c.json({
+    tournament,
+    participants: participants.results || [],
+    events: events.results || [],
+    matches: matches.results || [],
+    teamsByEvent
+  })
+})
