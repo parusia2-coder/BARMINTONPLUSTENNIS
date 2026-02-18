@@ -913,19 +913,19 @@ function renderSignatureScreen() {
       <div class="bg-white/5 rounded-2xl p-3 border border-white/10">
         <div class="flex items-center justify-center gap-4">
           <div class="text-center flex-1">
-            <p class="text-xs ${courtState.finishedWinner === 1 ? 'text-yellow-400' : 'text-gray-400'} font-bold mb-0.5">
-              ${courtState.finishedWinner === 1 ? '🏆 승리' : '패배'}
+            <p class="text-xs text-yellow-400 font-bold mb-0.5">
+              🏆 승리
             </p>
             <p class="text-sm font-bold truncate">${names.winner}</p>
-            <p class="text-2xl font-black ${courtState.finishedWinner === 1 ? 'text-yellow-400' : ''}">${winnerScore}</p>
+            <p class="text-2xl font-black text-yellow-400">${winnerScore}</p>
           </div>
           <span class="text-xl text-gray-600 font-bold">:</span>
           <div class="text-center flex-1">
-            <p class="text-xs ${courtState.finishedWinner === 2 ? 'text-yellow-400' : 'text-gray-400'} font-bold mb-0.5">
-              ${courtState.finishedWinner === 2 ? '🏆 승리' : '패배'}
+            <p class="text-xs text-gray-400 font-bold mb-0.5">
+              패배
             </p>
             <p class="text-sm font-bold truncate">${names.loser}</p>
-            <p class="text-2xl font-black ${courtState.finishedWinner === 2 ? 'text-yellow-400' : ''}">${loserScore}</p>
+            <p class="text-2xl font-black">${loserScore}</p>
           </div>
         </div>
       </div>
@@ -962,7 +962,7 @@ function renderSignatureScreen() {
       </div>
 
       <!-- 캔버스 (터치 서명 영역) -->
-      <div class="flex-1 relative rounded-2xl overflow-hidden border-2 ${signatureStep === 'winner' ? 'border-yellow-500/40' : 'border-blue-500/40'} bg-white min-h-0" id="sig-container">
+      <div class="flex-1 relative rounded-2xl overflow-hidden border-2 ${signatureStep === 'winner' ? 'border-yellow-500/40' : 'border-blue-500/40'} bg-white min-h-0" id="sig-container" style="max-height:45vh;">
         <canvas id="sig-canvas" class="w-full h-full" style="touch-action:none;"></canvas>
         <!-- 가이드 라인 -->
         <div class="absolute bottom-[30%] left-[10%] right-[10%] border-b border-dashed border-gray-300 pointer-events-none"></div>
@@ -976,16 +976,16 @@ function renderSignatureScreen() {
       </div>
 
       <!-- 하단 버튼 -->
-      <div class="flex gap-2 mt-3 shrink-0">
-        <button onclick="clearSignature()" class="flex-1 py-3 bg-white/10 rounded-xl text-sm font-medium hover:bg-white/20 active:scale-95 transition">
+      <div class="flex gap-2 mt-3 shrink-0 pb-2">
+        <button onclick="clearSignature()" class="py-3 px-4 bg-white/10 rounded-xl text-sm font-medium hover:bg-white/20 active:scale-95 transition">
           <i class="fas fa-eraser mr-1"></i>다시 쓰기
         </button>
         ${signatureStep !== 'done' ? `
-        <button onclick="confirmSignature()" id="sig-confirm-btn" class="flex-1 py-3 ${signatureStep === 'winner' ? 'bg-yellow-600' : 'bg-blue-600'} rounded-xl text-sm font-bold hover:opacity-90 shadow-lg active:scale-95 transition disabled:opacity-50" disabled>
-          <i class="fas fa-check mr-1"></i>${signatureStep === 'winner' ? '승리팀 서명 완료' : '패배팀 서명 완료'}
+        <button onclick="confirmSignature()" id="sig-confirm-btn" class="flex-1 py-4 ${signatureStep === 'winner' ? 'bg-yellow-500 text-black' : 'bg-blue-500 text-white'} rounded-xl text-base font-black hover:opacity-90 shadow-lg active:scale-95 transition disabled:opacity-30" disabled>
+          <i class="fas fa-arrow-right mr-2"></i>${signatureStep === 'winner' ? '승리팀 서명 완료 →' : '패배팀 서명 완료 → 경기 종료'}
         </button>
         ` : ''}
-        <button onclick="skipSignature()" class="py-3 px-4 bg-white/5 rounded-xl text-xs text-gray-500 hover:bg-white/10 active:scale-95 transition">
+        <button onclick="skipSignature()" class="py-3 px-3 bg-white/5 rounded-xl text-xs text-gray-500 hover:bg-white/10 active:scale-95 transition">
           건너뛰기
         </button>
       </div>
