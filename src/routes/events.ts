@@ -872,7 +872,44 @@ eventRoutes.post('/:tid/events/execute-merge', async (c) => {
     await db.prepare(`DELETE FROM events WHERE id=?`).bind(eid).run()
   }
 
-  return c.json({ id: newEventId, name: mergedName, message: `${events.length}개 종목이 합병되었습니다.` })
+  // 합병 후 자동 조 재편성 (랜덤 셔플)
+  const { results: mergedTeams } = await db.prepare(
+    `SELECT t.*, p1.club as p1_club, p2.club as p2_club
+     FROM teams t
+     JOIN participants p1 ON t.player1_id = p1.id
+     JOIN participants p2 ON t.player2_id = p2.id
+     WHERE t.event_id=?
+     ORDER BY t.id`
+  ).bind(newEventId).all()
+
+  let groupInfo = null
+  if (mergedTeams && mergedTeams.length > 0) {
+    const tournament = await db.prepare(`SELECT * FROM tournaments WHERE id=?`).bind(tid).first() as any
+    const groupSize = 5  // 기본 조당 팀 수
+    const avoidSameClub = true
+    const assignments = assignGroups(mergedTeams as any[], groupSize, avoidSameClub, mergedTeams as any[])
+
+    for (const a of assignments) {
+      await db.prepare(`UPDATE teams SET group_num=? WHERE id=?`).bind(a.groupNum, a.teamId).run()
+    }
+
+    const groupStats: Record<number, number> = {}
+    for (const a of assignments) {
+      groupStats[a.groupNum] = (groupStats[a.groupNum] || 0) + 1
+    }
+    groupInfo = {
+      groups: Object.keys(groupStats).length,
+      total_teams: mergedTeams.length,
+      detail: Object.entries(groupStats).map(([g, count]) => ({ group: parseInt(g), teams: count }))
+    }
+  }
+
+  return c.json({
+    id: newEventId,
+    name: mergedName,
+    message: `${events.length}개 종목이 합병되었습니다.${groupInfo ? ` ${groupInfo.groups}개 조로 자동 재편성 완료 (${groupInfo.total_teams}팀)` : ''}`,
+    group_info: groupInfo
+  })
 })
 
 // 합병 취소 (되돌리기)
