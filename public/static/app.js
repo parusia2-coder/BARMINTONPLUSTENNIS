@@ -2328,35 +2328,61 @@ async function loadDashboard(tid) {
 function renderMyPage() {
   const t = state.currentTournament;
   return `${renderNav()}${renderOffline()}
-  <div class="max-w-3xl mx-auto px-4 py-8 fade-in">
-    <button onclick="navigate('tournament')" class="text-gray-500 hover:text-gray-700 mb-6 inline-flex items-center text-sm"><i class="fas fa-arrow-left mr-2"></i>돌아가기</button>
-    <div class="text-center mb-8">
-      <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-400 to-indigo-600 mb-4 shadow-lg">
-        <i class="fas fa-user text-3xl text-white"></i>
-      </div>
-      <h1 class="text-3xl font-extrabold text-gray-900 mb-2">내 경기 조회</h1>
-      <p class="text-gray-500">${t?.name || '대회'} 참가자 전용 페이지</p>
-    </div>
 
-    <!-- 검색 폼 -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
-      <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-search mr-2 text-indigo-500"></i>참가자 검색</h3>
-      <form id="my-search-form" class="flex flex-wrap gap-3 items-end">
-        <div class="flex-1 min-w-[150px]">
-          <label class="block text-xs font-semibold text-gray-500 mb-1">이름 <span class="text-red-500">*</span></label>
-          <input name="name" required placeholder="예: 김민수" class="w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
-        </div>
-        <div class="flex-1 min-w-[150px]">
-          <label class="block text-xs font-semibold text-gray-500 mb-1">연락처 (선택)</label>
-          <input name="phone" placeholder="010-xxxx-xxxx" class="w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
-        </div>
-        <button type="submit" class="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-md">
-          <i class="fas fa-search mr-1"></i>조회
+  <!-- Hero Banner -->
+  <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-gray-900 relative overflow-hidden">
+    <div class="absolute inset-0 opacity-10">
+      <div class="absolute top-10 left-20 w-32 h-32 rounded-full bg-indigo-400 blur-3xl"></div>
+      <div class="absolute bottom-10 right-10 w-40 h-40 rounded-full bg-purple-400 blur-3xl"></div>
+    </div>
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 relative z-10">
+      <!-- Top Bar -->
+      <div class="flex items-center justify-between mb-5">
+        <button onclick="navigate('tournament')" class="flex items-center gap-2 text-white/60 hover:text-white transition text-sm group">
+          <i class="fas fa-arrow-left group-hover:-translate-x-0.5 transition-transform"></i>대회로 돌아가기
         </button>
-      </form>
+      </div>
+      <!-- Title -->
+      <div class="flex items-center gap-4 mb-6">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-500/20 flex-shrink-0">
+          <i class="fas fa-user-circle text-xl text-white"></i>
+        </div>
+        <div class="min-w-0">
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">내 경기 조회</h1>
+          <div class="flex items-center gap-2 mt-1 flex-wrap">
+            <span class="text-white/50 text-sm">${t?.name || '대회'}</span>
+            <span class="text-white/30">·</span>
+            <span class="text-white/50 text-sm">참가자 전용</span>
+          </div>
+        </div>
+      </div>
+      <!-- 검색 폼 (히어로 내부) -->
+      <div class="bg-white/[0.07] backdrop-blur-sm rounded-2xl p-5 border border-white/10">
+        <form id="my-search-form" class="flex flex-wrap gap-3 items-end">
+          <div class="flex-1 min-w-[140px]">
+            <label class="block text-xs font-semibold text-white/50 mb-1.5">이름 <span class="text-red-400">*</span></label>
+            <input name="name" required placeholder="예: 김민수" class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/30 outline-none focus:ring-2 focus:ring-indigo-400 focus:bg-white/15 transition">
+          </div>
+          <div class="flex-1 min-w-[140px]">
+            <label class="block text-xs font-semibold text-white/50 mb-1.5">연락처 (선택)</label>
+            <input name="phone" placeholder="010-xxxx-xxxx" class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/30 outline-none focus:ring-2 focus:ring-indigo-400 focus:bg-white/15 transition">
+          </div>
+          <button type="submit" class="px-6 py-3 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-xl font-bold hover:from-indigo-600 hover:to-indigo-700 shadow-lg shadow-indigo-500/30 transition-all">
+            <i class="fas fa-search mr-1.5"></i>조회
+          </button>
+        </form>
+      </div>
     </div>
+    <!-- Wave Divider -->
+    <svg class="w-full h-6 sm:h-8" viewBox="0 0 1440 30" fill="none" preserveAspectRatio="none">
+      <path d="M0,0 C360,30 1080,30 1440,0 L1440,30 L0,30 Z" fill="#f8fafc"/>
+    </svg>
+  </div>
 
+  <div class="bg-slate-50 min-h-screen">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 -mt-1 pb-10 fade-in">
     <div id="my-result"></div>
+  </div>
   </div>`;
 }
 
@@ -2367,89 +2393,119 @@ function renderMyResult(data) {
   const rec = data.record || {};
   const upcoming = data.upcoming_matches || [];
   const completed = matches.filter(m => m.status === 'completed');
+  const winRate = (rec.wins||0) + (rec.losses||0) > 0 ? Math.round((rec.wins||0) / ((rec.wins||0) + (rec.losses||0)) * 100) : 0;
 
-  const genderLabel = p.gender === 'm' ? '<span class="badge bg-blue-100 text-blue-700">남</span>' : '<span class="badge bg-pink-100 text-pink-700">여</span>';
-  const levelLabel = `<span class="badge ${LEVEL_COLORS[p.level] || 'bg-gray-100 text-gray-600'}">${LEVELS[p.level] || 'C'}급</span>`;
+  const genderBg = p.gender === 'm' ? 'from-blue-400 to-blue-600' : 'from-pink-400 to-pink-600';
+  const genderLabel = p.gender === 'm' ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold border border-blue-200"><i class="fas fa-mars text-[10px]"></i>남</span>' : '<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-pink-100 text-pink-700 rounded-full text-xs font-bold border border-pink-200"><i class="fas fa-venus text-[10px]"></i>여</span>';
+  const levelLabel = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold border ${LEVEL_COLORS[p.level] || 'bg-gray-100 text-gray-600 border-gray-200'}">${LEVELS[p.level] || 'C'}급</span>`;
 
   return `
-    <!-- 선수 프로필 -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
-      <div class="flex items-center gap-4">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br ${p.gender === 'm' ? 'from-blue-400 to-blue-600' : 'from-pink-400 to-pink-600'} flex items-center justify-center">
-          <i class="fas fa-user text-2xl text-white"></i>
+    <!-- 선수 프로필 카드 -->
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 mb-4 sm:mb-6 shadow-sm hover:shadow-md transition-shadow">
+      <div class="flex items-start sm:items-center gap-4 flex-col sm:flex-row">
+        <div class="flex items-center gap-4 flex-1 min-w-0">
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-br ${genderBg} flex items-center justify-center shadow-lg flex-shrink-0">
+            <i class="fas fa-user text-xl text-white"></i>
+          </div>
+          <div class="min-w-0">
+            <h2 class="text-xl sm:text-2xl font-extrabold text-gray-900 truncate">${p.name}</h2>
+            <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">${genderLabel} ${levelLabel} ${p.club ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full text-xs font-bold border border-teal-200"><i class="fas fa-building text-[10px]"></i>${p.club}</span>` : ''}</div>
+          </div>
         </div>
-        <div>
-          <h2 class="text-2xl font-extrabold text-gray-900">${p.name}</h2>
-          <div class="flex items-center gap-2 mt-1">${genderLabel} ${levelLabel} ${p.club ? `<span class="badge bg-teal-50 text-teal-700">${p.club}</span>` : ''}</div>
-        </div>
-        <div class="ml-auto text-right">
-          ${p.paid ? '<span class="badge bg-green-100 text-green-700"><i class="fas fa-check mr-1"></i>참가비 완납</span>' : '<span class="badge bg-red-100 text-red-600"><i class="fas fa-times mr-1"></i>미납</span>'}
-          ${p.checked_in ? '<span class="badge bg-blue-100 text-blue-700 ml-1"><i class="fas fa-check mr-1"></i>체크인</span>' : ''}
+        <div class="flex items-center gap-2 flex-shrink-0 sm:ml-auto">
+          ${p.paid ? '<span class="inline-flex items-center gap-1 px-2.5 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-bold border border-green-200"><i class="fas fa-check-circle text-[10px]"></i>참가비 완납</span>' : '<span class="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-200"><i class="fas fa-times-circle text-[10px]"></i>미납</span>'}
+          ${p.checked_in ? '<span class="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold border border-blue-200"><i class="fas fa-check text-[10px]"></i>체크인</span>' : ''}
         </div>
       </div>
     </div>
 
-    <!-- 전적 요약 -->
-    <div class="grid grid-cols-4 gap-3 mb-6">
-      <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
-        <div class="text-2xl font-extrabold text-gray-900">${data.total_matches}</div>
-        <div class="text-xs text-gray-500 mt-1">총 경기</div>
+    <!-- 전적 요약 카드 -->
+    <div class="grid grid-cols-4 gap-3 mb-4 sm:mb-6">
+      <div class="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 text-center shadow-sm hover:shadow-md transition-shadow">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-400 to-gray-600 mx-auto mb-1.5 flex items-center justify-center shadow-md"><i class="fas fa-gamepad text-white text-xs"></i></div>
+        <div class="text-xl sm:text-2xl font-extrabold text-gray-900">${data.total_matches}</div>
+        <div class="text-[11px] text-gray-500 mt-0.5">총 경기</div>
       </div>
-      <div class="bg-green-50 rounded-xl border border-green-200 p-4 text-center">
-        <div class="text-2xl font-extrabold text-green-600">${rec.wins || 0}</div>
-        <div class="text-xs text-gray-500 mt-1">승</div>
+      <div class="bg-white rounded-xl border border-green-200 p-3 sm:p-4 text-center shadow-sm hover:shadow-md transition-shadow">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-green-400 to-green-600 mx-auto mb-1.5 flex items-center justify-center shadow-md"><i class="fas fa-trophy text-white text-xs"></i></div>
+        <div class="text-xl sm:text-2xl font-extrabold text-green-600">${rec.wins || 0}</div>
+        <div class="text-[11px] text-gray-500 mt-0.5">승</div>
       </div>
-      <div class="bg-red-50 rounded-xl border border-red-200 p-4 text-center">
-        <div class="text-2xl font-extrabold text-red-500">${rec.losses || 0}</div>
-        <div class="text-xs text-gray-500 mt-1">패</div>
+      <div class="bg-white rounded-xl border border-red-200 p-3 sm:p-4 text-center shadow-sm hover:shadow-md transition-shadow">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-red-400 to-red-600 mx-auto mb-1.5 flex items-center justify-center shadow-md"><i class="fas fa-heart-broken text-white text-xs"></i></div>
+        <div class="text-xl sm:text-2xl font-extrabold text-red-500">${rec.losses || 0}</div>
+        <div class="text-[11px] text-gray-500 mt-0.5">패</div>
       </div>
-      <div class="bg-blue-50 rounded-xl border border-blue-200 p-4 text-center">
-        <div class="text-2xl font-extrabold text-blue-600">${rec.total_score && rec.total_lost ? `${rec.total_score > rec.total_lost ? '+' : ''}${rec.total_score - rec.total_lost}` : '0'}</div>
-        <div class="text-xs text-gray-500 mt-1">득실차</div>
+      <div class="bg-white rounded-xl border border-blue-200 p-3 sm:p-4 text-center shadow-sm hover:shadow-md transition-shadow">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 mx-auto mb-1.5 flex items-center justify-center shadow-md"><i class="fas fa-chart-line text-white text-xs"></i></div>
+        <div class="text-xl sm:text-2xl font-extrabold text-blue-600">${rec.total_score && rec.total_lost ? `${rec.total_score > rec.total_lost ? '+' : ''}${rec.total_score - rec.total_lost}` : '0'}</div>
+        <div class="text-[11px] text-gray-500 mt-0.5">득실차</div>
       </div>
     </div>
+
+    <!-- 승률 프로그레스 바 -->
+    ${(rec.wins||0) + (rec.losses||0) > 0 ? `
+    <div class="bg-white rounded-2xl border border-gray-200 p-4 mb-4 sm:mb-6 shadow-sm">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm font-semibold text-gray-600"><i class="fas fa-percentage mr-1.5 text-indigo-500"></i>승률</span>
+        <span class="text-lg font-extrabold ${winRate >= 60 ? 'text-green-600' : winRate >= 40 ? 'text-blue-600' : 'text-red-500'}">${winRate}%</span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2.5">
+        <div class="${winRate >= 60 ? 'bg-green-500' : winRate >= 40 ? 'bg-blue-500' : 'bg-red-400'} h-2.5 rounded-full transition-all duration-500" style="width:${winRate}%"></div>
+      </div>
+    </div>` : ''}
 
     <!-- 소속 팀 -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
-      <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-users mr-2 text-emerald-500"></i>소속 팀</h3>
-      <div class="space-y-2">
-        ${teams.length === 0 ? '<p class="text-gray-400 text-sm">배정된 팀이 없습니다.</p>' : ''}
-        ${teams.map(t => `
-          <div class="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
-            <div>
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 mb-4 sm:mb-6 shadow-sm hover:shadow-md transition-shadow">
+      <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center mr-2.5 shadow-md shadow-emerald-500/20"><i class="fas fa-users text-white text-xs"></i></div>소속 팀</h3>
+      ${teams.length === 0 ? '<div class="text-center py-6 text-gray-400"><i class="fas fa-user-friends text-2xl mb-2"></i><p class="text-sm">배정된 팀이 없습니다.</p></div>' : `<div class="space-y-2.5">
+        ${teams.map(t => {
+          const catBg = t.event_name?.includes('남자') ? 'border-l-blue-500' : t.event_name?.includes('여자') ? 'border-l-pink-500' : t.event_name?.includes('혼합') ? 'border-l-purple-500' : 'border-l-gray-400';
+          return `<div class="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 border border-gray-100 border-l-4 ${catBg} hover:shadow-sm transition-shadow">
+            <div class="min-w-0">
               <span class="font-bold text-gray-900">${t.team_name}</span>
-              <span class="ml-2 text-xs text-gray-500">${t.event_name}</span>
-              ${t.group_num ? `<span class="badge bg-indigo-50 text-indigo-600 text-xs ml-1">${t.group_num}조</span>` : ''}
+              <div class="flex items-center gap-1.5 mt-1">
+                <span class="text-xs text-gray-500">${t.event_name}</span>
+                ${t.group_num ? `<span class="inline-flex items-center px-1.5 py-0 bg-indigo-50 text-indigo-600 rounded text-xs font-bold border border-indigo-200">${t.group_num}조</span>` : ''}
+              </div>
             </div>
-            <span class="text-sm text-gray-600">${t.p1_name} · ${t.p2_name}</span>
-          </div>
-        `).join('')}
-      </div>
+            <div class="flex items-center gap-1 text-sm text-gray-600 flex-shrink-0">
+              <i class="fas fa-user-friends text-xs text-gray-400 mr-1"></i>${t.p1_name} · ${t.p2_name}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`}
     </div>
 
     <!-- 예정/진행중 경기 -->
     ${upcoming.length > 0 ? `
-    <div class="bg-white rounded-2xl shadow-sm border-2 border-green-200 p-6 mb-6">
-      <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-clock mr-2 text-green-500"></i>예정/진행중 경기 (${upcoming.length})</h3>
+    <div class="bg-white rounded-2xl border-2 border-green-200 p-5 sm:p-6 mb-4 sm:mb-6 shadow-sm hover:shadow-md transition-shadow">
+      <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center mr-2.5 shadow-md shadow-green-500/20"><i class="fas fa-clock text-white text-xs"></i></div>예정/진행중 경기 <span class="ml-2 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-bold">${upcoming.length}</span></h3>
       <div class="space-y-3">
         ${upcoming.map(m => {
           const isTeam1 = teams.some(t => t.id === m.team1_id);
           const myTeam = isTeam1 ? m.team1_name : m.team2_name;
           const oppTeam = isTeam1 ? m.team2_name : m.team1_name;
           const isPlaying = m.status === 'playing';
-          return `<div class="flex items-center justify-between rounded-xl px-4 py-3 ${isPlaying ? 'bg-green-50 border-2 border-green-300' : 'bg-gray-50'}">
-            <div>
-              <div class="flex items-center gap-2">
-                ${isPlaying ? '<span class="w-2 h-2 rounded-full bg-green-500 pulse-live"></span>' : ''}
-                <span class="font-bold ${isPlaying ? 'text-green-700' : ''}">${myTeam}</span>
-                <span class="text-gray-400 mx-1">vs</span>
-                <span class="font-medium">${oppTeam || 'BYE'}</span>
+          return `<div class="rounded-xl border ${isPlaying ? 'border-2 border-green-300 bg-gradient-to-r from-green-50 to-white' : 'border-gray-200 bg-gray-50'} p-4 hover:shadow-sm transition-all">
+            <div class="flex items-center justify-between">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  ${isPlaying ? '<span class="w-2.5 h-2.5 rounded-full bg-green-500 pulse-live flex-shrink-0"></span>' : ''}
+                  <span class="font-bold text-base ${isPlaying ? 'text-green-700' : 'text-gray-900'}">${myTeam}</span>
+                  <span class="text-gray-300 font-bold">vs</span>
+                  <span class="font-medium text-gray-600">${oppTeam || 'BYE'}</span>
+                </div>
+                <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <span class="text-xs text-gray-500"><i class="fas fa-layer-group mr-0.5"></i>${m.event_name || ''}</span>
+                  ${m.group_num ? `<span class="text-xs text-indigo-500 font-medium">${m.group_num}조</span>` : ''}
+                  <span class="text-xs text-gray-400">#${m.match_order}</span>
+                </div>
               </div>
-              <p class="text-xs text-gray-500 mt-1">${m.event_name || ''} ${m.group_num ? m.group_num+'조' : ''} · #${m.match_order}</p>
-            </div>
-            <div class="text-right">
-              ${m.court_number ? `<span class="badge bg-yellow-100 text-yellow-700">${m.court_number}코트</span>` : '<span class="text-xs text-gray-400">코트 미배정</span>'}
-              ${isPlaying ? '<span class="badge bg-green-100 text-green-700 ml-1">진행중</span>' : '<span class="badge bg-gray-100 text-gray-600 ml-1">대기</span>'}
+              <div class="flex items-center gap-2 flex-shrink-0">
+                ${m.court_number ? `<span class="inline-flex items-center gap-1 px-2 py-1 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-bold border border-yellow-200"><i class="fas fa-map-marker-alt text-[10px]"></i>${m.court_number}코트</span>` : '<span class="text-xs text-gray-400">미배정</span>'}
+                ${isPlaying ? '<span class="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-bold border border-green-200"><span class="w-1.5 h-1.5 rounded-full bg-green-500 pulse-live"></span>진행중</span>' : '<span class="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-500 rounded-lg text-xs font-medium border border-gray-200">대기</span>'}
+              </div>
             </div>
           </div>`;
         }).join('')}
@@ -2458,9 +2514,9 @@ function renderMyResult(data) {
 
     <!-- 완료된 경기 결과 -->
     ${completed.length > 0 ? `
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-      <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-history mr-2 text-blue-500"></i>경기 결과 (${completed.length})</h3>
-      <div class="space-y-2">
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+      <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center mr-2.5 shadow-md shadow-blue-500/20"><i class="fas fa-history text-white text-xs"></i></div>경기 결과 <span class="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">${completed.length}</span></h3>
+      <div class="space-y-3">
         ${completed.map(m => {
           const isTeam1 = teams.some(t => t.id === m.team1_id);
           const isWinner = (isTeam1 && m.winner_team === 1) || (!isTeam1 && m.winner_team === 2);
@@ -2468,23 +2524,30 @@ function renderMyResult(data) {
           const oppScore = isTeam1 ? (m.team2_set1||0) : (m.team1_set1||0);
           const myTeam = isTeam1 ? m.team1_name : m.team2_name;
           const oppTeam = isTeam1 ? m.team2_name : m.team1_name;
-          return `<div class="flex items-center justify-between rounded-xl px-4 py-3 ${isWinner ? 'bg-green-50' : 'bg-red-50'}">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="font-bold ${isWinner ? 'text-green-700' : 'text-red-600'}">${isWinner ? '🏆' : '💔'} ${myTeam}</span>
-                <span class="text-gray-400">vs</span>
-                <span>${oppTeam}</span>
+          return `<div class="rounded-xl border ${isWinner ? 'border-green-200 bg-gradient-to-r from-green-50 to-white' : 'border-red-200 bg-gradient-to-r from-red-50 to-white'} p-4 hover:shadow-sm transition-all">
+            <div class="flex items-center justify-between">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="w-7 h-7 rounded-lg ${isWinner ? 'bg-gradient-to-br from-yellow-400 to-yellow-500' : 'bg-gradient-to-br from-gray-300 to-gray-400'} flex items-center justify-center flex-shrink-0"><i class="fas ${isWinner ? 'fa-trophy' : 'fa-times'} text-white text-xs"></i></span>
+                  <span class="font-bold text-base ${isWinner ? 'text-green-700' : 'text-red-600'}">${myTeam}</span>
+                  <span class="text-gray-300 font-bold">vs</span>
+                  <span class="font-medium text-gray-600">${oppTeam}</span>
+                </div>
+                <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <span class="text-xs text-gray-500"><i class="fas fa-layer-group mr-0.5"></i>${m.event_name || ''}</span>
+                  ${m.group_num ? `<span class="text-xs text-indigo-500 font-medium">${m.group_num}조</span>` : ''}
+                  ${m.court_number ? `<span class="text-xs text-gray-400">${m.court_number}코트</span>` : ''}
+                </div>
               </div>
-              <p class="text-xs text-gray-500 mt-1">${m.event_name || ''} ${m.group_num ? m.group_num+'조' : ''} ${m.court_number ? m.court_number+'코트' : ''}</p>
-            </div>
-            <div class="text-right">
-              <span class="text-xl font-extrabold ${isWinner ? 'text-green-600' : 'text-red-500'}">${myScore} : ${oppScore}</span>
-              <span class="badge ${isWinner ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'} block mt-1 text-center">${isWinner ? '승리' : '패배'}</span>
+              <div class="text-right flex-shrink-0">
+                <div class="text-xl sm:text-2xl font-extrabold ${isWinner ? 'text-green-600' : 'text-red-500'}">${myScore} <span class="text-sm text-gray-300">:</span> ${oppScore}</div>
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 ${isWinner ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-600 border-red-200'} rounded-full text-xs font-bold border mt-1">${isWinner ? '<i class="fas fa-check text-[9px]"></i>승리' : '<i class="fas fa-times text-[9px]"></i>패배'}</span>
+              </div>
             </div>
           </div>`;
         }).join('')}
       </div>
-    </div>` : '<div class="text-center py-8 text-gray-400"><i class="fas fa-inbox text-3xl mb-2"></i><p>완료된 경기가 없습니다.</p></div>'}
+    </div>` : '<div class="text-center py-12 text-gray-400"><i class="fas fa-inbox text-4xl mb-3"></i><p class="text-sm">완료된 경기가 없습니다.</p></div>'}
   `;
 }
 
