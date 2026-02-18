@@ -872,44 +872,107 @@ eventRoutes.post('/:tid/events/execute-merge', async (c) => {
     await db.prepare(`DELETE FROM events WHERE id=?`).bind(eid).run()
   }
 
-  // 합병 후 자동 조 재편성 (랜덤 셔플)
-  const { results: mergedTeams } = await db.prepare(
-    `SELECT t.*, p1.club as p1_club, p2.club as p2_club
-     FROM teams t
-     JOIN participants p1 ON t.player1_id = p1.id
-     JOIN participants p2 ON t.player2_id = p2.id
-     WHERE t.event_id=?
-     ORDER BY t.id`
+  // =============================================
+  // 합병 후 팀 해체 → 급수 균형 재조합 → 조 재편성
+  // =============================================
+  // 1) 기존 팀에서 모든 선수 ID 수집
+  const { results: oldTeams } = await db.prepare(
+    `SELECT * FROM teams WHERE event_id=?`
   ).bind(newEventId).all()
 
-  let groupInfo = null
-  if (mergedTeams && mergedTeams.length > 0) {
-    const tournament = await db.prepare(`SELECT * FROM tournaments WHERE id=?`).bind(tid).first() as any
-    const groupSize = 5  // 기본 조당 팀 수
-    const avoidSameClub = true
-    const assignments = assignGroups(mergedTeams as any[], groupSize, avoidSameClub, mergedTeams as any[])
-
-    for (const a of assignments) {
-      await db.prepare(`UPDATE teams SET group_num=? WHERE id=?`).bind(a.groupNum, a.teamId).run()
+  if (oldTeams && oldTeams.length > 0) {
+    const playerIds = new Set<number>()
+    for (const t of oldTeams) {
+      playerIds.add(t.player1_id as number)
+      playerIds.add(t.player2_id as number)
     }
 
-    const groupStats: Record<number, number> = {}
-    for (const a of assignments) {
-      groupStats[a.groupNum] = (groupStats[a.groupNum] || 0) + 1
+    // 2) 기존 팀 전부 삭제
+    await db.prepare(`DELETE FROM teams WHERE event_id=?`).bind(newEventId).run()
+
+    // 3) 선수 정보 조회 (급수, 클럽 포함)
+    const allPlayers: any[] = []
+    for (const pid of playerIds) {
+      const p = await db.prepare(
+        `SELECT * FROM participants WHERE id=? AND deleted=0`
+      ).bind(pid).first()
+      if (p) allPlayers.push(p)
     }
-    groupInfo = {
-      groups: Object.keys(groupStats).length,
-      total_teams: mergedTeams.length,
-      detail: Object.entries(groupStats).map(([g, count]) => ({ group: parseInt(g), teams: count }))
+
+    // 4) 급수 균형 팀 재조합: 급수 정렬 후 상위+하위 페어링
+    //    (A+E, A+D, B+D, B+C 식으로 급수가 섞이도록)
+    allPlayers.sort((a, b) => (LEVEL_ORDER[a.level] || 3) - (LEVEL_ORDER[b.level] || 3))
+    const shuffledPlayers = [...allPlayers]
+    // 같은 급수 내에서는 랜덤 셔플
+    let start = 0
+    while (start < shuffledPlayers.length) {
+      let end = start
+      while (end < shuffledPlayers.length && shuffledPlayers[end].level === shuffledPlayers[start].level) end++
+      const slice = shuffledPlayers.slice(start, end)
+      const shuffled = shuffle(slice)
+      for (let k = 0; k < shuffled.length; k++) shuffledPlayers[start + k] = shuffled[k]
+      start = end
     }
+
+    // 상위 절반 + 하위 절반 페어링 (급수 균형)
+    const half = Math.floor(shuffledPlayers.length / 2)
+    const upper = shuffledPlayers.slice(0, half)   // 상위급수 (S, A, B ...)
+    const lower = shuffledPlayers.slice(half)       // 하위급수 (... D, E)
+    // 하위를 뒤집어서 최상위+최하위가 매칭되도록
+    lower.reverse()
+
+    const newTeams: { p1: any; p2: any }[] = []
+    const minLen = Math.min(upper.length, lower.length)
+    for (let i = 0; i < minLen; i++) {
+      newTeams.push({ p1: upper[i], p2: lower[i] })
+    }
+
+    // 5) 새 팀 DB 삽입
+    for (const team of newTeams) {
+      await db.prepare(
+        `INSERT INTO teams (event_id, player1_id, player2_id) VALUES (?, ?, ?)`
+      ).bind(newEventId, team.p1.id, team.p2.id).run()
+    }
+
+    // 6) 조 재편성
+    const { results: finalTeams } = await db.prepare(
+      `SELECT t.*, p1.club as p1_club, p2.club as p2_club
+       FROM teams t
+       JOIN participants p1 ON t.player1_id = p1.id
+       JOIN participants p2 ON t.player2_id = p2.id
+       WHERE t.event_id=?
+       ORDER BY t.id`
+    ).bind(newEventId).all()
+
+    let groupInfo = null
+    if (finalTeams && finalTeams.length > 0) {
+      const groupSize = 5
+      const avoidSameClub = true
+      const assignments = assignGroups(finalTeams as any[], groupSize, avoidSameClub, finalTeams as any[])
+      for (const a of assignments) {
+        await db.prepare(`UPDATE teams SET group_num=? WHERE id=?`).bind(a.groupNum, a.teamId).run()
+      }
+      const groupStats: Record<number, number> = {}
+      for (const a of assignments) {
+        groupStats[a.groupNum] = (groupStats[a.groupNum] || 0) + 1
+      }
+      groupInfo = {
+        groups: Object.keys(groupStats).length,
+        total_teams: finalTeams.length
+      }
+    }
+
+    return c.json({
+      id: newEventId,
+      name: mergedName,
+      message: `${events.length}개 종목 합병 완료! 선수 ${allPlayers.length}명 → ${newTeams.length}팀 급수균형 재조합${groupInfo ? ` → ${groupInfo.groups}개 조 편성` : ''}`,
+      players: allPlayers.length,
+      teams_created: newTeams.length,
+      group_info: groupInfo
+    })
   }
 
-  return c.json({
-    id: newEventId,
-    name: mergedName,
-    message: `${events.length}개 종목이 합병되었습니다.${groupInfo ? ` ${groupInfo.groups}개 조로 자동 재편성 완료 (${groupInfo.total_teams}팀)` : ''}`,
-    group_info: groupInfo
-  })
+  return c.json({ id: newEventId, name: mergedName, message: `${events.length}개 종목이 합병되었습니다. (팀 없음)` })
 })
 
 // 합병 취소 (되돌리기)
