@@ -715,6 +715,350 @@
   <p><strong>기록할 정보:</strong> 5GHz SSID, 2.4GHz SSID, Wi-Fi 비밀번호, 공유기 관리자 IP (보통 192.168.0.1)</p>
 </div>
 
+<div class="page-break"></div>
+<h3>3-10. 사설 IP 로컬 서버 운영 (인터넷 없는 환경) <span class="badge badge-red">중요</span></h3>
+
+<p>인터넷 회선이 없는 체육관에서도 <strong>공유기 + 노트북 + 태블릿</strong>만으로 대회를 운영할 수 있습니다. 노트북에서 로컬 서버를 실행하고, 태블릿은 사설 IP로 접속합니다.</p>
+
+<div class="box box-blue">
+  <div class="box-title">🌐 네트워크 구성도 (사설 IP)</div>
+  <div class="diagram">          ┌──────────────────────────┐
+          │    Wi-Fi 공유기 (AP)      │
+          │    게이트웨이: 192.168.0.1 │
+          │    DHCP: 192.168.0.100~254│
+          └──────┬─────────┬──────────┘
+                 │         │
+      ┌──────────┘         └──────────┐
+      ▼                               ▼
+┌─────────────────┐         ┌─────────────────┐
+│   💻 노트북      │         │   📱 태블릿 1~6  │
+│  192.168.0.100   │         │  192.168.0.201~  │
+│  (로컬 서버)     │         │  (코트별 점수판)  │
+│  :3000 포트      │         │                   │
+└─────────────────┘         └─────────────────┘
+
+  태블릿 접속 URL:  http://192.168.0.100:3000</div>
+</div>
+
+<h4>① 공유기 기본 설정</h4>
+
+<table class="tbl-blue">
+  <tr><th style="width:8%">순서</th><th style="width:30%">설정 항목</th><th>방법</th></tr>
+  <tr>
+    <td>1</td>
+    <td>공유기 관리 페이지 접속</td>
+    <td>노트북을 공유기에 Wi-Fi 연결 → 브라우저에서 <code>192.168.0.1</code> 접속 (제조사별 다름: ipTIME 192.168.0.1, TP-Link 192.168.0.1 또는 tplinkwifi.net)</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>DHCP 범위 설정</td>
+    <td>고급 설정 → 네트워크 관리 → 내부 네트워크 설정<br>
+      • 시작 IP: <code>192.168.0.100</code><br>
+      • 끝 IP: <code>192.168.0.254</code><br>
+      • 서브넷 마스크: <code>255.255.255.0</code><br>
+      • 게이트웨이: <code>192.168.0.1</code></td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>노트북 IP 고정 (권장)</td>
+    <td>고급 설정 → DHCP → 수동 IP 할당<br>
+      • 노트북의 MAC 주소를 찾아 <code>192.168.0.100</code> 고정 할당<br>
+      <strong>※ MAC 주소 확인법:</strong> Windows → <code>ipconfig /all</code> → 물리적 주소, Mac → 시스템 설정 → Wi-Fi → 상세 정보 → MAC 주소</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>Wi-Fi 이름/비밀번호 설정</td>
+    <td>무선 설정에서 SSID를 <code>BADMINTON-5G</code>(5GHz), <code>BADMINTON</code>(2.4GHz)로 설정<br>보안: WPA2-PSK, 비밀번호를 간단하게 (예: <code>badminton2026</code>)</td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td>설정 적용</td>
+    <td>저장 후 공유기 재부팅 (30초 대기)</td>
+  </tr>
+</table>
+
+<h4>② 노트북 IP 확인 및 고정</h4>
+
+<div class="cols-2">
+  <div>
+    <div class="box box-blue">
+      <div class="box-title">🪟 Windows 노트북</div>
+      <p><strong>IP 확인:</strong></p>
+      <div class="code-block">Win + R → cmd → Enter
+ipconfig</div>
+      <p style="margin-top:2mm">무선 LAN 어댑터 → <strong>IPv4 주소</strong> 확인 (예: 192.168.0.100)</p>
+      <p style="margin-top:3mm"><strong>수동 고정 IP 설정 (DHCP 고정 안 할 경우):</strong></p>
+      <ol>
+        <li>설정 → 네트워크 및 인터넷 → Wi-Fi → 하드웨어 속성</li>
+        <li>IP 할당 → 편집 → <strong>수동</strong></li>
+        <li>IPv4 켜기:
+          <ul>
+            <li>IP 주소: <code>192.168.0.100</code></li>
+            <li>서브넷 마스크: <code>255.255.255.0</code></li>
+            <li>게이트웨이: <code>192.168.0.1</code></li>
+            <li>DNS: <code>8.8.8.8</code></li>
+          </ul>
+        </li>
+        <li>저장</li>
+      </ol>
+    </div>
+  </div>
+  <div>
+    <div class="box box-green">
+      <div class="box-title">🍎 Mac 노트북</div>
+      <p><strong>IP 확인:</strong></p>
+      <div class="code-block">시스템 설정 → Wi-Fi → 연결된 네트워크 클릭 → "상세 정보"
+또는 터미널: ifconfig en0 | grep inet</div>
+      <p style="margin-top:3mm"><strong>수동 고정 IP 설정:</strong></p>
+      <ol>
+        <li>시스템 설정 → Wi-Fi → 연결된 네트워크 → 상세 정보</li>
+        <li>TCP/IP 탭 → IPv4 구성: <strong>수동</strong></li>
+        <li>설정:
+          <ul>
+            <li>IP 주소: <code>192.168.0.100</code></li>
+            <li>서브넷 마스크: <code>255.255.255.0</code></li>
+            <li>라우터: <code>192.168.0.1</code></li>
+          </ul>
+        </li>
+        <li>DNS 탭 → <code>8.8.8.8</code> 추가</li>
+        <li>확인</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<h4>③ 노트북에 로컬 서버 설치 및 실행</h4>
+
+<div class="box box-yellow">
+  <div class="box-title">⚠️ 사전 준비 (대회 전날)</div>
+  <p>인터넷이 되는 환경에서 미리 설치해야 합니다. 체육관 현장에서는 인터넷이 안 될 수 있습니다.</p>
+</div>
+
+<table class="tbl-blue">
+  <tr><th style="width:8%">순서</th><th style="width:25%">작업</th><th>명령어 / 방법</th></tr>
+  <tr>
+    <td>1</td>
+    <td>Node.js 설치</td>
+    <td><a href="https://nodejs.org" target="_blank">https://nodejs.org</a> 에서 <strong>LTS 버전 (v20+)</strong> 다운로드 설치<br>
+    설치 확인: <code>node --version</code> → v20.x.x, <code>npm --version</code> → 10.x.x</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>프로젝트 파일 복사</td>
+    <td>USB 또는 클라우드에서 프로젝트 폴더를 노트북에 복사<br>
+    <code>예: C:\badminton\webapp</code> (Windows) 또는 <code>~/badminton/webapp</code> (Mac)</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>의존성 설치</td>
+    <td><div class="code-block">cd C:\badminton\webapp      ← Windows
+cd ~/badminton/webapp       ← Mac
+
+npm install</div>
+    <strong>※ 반드시 인터넷이 되는 곳에서 실행!</strong> (3~5분 소요)</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>빌드</td>
+    <td><div class="code-block">npm run build</div>
+    dist/ 폴더가 생성되면 성공 (30초 내외)</td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td>로컬 서버 시작</td>
+    <td><div class="code-block">npx wrangler pages dev dist --d1=badminton-production --local --ip 0.0.0.0 --port 3000</div>
+    <strong>중요: <code>--ip 0.0.0.0</code></strong> → 같은 네트워크의 다른 장비에서 접속 허용<br>
+    "Ready on http://0.0.0.0:3000" 메시지 확인</td>
+  </tr>
+  <tr>
+    <td>6</td>
+    <td>노트북에서 테스트</td>
+    <td>노트북 브라우저에서 <code>http://localhost:3000</code> 접속 → 화면 표시 확인</td>
+  </tr>
+</table>
+
+<h4>④ Windows 방화벽 설정 (포트 3000 허용)</h4>
+
+<div class="box box-yellow">
+  <div class="box-title">🔥 Windows 방화벽 포트 개방 (필수!)</div>
+  <p>Windows 방화벽이 3000번 포트를 차단하면 태블릿에서 접속이 안 됩니다.</p>
+  <ol>
+    <li>시작 메뉴 → <strong>"Windows Defender 방화벽"</strong> 검색 → 열기</li>
+    <li>좌측 <strong>"고급 설정"</strong> 클릭</li>
+    <li>좌측 <strong>"인바운드 규칙"</strong> → 우측 <strong>"새 규칙"</strong> 클릭</li>
+    <li>규칙 종류: <strong>포트</strong> 선택 → 다음</li>
+    <li>TCP 선택, 특정 로컬 포트: <code>3000</code> 입력 → 다음</li>
+    <li><strong>연결 허용</strong> → 다음</li>
+    <li>도메인/개인/공용 <strong>모두 체크</strong> → 다음</li>
+    <li>이름: <code>배드민턴 대회 서버</code> 입력 → 마침</li>
+  </ol>
+  <p style="margin-top:2mm"><strong>Mac의 경우:</strong> 시스템 설정 → 네트워크 → 방화벽 → 방화벽 옵션 → Node.js 허용 (또는 방화벽 끄기)</p>
+</div>
+
+<h4>⑤ 태블릿 접속 설정</h4>
+
+<table class="tbl-blue">
+  <tr><th style="width:8%">순서</th><th style="width:25%">작업</th><th>방법</th></tr>
+  <tr>
+    <td>1</td>
+    <td>Wi-Fi 연결</td>
+    <td>태블릿 설정 → Wi-Fi → <code>BADMINTON-5G</code> (5GHz) 네트워크 연결<br>
+    <strong>반드시 노트북과 같은 네트워크!</strong></td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>태블릿 IP 확인</td>
+    <td>설정 → Wi-Fi → 연결된 네트워크 정보 → IP 주소 확인<br>
+    <code>192.168.0.xxx</code> 형태여야 함</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>메인 페이지 접속</td>
+    <td>브라우저에서 <code class="hl">http://192.168.0.100:3000</code> 입력<br>
+    <strong>https가 아니라 http!</strong> (로컬 서버는 SSL 없음)</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>코트 점수판 URL</td>
+    <td>코트별 바로가기 설정:
+    <div class="code-block">코트1: http://192.168.0.100:3000/court?tid=1&court=1&locked=1
+코트2: http://192.168.0.100:3000/court?tid=1&court=2&locked=1
+코트3: http://192.168.0.100:3000/court?tid=1&court=3&locked=1
+코트4: http://192.168.0.100:3000/court?tid=1&court=4&locked=1
+코트5: http://192.168.0.100:3000/court?tid=1&court=5&locked=1
+코트6: http://192.168.0.100:3000/court?tid=1&court=6&locked=1</div></td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td>홈 화면 바로가기</td>
+    <td><strong>iPad:</strong> Safari에서 공유 버튼(□↑) → "홈 화면에 추가"<br>
+    <strong>안드로이드:</strong> Chrome 메뉴(⋮) → "홈 화면에 추가"</td>
+  </tr>
+</table>
+
+<h4>⑥ 태블릿 최적 설정</h4>
+
+<table class="tbl-blue">
+  <tr><th style="width:30%">설정 항목</th><th style="width:35%">iPad (iPadOS)</th><th style="width:35%">Android 태블릿</th></tr>
+  <tr>
+    <td><strong>자동 잠금 해제</strong></td>
+    <td>설정 → 디스플레이 및 밝기 → 자동 잠금 → <strong>안 함</strong></td>
+    <td>설정 → 디스플레이 → 화면 시간 초과 → <strong>30분</strong> 또는 개발자 옵션에서 "화면 켜진 상태 유지"</td>
+  </tr>
+  <tr>
+    <td><strong>밝기</strong></td>
+    <td>설정 → 디스플레이 → 밝기 <strong>80% 이상</strong>, 자동 밝기 끄기</td>
+    <td>설정 → 디스플레이 → 밝기 <strong>80% 이상</strong>, 자동 밝기 끄기</td>
+  </tr>
+  <tr>
+    <td><strong>화면 회전 잠금</strong></td>
+    <td>제어 센터에서 회전 잠금 아이콘 ON</td>
+    <td>상단 알림바 → 자동 회전 끄기</td>
+  </tr>
+  <tr>
+    <td><strong>알림 방해 금지</strong></td>
+    <td>설정 → 집중 모드 → 방해 금지 ON</td>
+    <td>설정 → 알림 → 방해 금지 모드 ON</td>
+  </tr>
+  <tr>
+    <td><strong>전원 관리</strong></td>
+    <td>충전 케이블 연결 상태로 사용</td>
+    <td>충전 케이블 연결 상태로 사용</td>
+  </tr>
+</table>
+
+<h4>⑦ 접속 안 될 때 체크리스트</h4>
+
+<table class="tbl-blue">
+  <tr><th style="width:25%">증상</th><th style="width:35%">원인</th><th style="width:40%">해결법</th></tr>
+  <tr>
+    <td>페이지가 안 열림</td>
+    <td>노트북과 태블릿이 다른 네트워크</td>
+    <td>둘 다 <code>BADMINTON-5G</code> 연결 확인. 태블릿 IP가 <code>192.168.0.xxx</code>인지 확인</td>
+  </tr>
+  <tr>
+    <td>"연결 거부" 오류</td>
+    <td>서버가 안 켜져 있거나 방화벽 차단</td>
+    <td>노트북에서 서버 실행 상태 확인 + 방화벽 포트 3000 허용</td>
+  </tr>
+  <tr>
+    <td>https://로 접속 시도</td>
+    <td>자동으로 https가 붙음</td>
+    <td>반드시 <code>http://</code>로 시작하도록 전체 URL 직접 입력</td>
+  </tr>
+  <tr>
+    <td>로딩이 매우 느림</td>
+    <td>2.4GHz 연결 또는 신호 약함</td>
+    <td>5GHz(<code>BADMINTON-5G</code>)로 변경. 공유기 가까이 이동</td>
+  </tr>
+  <tr>
+    <td>점수가 반영 안 됨</td>
+    <td>네트워크 지연 또는 서버 오류</td>
+    <td>노트북 서버 콘솔 확인. <code>Ctrl+C</code> 후 재시작</td>
+  </tr>
+  <tr>
+    <td>노트북 IP가 바뀜</td>
+    <td>DHCP 재할당</td>
+    <td>공유기에서 MAC 기반 고정 IP 설정 (위 ① 참고) 또는 노트북에서 수동 IP 고정</td>
+  </tr>
+</table>
+
+<div class="box box-green">
+  <div class="box-title">💡 인터넷 vs 로컬 서버 운영 비교</div>
+  <table class="tbl-blue" style="margin-top:2mm">
+    <tr><th style="width:25%">항목</th><th style="width:37%">인터넷 사용 (클라우드)</th><th style="width:38%">로컬 서버 (사설 IP)</th></tr>
+    <tr>
+      <td>접속 URL</td>
+      <td><code>https://badminton-tournament-5ny.pages.dev</code></td>
+      <td><code>http://192.168.0.100:3000</code></td>
+    </tr>
+    <tr>
+      <td>인터넷 필요</td>
+      <td class="hl">필수</td>
+      <td><strong>불필요</strong> (공유기만 있으면 됨)</td>
+    </tr>
+    <tr>
+      <td>참가자 경기 조회</td>
+      <td>어디서든 접속 가능</td>
+      <td>같은 Wi-Fi에 연결해야 접속 가능</td>
+    </tr>
+    <tr>
+      <td>데이터 보관</td>
+      <td>클라우드 자동 저장</td>
+      <td>노트북 로컬에만 저장 (백업 필수!)</td>
+    </tr>
+    <tr>
+      <td>설정 난이도</td>
+      <td>쉬움 (URL만 접속)</td>
+      <td>보통 (Node.js 설치, 방화벽 설정 필요)</td>
+    </tr>
+    <tr>
+      <td>안정성</td>
+      <td>인터넷 품질에 의존</td>
+      <td><strong>매우 안정</strong> (로컬 네트워크만 사용)</td>
+    </tr>
+    <tr>
+      <td>권장 환경</td>
+      <td>인터넷이 안정적인 체육관</td>
+      <td>인터넷 없는 지하 체육관, 야외 등</td>
+    </tr>
+  </table>
+</div>
+
+<div class="box box-yellow">
+  <div class="box-title">⚡ 대회 당일 빠른 시작 요약</div>
+  <ol>
+    <li>공유기 전원 ON → 30초 대기</li>
+    <li>노트북 Wi-Fi 연결 (<code>BADMINTON-5G</code>)</li>
+    <li>IP 확인: <code>ipconfig</code>(Win) / <code>ifconfig</code>(Mac) → 192.168.0.100 확인</li>
+    <li>서버 시작: <code>cd webapp && npx wrangler pages dev dist --d1=badminton-production --local --ip 0.0.0.0 --port 3000</code></li>
+    <li>노트북 브라우저에서 <code>http://localhost:3000</code> 접속 확인</li>
+    <li>태블릿들 Wi-Fi 연결 → <code>http://192.168.0.100:3000</code> 접속 확인</li>
+    <li>각 코트 태블릿에서 코트 URL로 이동 → 점수 입력 테스트</li>
+    <li><strong>완료! 🏸 대회 시작!</strong></li>
+  </ol>
+</div>
+
 <!-- ========================================== -->
 <!--             4. 장비별 셋팅                   -->
 <!-- ========================================== -->
