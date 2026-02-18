@@ -140,58 +140,6 @@ function renderHome() {
           <i class="fas fa-plus"></i>새 대회 만들기
         </button>
       </div>
-
-      <!-- Feature Cards -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mt-16 max-w-5xl mx-auto">
-        <!-- Court Scoreboard -->
-        <a href="/court" class="glass-card rounded-2xl p-5 sm:p-6 text-center cursor-pointer block fade-in-delay-1">
-          <div class="feature-icon bg-gradient-to-br from-green-400 to-green-600 mx-auto shadow-lg shadow-green-500/20">
-            <i class="fas fa-tablet-alt text-white"></i>
-          </div>
-          <h3 class="text-white font-bold text-sm sm:text-base mb-1">코트 점수판</h3>
-          <p class="text-slate-400 text-xs leading-relaxed hidden sm:block">태블릿으로 실시간<br>점수 입력</p>
-        </a>
-        <!-- Dashboard -->
-        <a href="/dashboard" class="glass-card rounded-2xl p-5 sm:p-6 text-center cursor-pointer block fade-in-delay-2">
-          <div class="feature-icon bg-gradient-to-br from-orange-400 to-orange-600 mx-auto shadow-lg shadow-orange-500/20">
-            <i class="fas fa-chart-bar text-white"></i>
-          </div>
-          <h3 class="text-white font-bold text-sm sm:text-base mb-1">통계 대시보드</h3>
-          <p class="text-slate-400 text-xs leading-relaxed hidden sm:block">실시간 진행률<br>& 클럽별 현황</p>
-        </a>
-        <!-- My Matches -->
-        <a href="/my" class="glass-card rounded-2xl p-5 sm:p-6 text-center cursor-pointer block fade-in-delay-3">
-          <div class="feature-icon bg-gradient-to-br from-indigo-400 to-indigo-600 mx-auto shadow-lg shadow-indigo-500/20">
-            <i class="fas fa-user text-white"></i>
-          </div>
-          <h3 class="text-white font-bold text-sm sm:text-base mb-1">내 경기 조회</h3>
-          <p class="text-slate-400 text-xs leading-relaxed hidden sm:block">QR코드로 간편<br>일정 확인</p>
-        </a>
-        <!-- Manual -->
-        <a href="/static/manual.html" target="_blank" class="glass-card rounded-2xl p-5 sm:p-6 text-center cursor-pointer block fade-in-delay-4">
-          <div class="feature-icon bg-gradient-to-br from-purple-400 to-purple-600 mx-auto shadow-lg shadow-purple-500/20">
-            <i class="fas fa-book text-white"></i>
-          </div>
-          <h3 class="text-white font-bold text-sm sm:text-base mb-1">운영 매뉴얼</h3>
-          <p class="text-slate-400 text-xs leading-relaxed hidden sm:block">장비 셋팅부터<br>당일 운영까지</p>
-        </a>
-        <!-- Timeline -->
-        <a href="/timeline" class="glass-card rounded-2xl p-5 sm:p-6 text-center cursor-pointer block fade-in-delay-4">
-          <div class="feature-icon bg-gradient-to-br from-cyan-400 to-cyan-600 mx-auto shadow-lg shadow-cyan-500/20">
-            <i class="fas fa-stream text-white"></i>
-          </div>
-          <h3 class="text-white font-bold text-sm sm:text-base mb-1">코트 타임라인</h3>
-          <p class="text-slate-400 text-xs leading-relaxed hidden sm:block">전체 경기 흐름<br>한눈에 보기</p>
-        </a>
-        <!-- Print Center -->
-        <a href="/print" class="glass-card rounded-2xl p-5 sm:p-6 text-center cursor-pointer block fade-in-delay-4">
-          <div class="feature-icon bg-gradient-to-br from-amber-400 to-amber-600 mx-auto shadow-lg shadow-amber-500/20">
-            <i class="fas fa-print text-white"></i>
-          </div>
-          <h3 class="text-white font-bold text-sm sm:text-base mb-1">인쇄 센터</h3>
-          <p class="text-slate-400 text-xs leading-relaxed hidden sm:block">수기 운영 대비<br>인쇄물 출력</p>
-        </a>
-      </div>
     </div>
     <!-- Wave Divider -->
     <div class="relative">
@@ -202,7 +150,7 @@ function renderHome() {
   </section>
 
   <!-- Tournament List Section -->
-  <section class="max-w-5xl mx-auto px-4 sm:px-6 -mt-2 pb-16">
+  <section class="max-w-5xl mx-auto px-4 sm:px-6 -mt-2 pb-8">
     <div class="mb-8 flex items-center justify-between fade-in">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
@@ -221,6 +169,67 @@ function renderHome() {
       <div class="col-span-full text-center py-16 text-gray-400">
         <i class="fas fa-spinner fa-spin text-3xl"></i>
       </div>
+    </div>
+  </section>
+
+  <!-- Feature Cards Section -->
+  <section class="max-w-5xl mx-auto px-4 sm:px-6 pb-16">
+    <div class="mb-6 flex items-center gap-3 fade-in">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center shadow-lg shadow-slate-500/20">
+        <i class="fas fa-th-large text-white"></i>
+      </div>
+      <div>
+        <h2 class="text-xl font-bold text-gray-900">운영 도구</h2>
+        <p class="text-xs text-gray-400">대회 운영에 필요한 각종 도구 바로가기</p>
+      </div>
+    </div>
+    <!-- Row 1: 코트점수판 / 내경기조회 / 코트타임라인 -->
+    <div class="grid grid-cols-3 gap-3 sm:gap-4 mb-3 sm:mb-4">
+      <a href="/court" class="group rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 text-center cursor-pointer block hover:shadow-lg hover:border-green-300 transition-all">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-400 to-green-600 mx-auto mb-3 flex items-center justify-center shadow-lg shadow-green-500/20">
+          <i class="fas fa-tablet-alt text-white text-lg"></i>
+        </div>
+        <h3 class="font-bold text-gray-900 text-sm sm:text-base mb-1 group-hover:text-green-600 transition">코트 점수판</h3>
+        <p class="text-gray-400 text-xs leading-relaxed hidden sm:block">태블릿으로 실시간<br>점수 입력</p>
+      </a>
+      <a href="/my" class="group rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 text-center cursor-pointer block hover:shadow-lg hover:border-indigo-300 transition-all">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 mx-auto mb-3 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <i class="fas fa-user text-white text-lg"></i>
+        </div>
+        <h3 class="font-bold text-gray-900 text-sm sm:text-base mb-1 group-hover:text-indigo-600 transition">내 경기 조회</h3>
+        <p class="text-gray-400 text-xs leading-relaxed hidden sm:block">QR코드로 간편<br>일정 확인</p>
+      </a>
+      <a href="/timeline" class="group rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 text-center cursor-pointer block hover:shadow-lg hover:border-cyan-300 transition-all">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-cyan-600 mx-auto mb-3 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <i class="fas fa-stream text-white text-lg"></i>
+        </div>
+        <h3 class="font-bold text-gray-900 text-sm sm:text-base mb-1 group-hover:text-cyan-600 transition">코트 타임라인</h3>
+        <p class="text-gray-400 text-xs leading-relaxed hidden sm:block">전체 경기 흐름<br>한눈에 보기</p>
+      </a>
+    </div>
+    <!-- Row 2: 통계대시보드 / 인쇄센터 / 운영매뉴얼 -->
+    <div class="grid grid-cols-3 gap-3 sm:gap-4">
+      <a href="/dashboard" class="group rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 text-center cursor-pointer block hover:shadow-lg hover:border-orange-300 transition-all">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 mx-auto mb-3 flex items-center justify-center shadow-lg shadow-orange-500/20">
+          <i class="fas fa-chart-bar text-white text-lg"></i>
+        </div>
+        <h3 class="font-bold text-gray-900 text-sm sm:text-base mb-1 group-hover:text-orange-600 transition">통계 대시보드</h3>
+        <p class="text-gray-400 text-xs leading-relaxed hidden sm:block">실시간 진행률<br>& 클럽별 현황</p>
+      </a>
+      <a href="/print" class="group rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 text-center cursor-pointer block hover:shadow-lg hover:border-amber-300 transition-all">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 mx-auto mb-3 flex items-center justify-center shadow-lg shadow-amber-500/20">
+          <i class="fas fa-print text-white text-lg"></i>
+        </div>
+        <h3 class="font-bold text-gray-900 text-sm sm:text-base mb-1 group-hover:text-amber-600 transition">인쇄 센터</h3>
+        <p class="text-gray-400 text-xs leading-relaxed hidden sm:block">수기 운영 대비<br>인쇄물 출력</p>
+      </a>
+      <a href="/static/manual.html" target="_blank" class="group rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 text-center cursor-pointer block hover:shadow-lg hover:border-purple-300 transition-all">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 mx-auto mb-3 flex items-center justify-center shadow-lg shadow-purple-500/20">
+          <i class="fas fa-book text-white text-lg"></i>
+        </div>
+        <h3 class="font-bold text-gray-900 text-sm sm:text-base mb-1 group-hover:text-purple-600 transition">운영 매뉴얼</h3>
+        <p class="text-gray-400 text-xs leading-relaxed hidden sm:block">장비 셋팅부터<br>당일 운영까지</p>
+      </a>
     </div>
   </section>
 
