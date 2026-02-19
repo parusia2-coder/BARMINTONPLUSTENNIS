@@ -1441,7 +1441,44 @@ function renderAll() {
   // ============================
   html += '<div class="print-section visible ps-scoresheet page-break">';
   html += '<div class="print-title">📝 점수 기록지</div>';
-  html += '<div class="print-subtitle">' + t.name + ' | 출력일: ' + now + '</div>';
+  
+  // 종목별 점수 기록지 형식 결정
+  const isTennisSport = (t.sport === 'tennis');
+  const scoringType = t.scoring_type || (isTennisSport ? 'pro8' : '');
+  const deuceRule = t.deuce_rule || 'tiebreak';
+  const targetGames = t.target_games || 8;
+  const deuceLabel = deuceRule === 'noad' ? '노어드' : deuceRule === 'advantage' ? '어드밴티지' : '타이브레이크';
+  const sportEmoji = isTennisSport ? '🎾' : '🏸';
+  
+  // 점수 칼럼 헤더 결정
+  var scoreHeaders, scoreColCount, formatLabel, footerNote;
+  if (isTennisSport) {
+    if (scoringType === 'set3') {
+      scoreHeaders = '<th>1세트</th><th>2세트</th><th>3세트</th>';
+      scoreColCount = 3;
+      formatLabel = '3세트 매치 (6게임/세트, ' + deuceLabel + ')';
+    } else if (scoringType === 'set2') {
+      scoreHeaders = '<th>1세트</th><th>2세트</th><th>타이<br>브레이크</th>';
+      scoreColCount = 3;
+      formatLabel = '2세트 매치 (6게임/세트, ' + deuceLabel + ')';
+    } else if (scoringType === 'pro10') {
+      scoreHeaders = '<th>게임수</th>';
+      scoreColCount = 1;
+      formatLabel = '10게임 프로세트 (' + deuceLabel + ')';
+    } else {
+      scoreHeaders = '<th>게임수</th>';
+      scoreColCount = 1;
+      formatLabel = '8게임 프로세트 (' + deuceLabel + ')';
+    }
+    footerNote = '※ 게임 수를 기록하고 승자(◯)를 표시합니다. 듀스 규칙: ' + deuceLabel + '. 양팀 대표가 서명합니다.';
+  } else {
+    scoreHeaders = '<th>점수</th>';
+    scoreColCount = 1;
+    formatLabel = (t.target_score || 21) + '점제';
+    footerNote = '※ 최종 점수를 기입하고 승자(◯)를 표시합니다. 양팀 대표가 서명합니다. 네트워크 복구 후 시스템에 일괄 입력합니다.';
+  }
+  
+  html += '<div class="print-subtitle">' + t.name + ' | ' + sportEmoji + ' ' + formatLabel + ' | 출력일: ' + now + '</div>';
   
   // 코트별 그룹핑
   const matchesByCourt = {};
@@ -1451,13 +1488,16 @@ function renderAll() {
     matchesByCourt[c].push(m);
   });
   
+  var emptyCols = '';
+  for (var _sc = 0; _sc < scoreColCount; _sc++) emptyCols += '<td class="score-cell"></td>';
+  
   const courts = Object.keys(matchesByCourt).sort((a,b) => a - b);
   if (courts.length > 0) {
     courts.forEach(courtNum => {
       const courtMatches = matchesByCourt[courtNum];
       courtMatches.sort((a,b) => (a.round - b.round) || (a.match_order - b.match_order));
       
-      html += '<div class="section-header" style="margin-top:5mm">${E} ' + courtNum + '번 코트 (' + courtMatches.length + '경기)</div>';
+      html += '<div class="section-header" style="margin-top:5mm">' + sportEmoji + ' ' + courtNum + '번 코트 (' + courtMatches.length + '경기)</div>';
       
       courtMatches.forEach((m, i) => {
         const evName = (state.events.find(e => e.id === m.event_id) || {}).name || '';
@@ -1467,26 +1507,26 @@ function renderAll() {
         html += '<div class="score-sheet">';
         html += '<div class="match-header"><span>' + courtNum + '코트 #' + (i+1) + '</span><span>' + evName + '</span><span>R' + m.round + '</span></div>';
         html += '<table class="score-grid">';
-        html += '<tr><th style="width:35%">팀</th><th>1세트</th><th>2세트</th><th>3세트</th><th style="width:12%">승</th><th style="width:18%">서명</th></tr>';
-        html += '<tr><td class="team-name">' + t1 + '</td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="sig-cell"></td></tr>';
-        html += '<tr><td class="team-name">' + t2 + '</td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="sig-cell"></td></tr>';
+        html += '<tr><th style="width:35%">팀</th>' + scoreHeaders + '<th style="width:12%">승</th><th style="width:18%">서명</th></tr>';
+        html += '<tr><td class="team-name">' + t1 + '</td>' + emptyCols + '<td class="score-cell"></td><td class="sig-cell"></td></tr>';
+        html += '<tr><td class="team-name">' + t2 + '</td>' + emptyCols + '<td class="score-cell"></td><td class="sig-cell"></td></tr>';
         html += '</table></div>';
       });
     });
-    html += '<div class="info-footer">※ 각 세트 점수와 승자(◯)를 기입하고, 양팀 대표가 서명합니다. 네트워크 복구 후 시스템에 일괄 입력합니다.</div>';
+    html += '<div class="info-footer">' + footerNote + '</div>';
   } else {
     // 경기 미생성 시 빈 점수 기록지 양식
     const numCourts = t.courts || 6;
     html += '<div style="text-align:center; padding:5mm; color:#666; font-size:10pt;">⚠ 시스템에서 경기가 아직 생성되지 않았습니다. 아래 빈 양식을 사용하세요.</div>';
     for (let c = 1; c <= numCourts; c++) {
-      html += '<div class="section-header" style="margin-top:5mm">${E} ' + c + '번 코트</div>';
+      html += '<div class="section-header" style="margin-top:5mm">' + sportEmoji + ' ' + c + '번 코트</div>';
       for (let g = 0; g < 5; g++) {
         html += '<div class="score-sheet">';
         html += '<div class="match-header"><span>' + c + '코트 #' + (g+1) + '</span><span>종목: ___________</span><span>___조</span></div>';
         html += '<table class="score-grid">';
-        html += '<tr><th style="width:35%">팀</th><th>1세트</th><th>2세트</th><th>3세트</th><th style="width:12%">승</th><th style="width:18%">서명</th></tr>';
-        html += '<tr><td class="team-name" style="height:10mm"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="sig-cell"></td></tr>';
-        html += '<tr><td class="team-name" style="height:10mm"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="score-cell"></td><td class="sig-cell"></td></tr>';
+        html += '<tr><th style="width:35%">팀</th>' + scoreHeaders + '<th style="width:12%">승</th><th style="width:18%">서명</th></tr>';
+        html += '<tr><td class="team-name" style="height:10mm"></td>' + emptyCols + '<td class="score-cell"></td><td class="sig-cell"></td></tr>';
+        html += '<tr><td class="team-name" style="height:10mm"></td>' + emptyCols + '<td class="score-cell"></td><td class="sig-cell"></td></tr>';
         html += '</table></div>';
       }
     }
