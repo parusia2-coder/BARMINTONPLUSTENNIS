@@ -57,6 +57,8 @@ function switchSportConfig(sportName) {
   SCORE_LABEL = (SC.scoring && SC.scoring.scoreLabel) || '점수';
   SYSTEM_NAME = SC.name || '대회 운영 시스템';
   T = buildTheme(P, SC);
+  // 브라우저 탭 타이틀 동적 업데이트
+  document.title = EMOJI + ' ' + SYSTEM_NAME;
 }
 const LEVEL_COLORS = { s: 'bg-red-100 text-red-700', a: 'bg-orange-100 text-orange-700', b: 'bg-yellow-100 text-yellow-700', c: 'bg-green-100 text-green-700', d: 'bg-blue-100 text-blue-700', e: 'bg-gray-100 text-gray-600' };
 const AGE_GROUPS = [

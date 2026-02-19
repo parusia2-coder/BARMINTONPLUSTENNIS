@@ -194,7 +194,7 @@ function getIndexHtml(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${E} ${SC.name}</title>
+  <title>🏆 대회 운영 시스템</title>
   <script src="/static/vendor/tailwind.js"></script>
   <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
   <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
@@ -358,7 +358,7 @@ function getMyPageHtml(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${E} 내 경기 조회</title>
+  <title>🏆 내 경기 조회</title>
   <script src="/static/vendor/tailwind.js"></script>
   <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
   <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
@@ -700,7 +700,7 @@ function getDashboardHtml(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${E} 통계 대시보드</title>
+  <title>🏆 통계 대시보드</title>
   <script src="/static/vendor/tailwind.js"></script>
   <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
   <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
@@ -784,7 +784,7 @@ function getTimelineHtml(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${E} 코트별 타임라인</title>
+  <title>🏆 코트별 타임라인</title>
   <script src="/static/vendor/tailwind.js"></script>
   <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
   <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
@@ -1040,7 +1040,7 @@ function getPrintHtml(): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${E} 대회 인쇄 센터 - 수기 운영 대비</title>
+<title>🏆 대회 인쇄 센터</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
