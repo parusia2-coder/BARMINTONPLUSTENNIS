@@ -1,17 +1,46 @@
 // ==========================================
 // 코트 전용 스코어보드 - Court Scoreboard
 // 좌우 레이아웃 + 터치 스코어 입력 + 자동 체인지오버
+// 종목별 동적 테마 지원 (배드민턴/테니스)
 // ==========================================
 const API = '/api';
-const SC = window.SPORT_CONFIG || {};
-const P = (SC.theme && SC.theme.primaryClass) || 'blue';
-const SCORE_UNIT = (SC.scoring && SC.scoring.scoreUnit) || '점';
-const SWAP_LABEL = (SC.scoring && SC.scoring.swapLabel) || '교체';
-const SWAP_DESC = (SC.scoring && SC.scoring.swapDescription) || '중간 교체';
-const EMOJI = SC.emoji || '🏸';
-const BOARD_NAME = (SC.terms && SC.terms.scoreBoard) || '점수판';
-const HALF1 = (SC.terms && SC.terms.half1) || '전반';
-const HALF2 = (SC.terms && SC.terms.half2) || '후반';
+const ALL_CONFIGS = window.ALL_SPORT_CONFIGS || {};
+
+// 동적 sport config - 대회 선택 시 갱신됨
+let SC = window.SPORT_CONFIG || {};
+let P = (SC.theme && SC.theme.primaryClass) || 'blue';
+let SCORE_UNIT = (SC.scoring && SC.scoring.scoreUnit) || '점';
+let SWAP_LABEL = (SC.scoring && SC.scoring.swapLabel) || '교체';
+let SWAP_DESC = (SC.scoring && SC.scoring.swapDescription) || '중간 교체';
+let EMOJI = SC.emoji || '🏸';
+let BOARD_NAME = (SC.terms && SC.terms.scoreBoard) || '점수판';
+let HALF1 = (SC.terms && SC.terms.half1) || '전반';
+let HALF2 = (SC.terms && SC.terms.half2) || '후반';
+
+// 대회 종목에 따라 sport config를 동적으로 교체
+function applySportConfig(sport) {
+  const cfg = ALL_CONFIGS[sport] || ALL_CONFIGS['badminton'] || SC;
+  SC = cfg;
+  P = (cfg.theme && cfg.theme.primaryClass) || 'blue';
+  SCORE_UNIT = (cfg.scoring && cfg.scoring.scoreUnit) || '점';
+  SWAP_LABEL = (cfg.scoring && cfg.scoring.swapLabel) || '교체';
+  SWAP_DESC = (cfg.scoring && cfg.scoring.swapDescription) || '중간 교체';
+  EMOJI = cfg.emoji || '🏸';
+  BOARD_NAME = (cfg.terms && cfg.terms.scoreBoard) || '점수판';
+  HALF1 = (cfg.terms && cfg.terms.half1) || '전반';
+  HALF2 = (cfg.terms && cfg.terms.half2) || '후반';
+  // Tailwind 동적 테마 갱신
+  if (window.tailwind && cfg.theme) {
+    tailwind.config = {
+      theme: { extend: { colors: {
+        primary: cfg.theme.primary || {},
+        court: cfg.theme.secondary || {}
+      }}}
+    };
+  }
+  // 문서 타이틀 업데이트
+  document.title = EMOJI + ' ' + BOARD_NAME;
+}
 
 const courtState = {
   tournamentId: null,
@@ -120,10 +149,12 @@ function renderCourt() {
 // 대회/코트 선택 화면
 // ==========================================
 function renderCourtSelect() {
+  const sportGrad = P === 'emerald' ? 'from-emerald-400 to-emerald-600' : 'from-blue-400 to-blue-600';
+  const headerBg = P === 'emerald' ? 'bg-emerald-500' : 'bg-green-500';
   return `<div class="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col">
     <div class="flex items-center justify-between px-6 py-4 border-b border-white/10">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center"><svg viewBox="0 0 32 32" fill="white" width="22" height="22"><ellipse cx="16" cy="8" rx="5" ry="6"/><path d="M11 12c0 0-3 4-3 10 0 2 1.5 4 4 5l4 1 4-1c2.5-1 4-3 4-5 0-6-3-10-3-10" fill="white" opacity="0.85"/><line x1="13" y1="14" x2="13" y2="26" stroke="white" stroke-width="0.5" opacity="0.4"/><line x1="16" y1="12" x2="16" y2="28" stroke="white" stroke-width="0.5" opacity="0.4"/><line x1="19" y1="14" x2="19" y2="26" stroke="white" stroke-width="0.5" opacity="0.4"/></svg></div>
+        <div class="w-10 h-10 ${headerBg} rounded-xl flex items-center justify-center text-xl">${EMOJI}</div>
         <div><h1 class="text-xl font-bold">코트 ${BOARD_NAME}</h1><p class="text-xs text-gray-400">Court Scoreboard</p></div>
       </div>
       <a href="/" class="text-sm text-gray-400 hover:text-white"><i class="fas fa-home mr-1"></i>메인</a>
@@ -131,8 +162,8 @@ function renderCourtSelect() {
     <div class="flex-1 flex items-center justify-center p-6">
       <div class="w-full max-w-lg">
         <div class="text-center mb-8">
-          <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-green-400 to-green-600 mb-4 shadow-lg">
-            <i class="fas fa-tv text-3xl text-white"></i>
+          <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br ${sportGrad} mb-4 shadow-lg">
+            <span class="text-4xl">${EMOJI}</span>
           </div>
           <h2 class="text-3xl font-extrabold mb-2">코트 ${BOARD_NAME}</h2>
           <p class="text-gray-400">코트에 배치할 태블릿에서 사용하세요</p>
@@ -157,8 +188,8 @@ function renderTournamentPicker() {
 
 function renderCourtPicker() {
   return `<div>
-    <h3 class="text-lg font-semibold mb-2 text-center text-green-400">
-      <i class="fas fa-trophy mr-2"></i>${courtState.tournament?.name || '대회'}
+    <h3 class="text-lg font-semibold mb-2 text-center text-${P}-400">
+      <span class="mr-1">${EMOJI}</span>${courtState.tournament?.name || '대회'}
     </h3>
     <p class="text-center text-gray-400 mb-4">코트를 선택하세요</p>
     <!-- QR 코드 생성 버튼 -->
@@ -1211,6 +1242,10 @@ async function startNextMatch() {
     courtState.recentMatches = data.recent_matches;
     courtState.targetScore = data.target_score || 25;
     courtState.format = data.tournament?.format || 'kdk';
+    // 대회 종목에 맞는 config로 전환
+    if (data.tournament && data.tournament.sport) {
+      applySportConfig(data.tournament.sport);
+    }
 
     // 초기화
     courtState.score = { left: 0, right: 0 };
@@ -1241,6 +1276,10 @@ async function refreshCourtData() {
     courtState.recentMatches = data.recent_matches;
     courtState.targetScore = data.target_score || 25;
     courtState.format = data.tournament?.format || 'kdk';
+    // 대회 종목에 맞는 config로 전환
+    if (data.tournament && data.tournament.sport) {
+      applySportConfig(data.tournament.sport);
+    }
     
     if (data.current_match) {
       const m = data.current_match;
@@ -1290,11 +1329,22 @@ async function loadTournamentList() {
     
     el.innerHTML = data.tournaments.map(t => {
       const st = { draft: '준비중', open: '접수중', in_progress: '진행중', completed: '완료' };
-      const stColor = { draft: 'text-gray-400', open: `text-${P}-400`, in_progress: 'text-green-400', completed: 'text-purple-400' };
-      const targetPt = t.format === 'tournament' ? 21 : 25;
+      const sportEmoji = t.sport === 'tennis' ? '🎾' : '🏸';
+      const sportLabel = t.sport === 'tennis' ? '테니스' : '배드민턴';
+      const tCfg = ALL_CONFIGS[t.sport] || SC;
+      const tP = (tCfg.theme && tCfg.theme.primaryClass) || 'blue';
+      const tUnit = (tCfg.scoring && tCfg.scoring.scoreUnit) || '점';
+      const stColor = { draft: 'text-gray-400', open: 'text-' + tP + '-400', in_progress: 'text-green-400', completed: 'text-purple-400' };
+      const targetPt = t.target_games || (t.format === 'tournament' ? (tCfg.scoring && tCfg.scoring.tournamentTargetScore || 21) : (tCfg.scoring && tCfg.scoring.defaultTargetScore || 25));
       return `<button onclick="selectTournament(${t.id})" class="w-full text-left bg-white/5 rounded-xl p-4 hover:bg-white/10 transition border border-white/5">
         <div class="flex items-center justify-between">
-          <div><h4 class="font-bold text-lg">${t.name}</h4><p class="text-sm text-gray-500">${t.courts}코트 · ${({kdk:'KDK',league:'풀리그',tournament:'토너먼트'})[t.format]} · ${targetPt}${SCORE_UNIT}제</p></div>
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-lg">${sportEmoji}</span>
+              <h4 class="font-bold text-lg">${t.name}</h4>
+            </div>
+            <p class="text-sm text-gray-500">${sportLabel} · ${t.courts}코트 · ${({kdk:'KDK',league:'풀리그',tournament:'토너먼트'})[t.format]} · ${targetPt}${tUnit}제</p>
+          </div>
           <span class="text-sm font-medium ${stColor[t.status]||''}">${st[t.status]||t.status}</span>
         </div>
       </button>`;
@@ -1307,6 +1357,10 @@ async function selectTournament(tid) {
   try {
     const data = await courtApi(`/tournaments/${tid}`);
     courtState.tournament = data.tournament;
+    // 대회 종목에 맞는 config로 전환
+    if (data.tournament && data.tournament.sport) {
+      applySportConfig(data.tournament.sport);
+    }
     renderCourt();
     await loadCourtGrid();
   } catch(e) {}

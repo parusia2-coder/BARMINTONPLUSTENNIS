@@ -40,11 +40,13 @@ matchRoutes.get('/:tid/matches', async (c) => {
 
   // 대회 포맷 정보 포함 (점수 규칙 판단용)
   const tournament = await db.prepare(
-    `SELECT format FROM tournaments WHERE id=? AND deleted=0`
+    `SELECT format, sport, target_games FROM tournaments WHERE id=? AND deleted=0`
   ).bind(tid).first() as any
-  const targetScore = tournament?.target_games || (tournament?.format === 'tournament' ? sportConfig.scoring.tournamentTargetScore : sportConfig.scoring.defaultTargetScore)
+  const { badmintonConfig, tennisConfig } = await import('../config')
+  const sc = tournament?.sport === 'tennis' ? tennisConfig : badmintonConfig
+  const targetScore = tournament?.target_games || (tournament?.format === 'tournament' ? sc.scoring.tournamentTargetScore : sc.scoring.defaultTargetScore)
 
-  return c.json({ matches: results, target_score: targetScore, format: tournament?.format })
+  return c.json({ matches: results, target_score: targetScore, format: tournament?.format, sport: tournament?.sport })
 })
 
 // 점수 업데이트
@@ -334,13 +336,15 @@ matchRoutes.get('/:tid/court/:courtNum', async (c) => {
     LIMIT 3
   `).bind(tid, courtNum).all()
 
-  // 대회 정보 (포맷 포함 - 점수 규칙 판단용)
+  // 대회 정보 (포맷 + 스포츠 종류 포함)
   const tournament = await db.prepare(
-    `SELECT name, courts, format FROM tournaments WHERE id=? AND deleted=0`
-  ).bind(tid).first()
+    `SELECT name, courts, format, sport, target_games, scoring_type, deuce_rule FROM tournaments WHERE id=? AND deleted=0`
+  ).bind(tid).first() as any
 
-  // 점수 규칙: 대회 설정 또는 sportConfig 기본값 사용
-  const targetScore = tournament?.target_games || (tournament?.format === 'tournament' ? sportConfig.scoring.tournamentTargetScore : sportConfig.scoring.defaultTargetScore)
+  // 점수 규칙: 대회 설정 또는 종목별 기본값 사용
+  const { badmintonConfig, tennisConfig } = await import('../config')
+  const sc = tournament?.sport === 'tennis' ? tennisConfig : badmintonConfig
+  const targetScore = tournament?.target_games || (tournament?.format === 'tournament' ? sc.scoring.tournamentTargetScore : sc.scoring.defaultTargetScore)
 
   return c.json({
     tournament,
@@ -424,12 +428,14 @@ matchRoutes.get('/:tid/courts/overview', async (c) => {
   const db = c.env.DB
 
   const tournament = await db.prepare(
-    `SELECT name, courts, format FROM tournaments WHERE id=? AND deleted=0`
+    `SELECT name, courts, format, sport, target_games, scoring_type, deuce_rule FROM tournaments WHERE id=? AND deleted=0`
   ).bind(tid).first() as any
 
   if (!tournament) return c.json({ error: '대회를 찾을 수 없습니다.' }, 404)
 
-  const targetScore = tournament.target_games || (tournament.format === 'tournament' ? sportConfig.scoring.tournamentTargetScore : sportConfig.scoring.defaultTargetScore)
+  const { badmintonConfig, tennisConfig } = await import('../config')
+  const sc = tournament?.sport === 'tennis' ? tennisConfig : badmintonConfig
+  const targetScore = tournament.target_games || (tournament.format === 'tournament' ? sc.scoring.tournamentTargetScore : sc.scoring.defaultTargetScore)
 
   const courts: any[] = []
   for (let i = 1; i <= (tournament.courts || 2); i++) {
