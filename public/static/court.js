@@ -73,11 +73,21 @@ const courtState = {
   // ====== 테니스 전용 상태 ======
   tennis: {
     point: { left: 0, right: 0 },     // 현재 게임 포인트 (0,1,2,3 = 0,15,30,40)
-    games: { left: 0, right: 0 },     // 획득 게임 수
+    games: { left: 0, right: 0 },     // 현재 세트 획득 게임 수
     tiebreak: false,                    // 타이브레이크 모드
     tbPoint: { left: 0, right: 0 },   // 타이브레이크 포인트
     deuceRule: 'tiebreak',             // tiebreak | noad | advantage
-    lastSwapGames: 0                    // 마지막 체인지오버 시 게임 합
+    lastSwapGames: 0,                   // 마지막 체인지오버 시 게임 합
+    // === 서브권 ===
+    serving: 'left',                    // 현재 서브하는 쪽 ('left' | 'right')
+    initialServer: 'left',              // 경기 시작 시 첫 서버
+    // === 세트 시스템 ===
+    setFormat: 'pro8',                  // pro8 | pro10 | set2 | set3
+    currentSet: 1,                      // 현재 세트 번호 (1-based)
+    sets: [],                           // 완료된 세트 기록 [{left:6, right:4}, ...]
+    setsToWin: 1,                       // 승리에 필요한 세트 수 (pro=1, set2=2, set3=2)
+    gamesPerSet: 8,                     // 세트 당 목표 게임 수 (pro8=8, pro10=10, set=6)
+    finalSetTiebreak: true              // 마지막 세트 타이브레이크 여부
   }
 };
 
@@ -124,6 +134,22 @@ function getTennisStatusLabel() {
   return '';
 }
 
+// 테니스 서브 교대 처리
+function tennisToggleServe() {
+  const t = courtState.tennis;
+  t.serving = t.serving === 'left' ? 'right' : 'left';
+}
+
+// 타이브레이크 서브 교대 (첫 1포인트 후 매 2포인트)
+function tennisTiebreakServeCheck() {
+  const t = courtState.tennis;
+  const totalTB = t.tbPoint.left + t.tbPoint.right;
+  // 첫 포인트(1) 후 교대, 이후 매 2포인트(3,5,7,...) 마다 교대
+  if (totalTB === 1 || (totalTB > 1 && totalTB % 2 === 1)) {
+    tennisToggleServe();
+  }
+}
+
 // 테니스 포인트 득점 처리
 function tennisScorePoint(side) {
   const t = courtState.tennis;
@@ -134,14 +160,13 @@ function tennisScorePoint(side) {
     t.tbPoint[side]++;
     const myTB = t.tbPoint[side];
     const otherTB = t.tbPoint[otherSide];
-    // 타이브레이크 체인지오버: (합)이 홀수일 때마다
-    const tbTotal = myTB + otherTB;
-    if (tbTotal % 2 === 1 && !courtState.swapPending) {
-      // 자동 체인지오버 (알림만)
-    }
+    // 타이브레이크 서브 교대
+    tennisTiebreakServeCheck();
     // 타이브레이크 승리: 7점 이상 + 2점 차
     if (myTB >= 7 && myTB - otherTB >= 2) {
       t.games[side]++;
+      // 타이브레이크 후 서브: 타이브레이크 시작한 반대쪽이 다음 세트 첫 서브
+      tennisToggleServe();
       tennisGameWon(side);
       return;
     }
@@ -154,34 +179,26 @@ function tennisScorePoint(side) {
   const myPt = t.point[side];
   const otherPt = t.point[otherSide];
 
+  let gameWon = false;
   // 노어드(No-Ad) 규칙: 40-40에서 바로 결정
   if (t.deuceRule === 'noad' && myPt >= 3 && otherPt >= 3) {
-    if (myPt > otherPt) {
-      t.games[side]++;
-      t.point.left = 0;
-      t.point.right = 0;
-      tennisGameWon(side);
-      return;
-    }
-    renderCourt();
-    return;
+    if (myPt > otherPt) gameWon = true;
   }
-
   // 어드밴티지/타이브레이크 룰: 40 이상에서 2점 차
-  if (myPt >= 4 && myPt - otherPt >= 2) {
-    // 게임 획득!
-    t.games[side]++;
-    t.point.left = 0;
-    t.point.right = 0;
-    tennisGameWon(side);
-    return;
+  else if (myPt >= 4 && myPt - otherPt >= 2) {
+    gameWon = true;
+  }
+  // 40 이전에 4포인트 도달 (상대 3 미만) = 게임 획득
+  else if (myPt >= 4 && otherPt < 3) {
+    gameWon = true;
   }
 
-  // 40 이전에 4포인트 도달 (상대 3 미만) = 게임 획득
-  if (myPt >= 4 && otherPt < 3) {
+  if (gameWon) {
     t.games[side]++;
     t.point.left = 0;
     t.point.right = 0;
+    // 일반 게임 후 서브 교대
+    tennisToggleServe();
     tennisGameWon(side);
     return;
   }
@@ -189,19 +206,46 @@ function tennisScorePoint(side) {
   renderCourt();
 }
 
+// 세트 승리 조건 판별
+function checkSetWin(gL, gR, target) {
+  const t = courtState.tennis;
+  // 프로세트(pro8, pro10): target 이상 + 2점 차
+  if (t.setFormat === 'pro8' || t.setFormat === 'pro10') {
+    return (gL >= target && gL - gR >= 2) || (gR >= target && gR - gL >= 2);
+  }
+  // 정식 세트(set2, set3): 6게임 이상 + 2게임 차, 또는 타이브레이크 승리(7게임)
+  if (gL >= 6 && gL - gR >= 2) return true;
+  if (gR >= 6 && gR - gL >= 2) return true;
+  // 타이브레이크 결과 (7-6)
+  if ((gL === 7 && gR === 6) || (gR === 7 && gL === 6)) return true;
+  return false;
+}
+
+// 타이브레이크 진입 조건 판별
+function checkTiebreakEntry(gL, gR, target) {
+  const t = courtState.tennis;
+  if (t.setFormat === 'pro8' || t.setFormat === 'pro10') {
+    return gL === target - 1 && gR === target - 1;
+  }
+  // 정식 세트: 6-6
+  return gL === 6 && gR === 6;
+}
+
 // 테니스 게임 획득 후 처리
 function tennisGameWon(side) {
   const t = courtState.tennis;
-  const target = courtState.targetScore;
+  const target = t.gamesPerSet;
   const gL = t.games.left;
   const gR = t.games.right;
   const winnerName = side === 'left' ? getLeftName() : getRightName();
 
-  // 게임 카운트를 score에 동기화 (저장/표시용)
+  // 게임 카운트를 score에 동기화 (현재 세트 저장용)
   courtState.score.left = t.games.left;
   courtState.score.right = t.games.right;
 
-  showCourtToast(winnerName + ' 게임! (' + gL + '-' + gR + ')', 'success');
+  // 세트 표시 (멀티세트일 때)
+  const setLabel = t.setsToWin > 1 ? ' [세트 ' + t.currentSet + ']' : '';
+  showCourtToast(winnerName + ' 게임! (' + gL + '-' + gR + ')' + setLabel, 'success');
 
   // 체인지오버 체크: 게임 합이 홀수일 때
   const totalGames = gL + gR;
@@ -213,38 +257,69 @@ function tennisGameWon(side) {
     return;
   }
 
-  // 프로세트 승리 체크
-  if (gL >= target && gL - gR >= 2) {
-    // 왼쪽 승리
-    courtState.score.left = gL;
-    courtState.score.right = gR;
+  // 세트 승리 체크
+  if (checkSetWin(gL, gR, target)) {
+    const setWinner = gL > gR ? 'left' : 'right';
+    // 현재 세트를 기록
+    t.sets.push({ left: gL, right: gR });
+
+    // 매치 승리 체크
+    const setsWonLeft = t.sets.filter(function(s) { return s.left > s.right; }).length;
+    const setsWonRight = t.sets.filter(function(s) { return s.right > s.left; }).length;
+
+    if (setsWonLeft >= t.setsToWin || setsWonRight >= t.setsToWin) {
+      // 매치 종료!
+      const matchWinner = setsWonLeft >= t.setsToWin ? 'left' : 'right';
+      const matchWinnerName = matchWinner === 'left' ? getLeftName() : getRightName();
+      // DB에 저장할 세트별 점수 동기화
+      syncTennisScoreToDB();
+      renderCourt();
+      setTimeout(function() {
+        var setScores = t.sets.map(function(s) { return s.left + '-' + s.right; }).join(', ');
+        showCourtToast('🏆 ' + matchWinnerName + ' 승리! (' + setScores + ')', 'success');
+        setTimeout(function() { showFinishModal(); }, 500);
+      }, 300);
+      return;
+    }
+
+    // 다음 세트 시작
+    showCourtToast('🎾 세트 ' + t.currentSet + ' 종료! (' + gL + '-' + gR + ') → 세트 ' + (t.currentSet + 1) + ' 시작', 'info');
+    t.currentSet++;
+    t.games = { left: 0, right: 0 };
+    t.point = { left: 0, right: 0 };
+    t.tiebreak = false;
+    t.tbPoint = { left: 0, right: 0 };
+    t.lastSwapGames = 0;
+    // 세트 간 score 동기화
+    courtState.score.left = 0;
+    courtState.score.right = 0;
+    syncTennisScoreToDB();
     renderCourt();
-    setTimeout(function() {
-      showCourtToast('🏆 ' + getLeftName() + ' 승리! (' + gL + '-' + gR + ')', 'success');
-      setTimeout(function() { showFinishModal(); }, 500);
-    }, 300);
-    return;
-  }
-  if (gR >= target && gR - gL >= 2) {
-    courtState.score.left = gL;
-    courtState.score.right = gR;
-    renderCourt();
-    setTimeout(function() {
-      showCourtToast('🏆 ' + getRightName() + ' 승리! (' + gL + '-' + gR + ')', 'success');
-      setTimeout(function() { showFinishModal(); }, 500);
-    }, 300);
     return;
   }
 
-  // 타이브레이크 진입 체크: target-1 : target-1 (예: 7-7 for pro8)
-  if (gL === target - 1 && gR === target - 1 && !t.tiebreak) {
+  // 타이브레이크 진입 체크
+  if (checkTiebreakEntry(gL, gR, target) && !t.tiebreak) {
     t.tiebreak = true;
-    t.tbPoint.left = 0;
-    t.tbPoint.right = 0;
+    t.tbPoint = { left: 0, right: 0 };
     showCourtToast('🎯 TIEBREAK! 먼저 7포인트 + 2점 차 승리', 'info');
   }
 
   renderCourt();
+}
+
+// 테니스 세트별 점수를 courtState.score에 동기화 (DB 저장용)
+function syncTennisScoreToDB() {
+  const t = courtState.tennis;
+  // 프로세트는 단일 세트이므로 현재 게임 수만 저장
+  if (t.setsToWin === 1) {
+    courtState.score.left = t.games.left;
+    courtState.score.right = t.games.right;
+    return;
+  }
+  // 멀티세트: 승리 세트 수를 score에 저장
+  courtState.score.left = t.sets.filter(function(s) { return s.left > s.right; }).length;
+  courtState.score.right = t.sets.filter(function(s) { return s.right > s.left; }).length;
 }
 
 // 테니스 포인트 취소
@@ -275,11 +350,13 @@ function tennisUndoGame(side) {
     // 타이브레이크였다면 해제
     if (t.tiebreak) {
       t.tiebreak = false;
-      t.tbPoint.left = 0;
-      t.tbPoint.right = 0;
+      t.tbPoint = { left: 0, right: 0 };
     }
+    // 서브 되돌리기
+    tennisToggleServe();
     courtState.score.left = t.games.left;
     courtState.score.right = t.games.right;
+    syncTennisScoreToDB();
     renderCourt();
     showCourtToast('게임 취소 (' + t.games.left + '-' + t.games.right + ')', 'info');
   }
@@ -287,12 +364,41 @@ function tennisUndoGame(side) {
 
 // 테니스 상태 초기화
 function resetTennisState() {
-  courtState.tennis.point = { left: 0, right: 0 };
-  courtState.tennis.games = { left: 0, right: 0 };
-  courtState.tennis.tiebreak = false;
-  courtState.tennis.tbPoint = { left: 0, right: 0 };
-  courtState.tennis.deuceRule = courtState.tournament && courtState.tournament.deuce_rule || 'tiebreak';
-  courtState.tennis.lastSwapGames = 0;
+  const t = courtState.tennis;
+  const tournament = courtState.tournament || {};
+  t.point = { left: 0, right: 0 };
+  t.games = { left: 0, right: 0 };
+  t.tiebreak = false;
+  t.tbPoint = { left: 0, right: 0 };
+  t.deuceRule = tournament.deuce_rule || 'tiebreak';
+  t.lastSwapGames = 0;
+  t.serving = 'left';  // 사이드 선택 화면에서 변경 가능
+  t.initialServer = 'left';
+  t.sets = [];
+  t.currentSet = 1;
+
+  // 세트 포맷 결정
+  var sf = tournament.scoring_type || 'pro8';
+  t.setFormat = sf;
+  if (sf === 'pro8') {
+    t.setsToWin = 1;
+    t.gamesPerSet = tournament.target_games || 8;
+  } else if (sf === 'pro10') {
+    t.setsToWin = 1;
+    t.gamesPerSet = tournament.target_games || 10;
+  } else if (sf === 'set2') {
+    t.setsToWin = 2;
+    t.gamesPerSet = 6;
+  } else if (sf === 'set3') {
+    t.setsToWin = 2;
+    t.gamesPerSet = 6;
+  } else {
+    t.setsToWin = 1;
+    t.gamesPerSet = tournament.target_games || 8;
+  }
+  t.finalSetTiebreak = true;
+  // targetScore는 gamesPerSet로 통일
+  courtState.targetScore = t.gamesPerSet;
 }
 
 // 중간 교체(체인지오버) 점수 계산
@@ -505,10 +611,27 @@ function renderSideSelect() {
 
       <!-- 교체 버튼 -->
       <button onclick="toggleSidePreview()" 
-        class="mb-6 px-6 py-3 bg-white/10 hover:bg-white/20 rounded-2xl text-base font-bold border border-white/10 active:scale-95 transition flex items-center gap-3">
+        class="mb-4 px-6 py-3 bg-white/10 hover:bg-white/20 rounded-2xl text-base font-bold border border-white/10 active:scale-95 transition flex items-center gap-3">
         <i class="fas fa-exchange-alt text-yellow-400"></i>
         <span>좌우 바꾸기</span>
       </button>
+
+      ${isTennis() ? `
+      <!-- 테니스 서브 선택 -->
+      <div class="w-full max-w-lg mb-4">
+        <p class="text-center text-sm text-gray-400 mb-2"><i class="fas fa-baseball-ball mr-1 text-yellow-400"></i>첫 서브를 선택하세요</p>
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="selectFirstServer('left')" id="serve-btn-left"
+            class="py-3 rounded-xl text-center font-bold transition border-2 ${courtState.tennis.serving === 'left' ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300 ring-2 ring-yellow-500/30' : 'bg-white/5 border-white/10 text-gray-400'}">
+            🎾 ${courtState.leftTeam === 1 ? team1Name : team2Name}
+          </button>
+          <button onclick="selectFirstServer('right')" id="serve-btn-right"
+            class="py-3 rounded-xl text-center font-bold transition border-2 ${courtState.tennis.serving === 'right' ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300 ring-2 ring-yellow-500/30' : 'bg-white/5 border-white/10 text-gray-400'}">
+            🎾 ${courtState.rightTeam === 1 ? team1Name : team2Name}
+          </button>
+        </div>
+      </div>
+      ` : ''}
 
       <!-- 확인 / 시작 -->
       <button onclick="confirmSideAndStart()" 
@@ -517,6 +640,13 @@ function renderSideSelect() {
       </button>
     </div>
   </div>`;
+}
+
+// 테니스 첫 서버 선택
+function selectFirstServer(side) {
+  courtState.tennis.serving = side;
+  courtState.tennis.initialServer = side;
+  renderCourt();
 }
 
 // 사이드 선택 화면에서 좌우 바꾸기
@@ -549,7 +679,7 @@ function renderTennisScoreboard(m) {
   const t = courtState.tennis;
   const gL = t.games.left;
   const gR = t.games.right;
-  const target = courtState.targetScore;
+  const target = t.gamesPerSet;
   const leftName = getLeftName();
   const rightName = getRightName();
 
@@ -558,12 +688,47 @@ function renderTennisScoreboard(m) {
   const ptR = getTennisPointDisplay('right');
   const statusLabel = getTennisStatusLabel();
 
-  // 게임 진행률
-  const maxG = Math.max(gL, gR);
-  const matchOver = (gL >= target && gL - gR >= 2) || (gR >= target && gR - gL >= 2);
+  // 서브 표시
+  const servL = t.serving === 'left';
+  const servR = t.serving === 'right';
+
+  // 세트 승리 체크
+  const setsWonL = t.sets.filter(function(s) { return s.left > s.right; }).length;
+  const setsWonR = t.sets.filter(function(s) { return s.right > s.left; }).length;
+  const matchOver = setsWonL >= t.setsToWin || setsWonR >= t.setsToWin;
+  const isMultiSet = t.setsToWin > 1;
+
+  // 포맷 라벨
+  var formatLabel = target + '게임 프로세트';
+  if (t.setFormat === 'set2') formatLabel = '2세트 선취';
+  else if (t.setFormat === 'set3') formatLabel = '3세트 선취';
 
   // 듀스 규칙 라벨
   const deuceLabel = t.deuceRule === 'noad' ? '노어드' : t.deuceRule === 'advantage' ? '어드밴티지' : '타이브레이크';
+
+  // 세트 히스토리 HTML
+  var setsHtml = '';
+  if (t.sets.length > 0 || isMultiSet) {
+    setsHtml = '<div class="flex items-center justify-center gap-1 px-3 py-1 bg-black/40 border-b border-white/5 shrink-0" style="min-height:28px;">';
+    // 완료된 세트
+    for (var si = 0; si < t.sets.length; si++) {
+      var s = t.sets[si];
+      var sWin = s.left > s.right ? 'left' : 'right';
+      setsHtml += '<span class="px-2 py-0.5 rounded text-xs font-bold ' +
+        (sWin === 'left' ? 'bg-emerald-500/30 text-emerald-300' : 'bg-orange-500/30 text-orange-300') +
+        '">S' + (si+1) + ' ' + s.left + '-' + s.right + '</span>';
+    }
+    // 현재 세트 (진행 중)
+    if (!matchOver) {
+      setsHtml += '<span class="px-2 py-0.5 rounded text-xs font-bold bg-white/20 text-white animate-pulse">' +
+        'S' + t.currentSet + ' ' + gL + '-' + gR + '</span>';
+    }
+    // 세트 승리 수
+    if (isMultiSet) {
+      setsHtml += '<span class="ml-2 text-xs text-gray-500">세트 ' + setsWonL + '-' + setsWonR + '</span>';
+    }
+    setsHtml += '</div>';
+  }
 
   return '<div class="h-screen bg-gray-900 text-white flex flex-col select-none" style="touch-action:manipulation;overflow:hidden;">' +
     // 상단 정보 바
@@ -574,8 +739,7 @@ function renderTennisScoreboard(m) {
         '<span class="text-xs text-gray-500">' + (m.event_name || '') + '</span>' +
       '</div>' +
       '<div class="flex items-center gap-1.5">' +
-        '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/30 text-emerald-300">' +
-          target + '게임 프로세트</span>' +
+        '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/30 text-emerald-300">' + formatLabel + '</span>' +
         '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/30 text-amber-300">' + deuceLabel + '</span>' +
         (t.tiebreak ? '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-red-500/30 text-red-300 animate-pulse">TIEBREAK</span>' : '') +
         (statusLabel === 'DEUCE' ? '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-purple-500/30 text-purple-300 animate-pulse">DEUCE</span>' : '') +
@@ -584,6 +748,9 @@ function renderTennisScoreboard(m) {
       '</div>' +
     '</div>' +
 
+    // 세트 히스토리 바
+    setsHtml +
+
     // 메인 점수판: 좌우 구조
     '<div class="flex-1 flex flex-row relative" style="min-height:0;">' +
 
@@ -591,18 +758,24 @@ function renderTennisScoreboard(m) {
       '<div id="left-zone" class="flex-1 flex flex-col items-center justify-center relative cursor-pointer touch-area' +
         (gL > gR ? ' bg-gradient-to-r from-emerald-900/30 to-transparent' : '') + '"' +
         ' style="border-right: 3px solid rgba(255,255,255,0.1);">' +
+        // 이름 + 서브 표시
         '<div class="absolute top-3 left-0 right-0 text-center">' +
-          '<p class="text-lg sm:text-xl font-bold text-emerald-400 truncate px-4">' + leftName + '</p>' +
+          '<p class="text-lg sm:text-xl font-bold text-emerald-400 truncate px-4">' +
+            (servL ? '<span class="inline-block w-3 h-3 bg-yellow-400 rounded-full mr-1.5 animate-pulse" title="서브"></span>' : '') +
+            leftName +
+            (servL ? ' <span class="text-xs text-yellow-400 font-normal">SERVE</span>' : '') +
+          '</p>' +
         '</div>' +
         // 게임 점수 (큰 글씨)
         '<div class="text-center">' +
-          '<div class="font-black tabular-nums leading-none text-white' + (matchOver && gL > gR ? ' text-yellow-400' : '') + '" ' +
+          '<div class="font-black tabular-nums leading-none text-white' + (matchOver && setsWonL > setsWonR ? ' text-yellow-400' : '') + '" ' +
             'style="font-size:clamp(5rem,16vw,10rem);text-shadow:0 4px 20px rgba(0,0,0,0.5);">' + gL + '</div>' +
           '<p class="text-xs text-emerald-400/60 font-bold mt-1 uppercase tracking-wider">GAMES</p>' +
         '</div>' +
         // 현재 포인트 (작은 글씨)
         '<div class="absolute bottom-20 left-0 right-0 text-center">' +
-          '<div class="inline-flex items-center gap-1 px-4 py-2 rounded-full ' + (t.tiebreak ? 'bg-red-500/20 border border-red-500/30' : 'bg-white/10 border border-white/10') + '">' +
+          '<div class="inline-flex items-center gap-1 px-4 py-2 rounded-full ' +
+            (t.tiebreak ? 'bg-red-500/20 border border-red-500/30' : ptL === 'AD' ? 'bg-yellow-500/20 border border-yellow-500/30' : 'bg-white/10 border border-white/10') + '">' +
             '<span class="text-2xl sm:text-3xl font-black ' + (ptL === 'AD' ? 'text-yellow-400' : 'text-white') + '" id="score-left">' + ptL + '</span>' +
             '<span class="text-xs text-white/40 ml-1">' + (t.tiebreak ? 'TB' : 'PT') + '</span>' +
           '</div>' +
@@ -614,29 +787,38 @@ function renderTennisScoreboard(m) {
 
       // 중앙 컨트롤
       '<div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-2">' +
-        '<button onclick="manualSwapSides()" class="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 border-2 border-white/20 flex items-center justify-center text-white shadow-xl active:scale-90 transition backdrop-blur-sm" title="좌우 교체">' +
-          '<i class="fas fa-exchange-alt text-xl"></i></button>' +
+        '<button onclick="manualSwapSides()" class="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 border-2 border-white/20 flex items-center justify-center text-white shadow-xl active:scale-90 transition backdrop-blur-sm" title="좌우 교체">' +
+          '<i class="fas fa-exchange-alt text-lg"></i></button>' +
         '<div class="flex flex-col items-center">' +
           '<span class="text-xs text-white/40 font-bold">' + gL + ' - ' + gR + '</span>' +
           (t.tiebreak ? '<span class="text-xs text-red-400 font-bold">TB ' + t.tbPoint.left + '-' + t.tbPoint.right + '</span>' : '') +
         '</div>' +
+        // 서브 전환 버튼
+        '<button onclick="event.stopPropagation();toggleServeManual()" class="w-10 h-10 rounded-full bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 flex items-center justify-center text-yellow-400 shadow-lg active:scale-90 transition" title="서브 전환">' +
+          '<span class="text-sm">🎾</span></button>' +
       '</div>' +
 
       // 오른쪽 팀
       '<div id="right-zone" class="flex-1 flex flex-col items-center justify-center relative cursor-pointer touch-area' +
         (gR > gL ? ' bg-gradient-to-l from-orange-900/30 to-transparent' : '') + '">' +
+        // 이름 + 서브 표시
         '<div class="absolute top-3 left-0 right-0 text-center">' +
-          '<p class="text-lg sm:text-xl font-bold text-orange-400 truncate px-4">' + rightName + '</p>' +
+          '<p class="text-lg sm:text-xl font-bold text-orange-400 truncate px-4">' +
+            (servR ? '<span class="inline-block w-3 h-3 bg-yellow-400 rounded-full mr-1.5 animate-pulse" title="서브"></span>' : '') +
+            rightName +
+            (servR ? ' <span class="text-xs text-yellow-400 font-normal">SERVE</span>' : '') +
+          '</p>' +
         '</div>' +
         // 게임 점수
         '<div class="text-center">' +
-          '<div class="font-black tabular-nums leading-none text-white' + (matchOver && gR > gL ? ' text-yellow-400' : '') + '" ' +
+          '<div class="font-black tabular-nums leading-none text-white' + (matchOver && setsWonR > setsWonL ? ' text-yellow-400' : '') + '" ' +
             'style="font-size:clamp(5rem,16vw,10rem);text-shadow:0 4px 20px rgba(0,0,0,0.5);">' + gR + '</div>' +
           '<p class="text-xs text-orange-400/60 font-bold mt-1 uppercase tracking-wider">GAMES</p>' +
         '</div>' +
         // 현재 포인트
         '<div class="absolute bottom-20 left-0 right-0 text-center">' +
-          '<div class="inline-flex items-center gap-1 px-4 py-2 rounded-full ' + (t.tiebreak ? 'bg-red-500/20 border border-red-500/30' : 'bg-white/10 border border-white/10') + '">' +
+          '<div class="inline-flex items-center gap-1 px-4 py-2 rounded-full ' +
+            (t.tiebreak ? 'bg-red-500/20 border border-red-500/30' : ptR === 'AD' ? 'bg-yellow-500/20 border border-yellow-500/30' : 'bg-white/10 border border-white/10') + '">' +
             '<span class="text-2xl sm:text-3xl font-black ' + (ptR === 'AD' ? 'text-yellow-400' : 'text-white') + '" id="score-right">' + ptR + '</span>' +
             '<span class="text-xs text-white/40 ml-1">' + (t.tiebreak ? 'TB' : 'PT') + '</span>' +
           '</div>' +
@@ -671,13 +853,22 @@ function renderTennisScoreboard(m) {
     renderSwapModal() +
     // 터치 피드백
     '<div id="touch-feedback" class="fixed pointer-events-none z-[100]" style="display:none;">' +
-      '<div class="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-3xl font-black text-white animate-ping">+1</div></div>' +
+      '<div class="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-3xl font-black text-white animate-ping">🎾</div></div>' +
   '</div>';
 }
 
 // 테니스 -1 포인트 버튼
 function tennisMinusPoint(side) {
   tennisUndoPoint(side);
+}
+
+// 수동 서브 전환 버튼
+function toggleServeManual() {
+  const t = courtState.tennis;
+  t.serving = t.serving === 'left' ? 'right' : 'left';
+  renderCourt();
+  var serverName = t.serving === 'left' ? getLeftName() : getRightName();
+  showCourtToast('🎾 서브 → ' + serverName, 'info');
 }
 
 // 테니스 종합 취소 (최근 액션)
@@ -905,12 +1096,16 @@ function executeAutoSwap() {
   courtState.swapped = !courtState.swapped;
   courtState.swapDone = true;
 
-  // 테니스: 포인트/게임/타이브레이크 데이터도 좌우 교체
+  // 테니스: 포인트/게임/타이브레이크/서브/세트 데이터도 좌우 교체
   if (isTennis()) {
     const t = courtState.tennis;
     const tmpPt = t.point.left; t.point.left = t.point.right; t.point.right = tmpPt;
     const tmpG = t.games.left; t.games.left = t.games.right; t.games.right = tmpG;
     const tmpTB = t.tbPoint.left; t.tbPoint.left = t.tbPoint.right; t.tbPoint.right = tmpTB;
+    t.serving = t.serving === 'left' ? 'right' : 'left';
+    for (var i = 0; i < t.sets.length; i++) {
+      var tmp = t.sets[i].left; t.sets[i].left = t.sets[i].right; t.sets[i].right = tmp;
+    }
   }
 
   renderCourt();
@@ -925,6 +1120,38 @@ function renderFinishModal() {
   const leftName = getLeftName();
   const rightName = getRightName();
 
+  // 테니스 세트 상세 정보
+  var tennisDetail = '';
+  if (isTennis()) {
+    const t = courtState.tennis;
+    var allSets = t.sets.slice();
+    if (t.games.left > 0 || t.games.right > 0) {
+      allSets.push({ left: t.games.left, right: t.games.right });
+    }
+    if (allSets.length > 0) {
+      tennisDetail = '<div class="mt-3 flex justify-center gap-2 flex-wrap">';
+      for (var si = 0; si < allSets.length; si++) {
+        var s = allSets[si];
+        var sWin = s.left > s.right ? 'left' : 'right';
+        tennisDetail += '<span class="px-2 py-1 rounded text-xs font-bold ' +
+          (sWin === 'left' ? 'bg-emerald-500/30 text-emerald-300' : 'bg-orange-500/30 text-orange-300') +
+          '">세트' + (si+1) + ': ' + s.left + '-' + s.right + '</span>';
+      }
+      tennisDetail += '</div>';
+    }
+  }
+
+  // 게임 수 vs 세트 승리 수 표시
+  var displayL = sL, displayR = sR;
+  if (isTennis() && courtState.tennis.setsToWin > 1) {
+    // 멀티세트: 세트 승리 수 표시
+    displayL = courtState.tennis.sets.filter(function(s) { return s.left > s.right; }).length;
+    displayR = courtState.tennis.sets.filter(function(s) { return s.right > s.left; }).length;
+  } else if (isTennis()) {
+    displayL = courtState.tennis.games.left;
+    displayR = courtState.tennis.games.right;
+  }
+
   return `<div id="finish-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
     <div class="bg-gray-800 rounded-3xl shadow-2xl w-full max-w-md mx-4 p-6 border border-white/10">
       <h3 class="text-xl font-bold text-center mb-6"><i class="fas fa-flag-checkered mr-2 text-green-400"></i>경기 종료</h3>
@@ -932,25 +1159,26 @@ function renderFinishModal() {
         <div class="flex items-center justify-between bg-white/5 rounded-xl px-6 py-4">
           <div class="text-center flex-1">
             <p class="text-sm text-${P}-400 font-medium mb-1">${leftName}</p>
-            <p class="text-4xl font-black ${sL > sR ? 'text-yellow-400' : ''}">${sL}</p>
+            <p class="text-4xl font-black ${displayL > displayR ? 'text-yellow-400' : ''}">${displayL}</p>
           </div>
           <span class="text-2xl text-gray-600 font-bold mx-4">:</span>
           <div class="text-center flex-1">
             <p class="text-sm text-orange-400 font-medium mb-1">${rightName}</p>
-            <p class="text-4xl font-black ${sR > sL ? 'text-yellow-400' : ''}">${sR}</p>
+            <p class="text-4xl font-black ${displayR > displayL ? 'text-yellow-400' : ''}">${displayR}</p>
           </div>
         </div>
+        ${tennisDetail}
       </div>
       <div class="mb-6">
         <p class="text-sm text-gray-400 mb-3 text-center">승자를 선택하세요</p>
         <div class="grid grid-cols-2 gap-3">
           <button onclick="selectWinner('left')" id="winner-btn-left" class="py-4 bg-${P}-600/30 border-2 border-${P}-500/30 rounded-2xl text-center hover:bg-${P}-600/50 transition">
             <p class="font-bold text-${P}-400">${leftName}</p>
-            <p class="text-3xl font-black mt-1">${sL}</p>
+            <p class="text-3xl font-black mt-1">${displayL}</p>
           </button>
           <button onclick="selectWinner('right')" id="winner-btn-right" class="py-4 bg-orange-600/30 border-2 border-orange-500/30 rounded-2xl text-center hover:bg-orange-600/50 transition">
             <p class="font-bold text-orange-400">${rightName}</p>
-            <p class="text-3xl font-black mt-1">${sR}</p>
+            <p class="text-3xl font-black mt-1">${displayR}</p>
           </button>
         </div>
       </div>
@@ -1146,12 +1374,16 @@ function manualSwapSides() {
 
   courtState.swapped = !courtState.swapped;
 
-  // 테니스: 포인트/게임/타이브레이크 데이터도 좌우 교체
+  // 테니스: 포인트/게임/타이브레이크/서브/세트 데이터도 좌우 교체
   if (isTennis()) {
     const t = courtState.tennis;
     const tmpPt = t.point.left; t.point.left = t.point.right; t.point.right = tmpPt;
     const tmpG = t.games.left; t.games.left = t.games.right; t.games.right = tmpG;
     const tmpTB = t.tbPoint.left; t.tbPoint.left = t.tbPoint.right; t.tbPoint.right = tmpTB;
+    t.serving = t.serving === 'left' ? 'right' : 'left';
+    for (var i = 0; i < t.sets.length; i++) {
+      var tmp = t.sets[i].left; t.sets[i].left = t.sets[i].right; t.sets[i].right = tmp;
+    }
   }
 
   showCourtToast('🔄 좌우 ' + SWAP_LABEL + '!', 'info');
@@ -1245,17 +1477,67 @@ function undoLastAction() {
 // ==========================================
 // 점수 저장 / 경기 종료
 // ==========================================
+function getTennisSetScores() {
+  // 테니스 세트별 점수를 DB 필드에 매핑
+  const t = courtState.tennis;
+  const result = {
+    team1_set1: 0, team1_set2: 0, team1_set3: 0,
+    team2_set1: 0, team2_set2: 0, team2_set3: 0
+  };
+
+  // 프로세트 (단일 세트)
+  if (t.setsToWin === 1) {
+    if (courtState.leftTeam === 1) {
+      result.team1_set1 = t.games.left;
+      result.team2_set1 = t.games.right;
+    } else {
+      result.team1_set1 = t.games.right;
+      result.team2_set1 = t.games.left;
+    }
+    return result;
+  }
+
+  // 멀티세트: 완료된 세트 + 현재 세트
+  var allSets = t.sets.slice();
+  // 현재 진행 중인 세트가 있으면 추가
+  if (t.games.left > 0 || t.games.right > 0) {
+    allSets.push({ left: t.games.left, right: t.games.right });
+  }
+
+  for (var i = 0; i < allSets.length && i < 3; i++) {
+    var s = allSets[i];
+    var team1g, team2g;
+    if (courtState.leftTeam === 1) {
+      team1g = s.left;
+      team2g = s.right;
+    } else {
+      team1g = s.right;
+      team2g = s.left;
+    }
+    if (i === 0) { result.team1_set1 = team1g; result.team2_set1 = team2g; }
+    else if (i === 1) { result.team1_set2 = team1g; result.team2_set2 = team2g; }
+    else if (i === 2) { result.team1_set3 = team1g; result.team2_set3 = team2g; }
+  }
+  return result;
+}
+
 async function saveCurrentScore() {
   const m = courtState.currentMatch;
   if (!m) return;
 
-  const data = {
-    team1_set1: getTeam1Score(),
-    team1_set2: 0, team1_set3: 0,
-    team2_set1: getTeam2Score(),
-    team2_set2: 0, team2_set3: 0,
-    status: 'playing'
-  };
+  var data;
+  if (isTennis()) {
+    data = getTennisSetScores();
+    data.status = 'playing';
+  } else {
+    data = {
+      team1_set1: getTeam1Score(),
+      team1_set2: 0, team1_set3: 0,
+      team2_set1: getTeam2Score(),
+      team2_set2: 0, team2_set3: 0,
+      status: 'playing'
+    };
+  }
 
   try {
     await courtApi(`/tournaments/${courtState.tournamentId}/matches/${m.id}/score`, {
@@ -1309,14 +1591,21 @@ async function confirmFinish() {
   const winnerTeam = selectedWinnerSide === 'left' ? courtState.leftTeam : courtState.rightTeam;
   const loserTeam = winnerTeam === 1 ? 2 : 1;
 
-  const data = {
-    team1_set1: getTeam1Score(),
-    team1_set2: 0, team1_set3: 0,
-    team2_set1: getTeam2Score(),
-    team2_set2: 0, team2_set3: 0,
-    status: 'completed',
-    winner_team: winnerTeam
-  };
+  var data;
+  if (isTennis()) {
+    data = getTennisSetScores();
+    data.status = 'completed';
+    data.winner_team = winnerTeam;
+  } else {
+    data = {
+      team1_set1: getTeam1Score(),
+      team1_set2: 0, team1_set3: 0,
+      team2_set1: getTeam2Score(),
+      team2_set2: 0, team2_set3: 0,
+      status: 'completed',
+      winner_team: winnerTeam
+    };
+  }
 
   try {
     await courtApi(`/tournaments/${courtState.tournamentId}/matches/${m.id}/score`, {
@@ -1724,21 +2013,71 @@ async function refreshCourtData() {
         } else {
           courtState.score = { left: t2s, right: t1s };
         }
-        // 테니스: DB에 저장된 게임 수를 tennis.games에도 복원
+        // 테니스: DB에 저장된 게임 수를 tennis 상태에 복원
         if (isTennis()) {
-          courtState.tennis.games.left = courtState.score.left;
-          courtState.tennis.games.right = courtState.score.right;
-          // 포인트는 DB에 저장되지 않으므로 0으로 시작
-          courtState.tennis.point = { left: 0, right: 0 };
-          courtState.tennis.tiebreak = false;
-          courtState.tennis.tbPoint = { left: 0, right: 0 };
-          courtState.tennis.deuceRule = data.tournament && data.tournament.deuce_rule || 'tiebreak';
-          courtState.tennis.lastSwapGames = 0;
-          // 타이브레이크 진입 체크 (게임이 target-1 : target-1 이면)
-          const target = courtState.targetScore;
-          if (courtState.tennis.games.left === target - 1 && courtState.tennis.games.right === target - 1) {
-            courtState.tennis.tiebreak = true;
+          resetTennisState();
+          const mt = data.current_match;
+          const t = courtState.tennis;
+          // 멀티세트: set2, set3 데이터가 있으면 완료된 세트로 복원
+          var t1s1 = mt.team1_set1 || 0, t2s1 = mt.team2_set1 || 0;
+          var t1s2 = mt.team1_set2 || 0, t2s2 = mt.team2_set2 || 0;
+          var t1s3 = mt.team1_set3 || 0, t2s3 = mt.team2_set3 || 0;
+
+          if (t.setsToWin > 1) {
+            // 멀티세트 복원
+            t.sets = [];
+            t.currentSet = 1;
+            // 세트1이 완료 상태인지 체크 (둘 다 0이 아니고, 승자가 있는 경우)
+            if ((t1s1 > 0 || t2s1 > 0) && (t1s2 > 0 || t2s2 > 0)) {
+              // 세트1은 완료됨
+              if (courtState.leftTeam === 1) {
+                t.sets.push({ left: t1s1, right: t2s1 });
+              } else {
+                t.sets.push({ left: t2s1, right: t1s1 });
+              }
+              t.currentSet = 2;
+              // 세트2도 완료됐는지 체크
+              if ((t1s3 > 0 || t2s3 > 0)) {
+                if (courtState.leftTeam === 1) {
+                  t.sets.push({ left: t1s2, right: t2s2 });
+                } else {
+                  t.sets.push({ left: t2s2, right: t1s2 });
+                }
+                t.currentSet = 3;
+                // 현재 세트 = 세트3
+                if (courtState.leftTeam === 1) {
+                  t.games = { left: t1s3, right: t2s3 };
+                } else {
+                  t.games = { left: t2s3, right: t1s3 };
+                }
+              } else {
+                // 현재 세트 = 세트2
+                if (courtState.leftTeam === 1) {
+                  t.games = { left: t1s2, right: t2s2 };
+                } else {
+                  t.games = { left: t2s2, right: t1s2 };
+                }
+              }
+            } else {
+              // 현재 세트 = 세트1
+              if (courtState.leftTeam === 1) {
+                t.games = { left: t1s1, right: t2s1 };
+              } else {
+                t.games = { left: t2s1, right: t1s1 };
+              }
+            }
+          } else {
+            // 프로세트: 단일 세트
+            t.games.left = courtState.score.left;
+            t.games.right = courtState.score.right;
           }
+
+          // 타이브레이크 진입 체크
+          if (checkTiebreakEntry(t.games.left, t.games.right, t.gamesPerSet) && !t.tiebreak) {
+            t.tiebreak = true;
+          }
+          // score 동기화
+          syncTennisScoreToDB();
         }
         courtState.page = 'court';
       }
