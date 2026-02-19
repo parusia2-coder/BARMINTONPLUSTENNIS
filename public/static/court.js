@@ -807,7 +807,7 @@ async function saveCurrentScore() {
     await courtApi(`/tournaments/${courtState.tournamentId}/matches/${m.id}/score`, {
       method: 'PUT', body: JSON.stringify(data)
     });
-    showCourtToast('${SC.scoring?.scoreLabel || '점수'} 저장됨!', 'success');
+    showCourtToast((SC.scoring && SC.scoring.scoreLabel || '점수') + ' 저장됨!', 'success');
   } catch(e) {}
 }
 
