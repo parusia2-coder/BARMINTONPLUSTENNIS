@@ -1,11 +1,26 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { sportConfig, badmintonConfig, tennisConfig } from './config'
 import { tournamentRoutes } from './routes/tournaments'
 import { participantRoutes } from './routes/participants'
 import { eventRoutes } from './routes/events'
 import { matchRoutes } from './routes/matches'
 import { bracketRoutes } from './routes/brackets'
 import { notificationRoutes } from './routes/notifications'
+
+// sportConfig 편의 변수 (기본 = badminton)
+const SC = sportConfig
+const E = SC.emoji  // 🏸 or 🎾
+const P = SC.theme.primaryClass  // blue or emerald
+const themeColors = JSON.stringify(SC.theme.primary)
+const courtColors = JSON.stringify(SC.theme.secondary)
+const configJson = JSON.stringify(SC)
+
+// 양쪽 config를 모두 전달 (런타임 종목 전환용)
+const allConfigsJson = JSON.stringify({
+  badminton: badmintonConfig,
+  tennis: tennisConfig
+})
 
 type Bindings = {
   DB: D1Database
@@ -72,7 +87,7 @@ function getCourtHtml(): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <title>🏸 코트 점수판</title>
+  <title>${E} ${SC.terms.scoreBoard}</title>
   <script src="/static/vendor/tailwind.js"></script>
   <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
   <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
@@ -82,8 +97,8 @@ function getCourtHtml(): string {
       theme: {
         extend: {
           colors: {
-            primary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' },
-            shuttle: { 50:'#f0fdf4',100:'#dcfce7',200:'#bbf7d0',300:'#86efac',400:'#4ade80',500:'#22c55e',600:'#16a34a',700:'#15803d',800:'#166534',900:'#14532d' }
+            primary: ${themeColors},
+            court: ${courtColors}
           }
         }
       }
@@ -166,6 +181,8 @@ function getCourtHtml(): string {
 </head>
 <body class="bg-gray-900 min-h-screen">
   <div id="app"></div>
+  <script>window.SPORT_CONFIG = ${configJson};</script>
+  <script>window.ALL_SPORT_CONFIGS = ${allConfigsJson};</script>
   <script src="/static/court.js"></script>
 </body>
 </html>`
@@ -177,7 +194,7 @@ function getIndexHtml(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🏸 배드민턴 대회 운영 시스템</title>
+  <title>${E} ${SC.name}</title>
   <script src="/static/vendor/tailwind.js"></script>
   <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
   <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
@@ -189,8 +206,8 @@ function getIndexHtml(): string {
       theme: {
         extend: {
           colors: {
-            primary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' },
-            shuttle: { 50:'#f0fdf4',100:'#dcfce7',200:'#bbf7d0',300:'#86efac',400:'#4ade80',500:'#22c55e',600:'#16a34a',700:'#15803d',800:'#166534',900:'#14532d' }
+            primary: ${themeColors},
+            court: ${courtColors}
           }
         }
       }
@@ -300,7 +317,7 @@ function getIndexHtml(): string {
     .status-bar-in_progress::before { background: linear-gradient(180deg, #10b981, #059669); }
     .status-bar-completed::before { background: #8b5cf6; }
     .status-bar-cancelled::before { background: #ef4444; }
-    .glow-emerald {
+    .glow-primary {
       box-shadow: 0 0 60px rgba(16,185,129,0.15), 0 0 120px rgba(16,185,129,0.05);
     }
     @keyframes float {
@@ -326,6 +343,8 @@ function getIndexHtml(): string {
 </head>
 <body class="bg-slate-50 min-h-screen">
   <div id="app"></div>
+  <script>window.SPORT_CONFIG = ${configJson};</script>
+  <script>window.ALL_SPORT_CONFIGS = ${allConfigsJson};</script>
   <script src="/static/app.js"></script>
 </body>
 </html>`
@@ -339,7 +358,7 @@ function getMyPageHtml(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🏸 내 경기 조회</title>
+  <title>${E} 내 경기 조회</title>
   <script src="/static/vendor/tailwind.js"></script>
   <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
   <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
@@ -347,7 +366,8 @@ function getMyPageHtml(): string {
   <script>
     tailwind.config = {
       theme: { extend: { colors: {
-        emerald: { 50:'#ecfdf5',100:'#d1fae5',200:'#a7f3d0',300:'#6ee7b7',400:'#34d399',500:'#10b981',600:'#059669',700:'#047857',800:'#065f46',900:'#064e3b' }
+        primary: ${themeColors},
+        court: ${courtColors}
       }}}
     }
   </script>
@@ -376,7 +396,7 @@ function getMyPageHtml(): string {
 
     function showToast(msg,type){
       var t=document.createElement('div');
-      var c={info:'bg-blue-500',success:'bg-emerald-500',error:'bg-red-500',warning:'bg-yellow-500 text-gray-900'};
+      var c={info:'bg-${P}-500',success:'bg-primary-500',error:'bg-red-500',warning:'bg-yellow-500 text-gray-900'};
       t.className='fixed top-4 right-4 z-[9999] px-5 py-3 rounded-lg text-white shadow-lg '+(c[type]||c.info)+' fade-in max-w-md';
       t.textContent=msg; document.body.appendChild(t);
       setTimeout(function(){t.style.opacity='0';t.style.transition='opacity 0.3s';setTimeout(function(){t.remove()},300)},3000);
@@ -386,10 +406,10 @@ function getMyPageHtml(): string {
     function showNotifBanner(title, body, courtNum) {
       var area = document.getElementById('notif-area');
       var id = 'nb-'+Date.now();
-      var html = '<div id="'+id+'" class="notif-banner fixed top-0 left-0 right-0 z-[9998] bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 py-3 shadow-xl">';
+      var html = '<div id="'+id+'" class="notif-banner fixed top-0 left-0 right-0 z-[9998] bg-gradient-to-r from-primary-500 to-primary-600 text-white px-4 py-3 shadow-xl">';
       html += '<div class="max-w-2xl mx-auto flex items-center justify-between">';
       html += '<div class="flex items-center gap-3"><div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center"><i class="fas fa-bell text-lg"></i></div>';
-      html += '<div><div class="font-bold text-sm">'+title+'</div><div class="text-xs text-emerald-100">'+body+'</div></div></div>';
+      html += '<div><div class="font-bold text-sm">'+title+'</div><div class="text-xs text-primary-100">'+body+'</div></div></div>';
       html += '<button onclick="document.getElementById(\\''+id+'\\').remove()" class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30"><i class="fas fa-times text-sm"></i></button>';
       html += '</div></div>';
       area.insertAdjacentHTML('beforeend', html);
@@ -479,9 +499,9 @@ function getMyPageHtml(): string {
       var btn = document.getElementById('push-btn');
       if (!btn) return;
       if (pushSubscribed) {
-        btn.innerHTML = '<div class="flex items-center gap-2"><div class="flex items-center gap-1.5 text-emerald-700"><i class="fas fa-bell text-emerald-500"></i><span class="font-bold text-sm">알림 ON</span></div><div class="flex gap-1"><button onclick="testPush()" class="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-200"><i class="fas fa-paper-plane mr-1"></i>테스트</button><button onclick="unsubscribePush()" class="px-2 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200"><i class="fas fa-bell-slash mr-1"></i>해제</button></div></div>';
+        btn.innerHTML = '<div class="flex items-center gap-2"><div class="flex items-center gap-1.5 text-primary-700"><i class="fas fa-bell text-primary-500"></i><span class="font-bold text-sm">알림 ON</span></div><div class="flex gap-1"><button onclick="testPush()" class="px-2 py-1 bg-primary-100 text-primary-700 rounded-lg text-xs font-medium hover:bg-primary-200"><i class="fas fa-paper-plane mr-1"></i>테스트</button><button onclick="unsubscribePush()" class="px-2 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200"><i class="fas fa-bell-slash mr-1"></i>해제</button></div></div>';
       } else {
-        btn.innerHTML = '<button onclick="subscribePush(\\''+currentName.replace(/'/g,"\\\\'")+'\\',\\''+currentPhone.replace(/'/g,"\\\\'")+'\\');" class="w-full px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-bold text-sm hover:shadow-lg transition flex items-center justify-center gap-2"><i class="fas fa-bell"></i>경기 시작 알림 받기 (푸시)</button>';
+        btn.innerHTML = '<button onclick="subscribePush(\\''+currentName.replace(/'/g,"\\\\'")+'\\',\\''+currentPhone.replace(/'/g,"\\\\'")+'\\');" class="w-full px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-bold text-sm hover:shadow-lg transition flex items-center justify-center gap-2"><i class="fas fa-bell"></i>경기 시작 알림 받기 (푸시)</button>';
       }
     }
 
@@ -527,7 +547,7 @@ function getMyPageHtml(): string {
         // 대기→진행 전환 감지
         if (oldStatus === 'pending' && m.status === 'playing') {
           showNotifBanner(
-            '🏸 경기 시작!',
+            '${E} 경기 시작!',
             '코트 '+m.court_number+'에서 경기가 시작됩니다!\\n'+m.team1_name+' vs '+m.team2_name,
             m.court_number
           );
@@ -541,7 +561,7 @@ function getMyPageHtml(): string {
       if (!tid) {
         try {
           var res = await fetch(API+'/tournaments'); var d = await res.json();
-          app.innerHTML = '<div class="max-w-lg mx-auto px-4 py-8 fade-in"><div class="text-center mb-8"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 mb-3 shadow-lg"><i class="fas fa-user text-2xl text-white"></i></div><h1 class="text-2xl font-extrabold text-gray-900">내 경기 조회</h1><p class="text-gray-500 mt-1">대회를 선택하세요</p></div><div class="space-y-3">'+
+          app.innerHTML = '<div class="max-w-lg mx-auto px-4 py-8 fade-in"><div class="text-center mb-8"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-400 to-primary-600 mb-3 shadow-lg"><i class="fas fa-user text-2xl text-white"></i></div><h1 class="text-2xl font-extrabold text-gray-900">내 경기 조회</h1><p class="text-gray-500 mt-1">대회를 선택하세요</p></div><div class="space-y-3">'+
             d.tournaments.map(function(t){return '<a href="/my?tid='+t.id+'" class="block bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition"><h3 class="font-bold text-gray-900">'+t.name+'</h3><p class="text-sm text-gray-500">'+t.courts+'코트</p></a>';}).join('')+
             '</div><a href="/" class="block text-center mt-6 text-sm text-gray-500 hover:text-gray-700"><i class="fas fa-home mr-1"></i>메인으로</a></div>';
         } catch(e) { app.innerHTML='<div class="text-center py-20 text-gray-400">로딩 실패</div>'; }
@@ -555,17 +575,17 @@ function getMyPageHtml(): string {
       var app = document.getElementById('app');
       var h = '<div class="max-w-2xl mx-auto px-4 py-8 fade-in">';
       h += '<div class="flex items-center justify-between mb-6"><a href="/my" class="text-gray-500 hover:text-gray-700 text-sm"><i class="fas fa-arrow-left mr-1"></i>대회 선택</a><a href="/" class="text-gray-500 hover:text-gray-700 text-sm"><i class="fas fa-home mr-1"></i>메인</a></div>';
-      h += '<div class="text-center mb-6"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 mb-3 shadow-lg"><i class="fas fa-user text-2xl text-white"></i></div>';
+      h += '<div class="text-center mb-6"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-400 to-primary-600 mb-3 shadow-lg"><i class="fas fa-user text-2xl text-white"></i></div>';
       h += '<h1 class="text-2xl font-extrabold text-gray-900">내 경기 조회</h1>';
       h += '<p class="text-gray-500 mt-1">'+(tournament?.name||'')+'</p></div>';
       // 검색 폼
       h += '<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-4">';
       h += '<form id="search-form" class="flex flex-wrap gap-3 items-end">';
       h += '<div class="flex-1 min-w-[150px]"><label class="block text-xs font-semibold text-gray-500 mb-1">이름 <span class="text-red-500">*</span></label>';
-      h += '<input id="s-name" required placeholder="이름 입력" class="w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"></div>';
+      h += '<input id="s-name" required placeholder="이름 입력" class="w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-primary-500"></div>';
       h += '<div class="flex-1 min-w-[150px]"><label class="block text-xs font-semibold text-gray-500 mb-1">연락처 (선택)</label>';
-      h += '<input id="s-phone" placeholder="010-xxxx-xxxx" class="w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"></div>';
-      h += '<button type="submit" class="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition"><i class="fas fa-search mr-1"></i>조회</button>';
+      h += '<input id="s-phone" placeholder="010-xxxx-xxxx" class="w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-primary-500"></div>';
+      h += '<button type="submit" class="px-6 py-3 bg-primary-600 text-white rounded-xl font-bold hover:bg-primary-700 transition"><i class="fas fa-search mr-1"></i>조회</button>';
       h += '</form></div>';
       // 푸시 알림 버튼 영역
       h += '<div id="push-btn" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 mb-6 hidden"></div>';
@@ -610,23 +630,23 @@ function getMyPageHtml(): string {
       // 프로필 카드
       h+='<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6"><div class="flex items-center gap-4"><div class="w-14 h-14 rounded-2xl bg-gradient-to-br '+(p.gender==='m'?'from-blue-400 to-blue-600':'from-pink-400 to-pink-600')+' flex items-center justify-center"><i class="fas fa-user text-xl text-white"></i></div><div><h2 class="text-xl font-extrabold">'+p.name+'</h2><div class="flex items-center gap-2 mt-1"><span class="badge '+(p.gender==='m'?'bg-blue-100 text-blue-700':'bg-pink-100 text-pink-700')+'">'+(p.gender==='m'?'남':'여')+'</span><span class="badge '+(LEVEL_COLORS[p.level]||'bg-gray-100 text-gray-600')+'">'+(LEVELS[p.level]||'C')+'급</span>'+(p.club?'<span class="badge bg-teal-50 text-teal-700">'+p.club+'</span>':'')+'</div></div></div></div>';
       // 전적
-      h+='<div class="grid grid-cols-4 gap-3 mb-6"><div class="bg-white rounded-xl border p-3 text-center"><div class="text-xl font-extrabold">'+data.total_matches+'</div><div class="text-xs text-gray-500">총</div></div><div class="bg-green-50 rounded-xl border border-green-200 p-3 text-center"><div class="text-xl font-extrabold text-green-600">'+(rec.wins||0)+'</div><div class="text-xs text-gray-500">승</div></div><div class="bg-red-50 rounded-xl border border-red-200 p-3 text-center"><div class="text-xl font-extrabold text-red-500">'+(rec.losses||0)+'</div><div class="text-xs text-gray-500">패</div></div><div class="bg-blue-50 rounded-xl border border-blue-200 p-3 text-center"><div class="text-xl font-extrabold text-blue-600">'+((rec.total_score||0)-(rec.total_lost||0)>0?'+':'')+((rec.total_score||0)-(rec.total_lost||0))+'</div><div class="text-xs text-gray-500">득실</div></div></div>';
+      h+='<div class="grid grid-cols-4 gap-3 mb-6"><div class="bg-white rounded-xl border p-3 text-center"><div class="text-xl font-extrabold">'+data.total_matches+'</div><div class="text-xs text-gray-500">총</div></div><div class="bg-green-50 rounded-xl border border-green-200 p-3 text-center"><div class="text-xl font-extrabold text-green-600">'+(rec.wins||0)+'</div><div class="text-xs text-gray-500">승</div></div><div class="bg-red-50 rounded-xl border border-red-200 p-3 text-center"><div class="text-xl font-extrabold text-red-500">'+(rec.losses||0)+'</div><div class="text-xs text-gray-500">패</div></div><div class="bg-${P}-50 rounded-xl border border-${P}-200 p-3 text-center"><div class="text-xl font-extrabold text-${P}-600">'+((rec.total_score||0)-(rec.total_lost||0)>0?'+':'')+((rec.total_score||0)-(rec.total_lost||0))+'</div><div class="text-xs text-gray-500">득실</div></div></div>';
       // 소속 팀
       if(teams.length>0){
-        h+='<div class="bg-white rounded-2xl shadow-sm border p-5 mb-6"><h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-users mr-2 text-emerald-500"></i>소속 팀</h3><div class="space-y-2">'+teams.map(function(t){return '<div class="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3"><div><span class="font-bold">'+t.team_name+'</span><span class="ml-2 text-xs text-gray-500">'+t.event_name+'</span>'+(t.group_num?'<span class="badge bg-indigo-50 text-indigo-600 text-xs ml-1">'+t.group_num+'조</span>':'')+'</div><span class="text-sm text-gray-600">'+t.p1_name+' · '+t.p2_name+'</span></div>';}).join('')+'</div></div>';
+        h+='<div class="bg-white rounded-2xl shadow-sm border p-5 mb-6"><h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-users mr-2 text-primary-500"></i>소속 팀</h3><div class="space-y-2">'+teams.map(function(t){return '<div class="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3"><div><span class="font-bold">'+t.team_name+'</span><span class="ml-2 text-xs text-gray-500">'+t.event_name+'</span>'+(t.group_num?'<span class="badge bg-indigo-50 text-indigo-600 text-xs ml-1">'+t.group_num+'조</span>':'')+'</div><span class="text-sm text-gray-600">'+t.p1_name+' · '+t.p2_name+'</span></div>';}).join('')+'</div></div>';
       }
       // 예정/진행중
       if(upcoming.length>0){
-        h+='<div class="bg-white rounded-2xl shadow-sm border-2 border-emerald-200 p-5 mb-6"><h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-clock mr-2 text-emerald-500"></i>예정/진행중 ('+upcoming.length+')</h3><div class="space-y-2">'+upcoming.map(function(m){
+        h+='<div class="bg-white rounded-2xl shadow-sm border-2 border-primary-200 p-5 mb-6"><h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-clock mr-2 text-primary-500"></i>예정/진행중 ('+upcoming.length+')</h3><div class="space-y-2">'+upcoming.map(function(m){
           var isT1=teams.some(function(t){return t.id===m.team1_id});
           var my=isT1?m.team1_name:m.team2_name;
           var opp=isT1?m.team2_name:m.team1_name;
-          return '<div data-mid="'+m.id+'" class="flex items-center justify-between rounded-xl px-4 py-3 '+(m.status==='playing'?'bg-emerald-50 border-2 border-emerald-300':'bg-gray-50')+'"><div><span class="font-bold">'+my+'</span> <span class="text-gray-400">vs</span> <span>'+(opp||'BYE')+'</span><p class="text-xs text-gray-500 mt-0.5">'+(m.event_name||'')+' #'+m.match_order+'</p></div><div>'+(m.court_number?'<span class="badge bg-yellow-100 text-yellow-700">'+m.court_number+'코트</span>':'')+(m.status==='playing'?'<span class="badge bg-emerald-100 text-emerald-700 ml-1 pulse-live">진행중</span>':'<span class="badge bg-gray-100 text-gray-600 ml-1">대기</span>')+'</div></div>';
+          return '<div data-mid="'+m.id+'" class="flex items-center justify-between rounded-xl px-4 py-3 '+(m.status==='playing'?'bg-primary-50 border-2 border-primary-300':'bg-gray-50')+'"><div><span class="font-bold">'+my+'</span> <span class="text-gray-400">vs</span> <span>'+(opp||'BYE')+'</span><p class="text-xs text-gray-500 mt-0.5">'+(m.event_name||'')+' #'+m.match_order+'</p></div><div>'+(m.court_number?'<span class="badge bg-yellow-100 text-yellow-700">'+m.court_number+'코트</span>':'')+(m.status==='playing'?'<span class="badge bg-primary-100 text-primary-700 ml-1 pulse-live">진행중</span>':'<span class="badge bg-gray-100 text-gray-600 ml-1">대기</span>')+'</div></div>';
         }).join('')+'</div></div>';
       }
       // 완료
       if(completed.length>0){
-        h+='<div class="bg-white rounded-2xl shadow-sm border p-5"><h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-history mr-2 text-blue-500"></i>경기 결과 ('+completed.length+')</h3><div class="space-y-2">'+completed.map(function(m){
+        h+='<div class="bg-white rounded-2xl shadow-sm border p-5"><h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-history mr-2 text-${P}-500"></i>경기 결과 ('+completed.length+')</h3><div class="space-y-2">'+completed.map(function(m){
           var isT1=teams.some(function(t){return t.id===m.team1_id});
           var isW=(isT1&&m.winner_team===1)||(!isT1&&m.winner_team===2);
           var myS=isT1?(m.team1_set1||0):(m.team2_set1||0);
@@ -649,9 +669,9 @@ function getMyPageHtml(): string {
         var els = document.querySelectorAll('[data-mid="'+matchId+'"]');
         if (els.length > 0) {
           els[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-          els[0].classList.add('ring-2', 'ring-emerald-500', 'ring-offset-2');
+          els[0].classList.add('ring-2', 'ring-primary-500', 'ring-offset-2');
           els[0].style.transition = 'all 0.3s';
-          setTimeout(function(){ els[0].classList.remove('ring-2','ring-emerald-500','ring-offset-2'); }, 5000);
+          setTimeout(function(){ els[0].classList.remove('ring-2','ring-primary-500','ring-offset-2'); }, 5000);
         }
       }, 500);
     }
@@ -663,7 +683,7 @@ function getMyPageHtml(): string {
         if (event.data && event.data.type === 'MATCH_NOTIFICATION') {
           pollForChanges(); // 즉시 갱신
           highlightMatch(event.data.matchId);
-          showNotifBanner('🏸 경기 알림!', '코트 '+(event.data.courtNumber||'')+' 경기 알림이 도착했습니다.', event.data.courtNumber);
+          showNotifBanner('${E} 경기 알림!', '코트 '+(event.data.courtNumber||'')+' 경기 알림이 도착했습니다.', event.data.courtNumber);
         }
       });
     }
@@ -680,7 +700,7 @@ function getDashboardHtml(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🏸 통계 대시보드</title>
+  <title>${E} 통계 대시보드</title>
   <script src="/static/vendor/tailwind.js"></script>
   <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
   <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
@@ -688,7 +708,8 @@ function getDashboardHtml(): string {
   <script>
     tailwind.config = {
       theme: { extend: { colors: {
-        shuttle: { 50:'#f0fdf4',100:'#dcfce7',200:'#bbf7d0',300:'#86efac',400:'#4ade80',500:'#22c55e',600:'#16a34a',700:'#15803d',800:'#166534',900:'#14532d' }
+        primary: ${themeColors},
+        court: ${courtColors}
       }}}
     }
   </script>
@@ -735,17 +756,17 @@ function getDashboardHtml(): string {
       app.innerHTML = '<div class="max-w-6xl mx-auto px-4 py-6 fade-in">'+
         '<div class="flex items-center justify-between mb-6"><div class="flex items-center gap-3"><a href="/" class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200"><i class="fas fa-home text-gray-600"></i></a><h1 class="text-2xl font-bold text-gray-900"><i class="fas fa-chart-bar mr-2 text-orange-500"></i>'+(d.tournament?.name||'')+' - 통계</h1></div><button onclick="location.reload()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"><i class="fas fa-sync-alt mr-1"></i>새로고침</button></div>'+
         // 진행률
-        '<div class="bg-white rounded-2xl border p-6 mb-6"><div class="flex items-center justify-between mb-3"><h3 class="text-lg font-bold text-gray-800"><i class="fas fa-tasks mr-2 text-shuttle-500"></i>대회 진행률</h3><span class="text-3xl font-extrabold '+(progress>=100?'text-green-600':progress>=50?'text-blue-600':'text-yellow-600')+'">'+progress+'%</span></div><div class="w-full bg-gray-200 rounded-full h-4 mb-3"><div class="h-4 rounded-full transition-all '+(progress>=100?'bg-green-500':progress>=50?'bg-blue-500':'bg-yellow-500')+'" style="width:'+progress+'%"></div></div><div class="grid grid-cols-2 sm:grid-cols-4 gap-4"><div class="bg-gray-50 rounded-xl p-4 text-center"><div class="text-2xl font-extrabold">'+(ms.total||0)+'</div><div class="text-xs text-gray-500">전체 경기</div></div><div class="bg-green-50 rounded-xl p-4 text-center"><div class="text-2xl font-extrabold text-green-600">'+(ms.playing||0)+'</div><div class="text-xs text-gray-500">진행중</div></div><div class="bg-yellow-50 rounded-xl p-4 text-center"><div class="text-2xl font-extrabold text-yellow-600">'+(ms.pending||0)+'</div><div class="text-xs text-gray-500">대기중</div></div><div class="bg-blue-50 rounded-xl p-4 text-center"><div class="text-2xl font-extrabold text-blue-600">'+(ms.completed||0)+'</div><div class="text-xs text-gray-500">완료</div></div></div></div>'+
+        '<div class="bg-white rounded-2xl border p-6 mb-6"><div class="flex items-center justify-between mb-3"><h3 class="text-lg font-bold text-gray-800"><i class="fas fa-tasks mr-2 text-shuttle-500"></i>대회 진행률</h3><span class="text-3xl font-extrabold '+(progress>=100?'text-green-600':progress>=50?'text-${P}-600':'text-yellow-600')+'">'+progress+'%</span></div><div class="w-full bg-gray-200 rounded-full h-4 mb-3"><div class="h-4 rounded-full transition-all '+(progress>=100?'bg-green-500':progress>=50?'bg-${P}-500':'bg-yellow-500')+'" style="width:'+progress+'%"></div></div><div class="grid grid-cols-2 sm:grid-cols-4 gap-4"><div class="bg-gray-50 rounded-xl p-4 text-center"><div class="text-2xl font-extrabold">'+(ms.total||0)+'</div><div class="text-xs text-gray-500">전체 경기</div></div><div class="bg-green-50 rounded-xl p-4 text-center"><div class="text-2xl font-extrabold text-green-600">'+(ms.playing||0)+'</div><div class="text-xs text-gray-500">진행중</div></div><div class="bg-yellow-50 rounded-xl p-4 text-center"><div class="text-2xl font-extrabold text-yellow-600">'+(ms.pending||0)+'</div><div class="text-xs text-gray-500">대기중</div></div><div class="bg-${P}-50 rounded-xl p-4 text-center"><div class="text-2xl font-extrabold text-${P}-600">'+(ms.completed||0)+'</div><div class="text-xs text-gray-500">완료</div></div></div></div>'+
         // 참가자 + 급수
         '<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">'+
-        '<div class="bg-white rounded-2xl border p-6"><h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-users mr-2 text-indigo-500"></i>참가자 현황</h3><div class="grid grid-cols-3 gap-3 mb-4"><div class="text-center bg-gray-50 rounded-xl p-3"><div class="text-xl font-bold">'+(ps.total||0)+'</div><div class="text-xs text-gray-500">총</div></div><div class="text-center bg-blue-50 rounded-xl p-3"><div class="text-xl font-bold text-blue-600">'+(ps.male||0)+'</div><div class="text-xs text-gray-500">남</div></div><div class="text-center bg-pink-50 rounded-xl p-3"><div class="text-xl font-bold text-pink-600">'+(ps.female||0)+'</div><div class="text-xs text-gray-500">여</div></div></div><div class="space-y-2"><div class="flex items-center justify-between text-sm"><span class="text-gray-600"><i class="fas fa-won-sign mr-1 text-green-500"></i>참가비</span><span class="font-bold">'+(ps.paid||0)+'/'+(ps.total||0)+'</span></div><div class="flex items-center justify-between text-sm"><span class="text-gray-600"><i class="fas fa-check-circle mr-1 text-blue-500"></i>체크인</span><span class="font-bold">'+(ps.checked_in||0)+'/'+(ps.total||0)+'</span></div></div></div>'+
+        '<div class="bg-white rounded-2xl border p-6"><h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-users mr-2 text-indigo-500"></i>참가자 현황</h3><div class="grid grid-cols-3 gap-3 mb-4"><div class="text-center bg-gray-50 rounded-xl p-3"><div class="text-xl font-bold">'+(ps.total||0)+'</div><div class="text-xs text-gray-500">총</div></div><div class="text-center bg-${P}-50 rounded-xl p-3"><div class="text-xl font-bold text-${P}-600">'+(ps.male||0)+'</div><div class="text-xs text-gray-500">남</div></div><div class="text-center bg-pink-50 rounded-xl p-3"><div class="text-xl font-bold text-pink-600">'+(ps.female||0)+'</div><div class="text-xs text-gray-500">여</div></div></div><div class="space-y-2"><div class="flex items-center justify-between text-sm"><span class="text-gray-600"><i class="fas fa-won-sign mr-1 text-green-500"></i>참가비</span><span class="font-bold">'+(ps.paid||0)+'/'+(ps.total||0)+'</span></div><div class="flex items-center justify-between text-sm"><span class="text-gray-600"><i class="fas fa-check-circle mr-1 text-${P}-500"></i>체크인</span><span class="font-bold">'+(ps.checked_in||0)+'/'+(ps.total||0)+'</span></div></div></div>'+
         '<div class="bg-white rounded-2xl border p-6"><h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-signal mr-2 text-orange-500"></i>급수 분포</h3><div class="space-y-2">'+(d.level_distribution||[]).map(l => '<div class="flex items-center gap-3"><span class="w-8 text-sm font-bold">'+(lvLabels[l.level]||l.level)+'</span><div class="flex-1 bg-gray-100 rounded-full h-5"><div class="'+(lvColors[l.level]||'bg-gray-400')+' h-5 rounded-full flex items-center justify-end pr-2" style="width:'+Math.max(ps.total?Math.round(l.count/ps.total*100):0,8)+'%"><span class="text-white text-xs font-bold">'+l.count+'</span></div></div><span class="text-xs text-gray-500 w-10 text-right">'+(ps.total?Math.round(l.count/ps.total*100):0)+'%</span></div>').join('')+'</div></div></div>'+
         // 종목별
-        '<div class="bg-white rounded-2xl border p-6 mb-6"><h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-layer-group mr-2 text-shuttle-500"></i>종목별 현황</h3><div class="overflow-x-auto"><table class="w-full"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left text-sm font-semibold text-gray-600">종목</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">팀</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">전체</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">진행</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">완료</th><th class="px-3 py-2 text-left text-sm font-semibold text-gray-600">진행률</th></tr></thead><tbody class="divide-y divide-gray-100">'+(d.event_stats||[]).map(ev => { const pct=ev.total_matches>0?Math.round(ev.completed_matches/ev.total_matches*100):0; return '<tr class="hover:bg-gray-50"><td class="px-3 py-2 font-medium">'+ev.name+'</td><td class="px-3 py-2 text-center font-bold">'+ev.team_count+'</td><td class="px-3 py-2 text-center">'+ev.total_matches+'</td><td class="px-3 py-2 text-center text-green-600 font-bold">'+ev.playing_matches+'</td><td class="px-3 py-2 text-center text-blue-600">'+ev.completed_matches+'</td><td class="px-3 py-2"><div class="flex items-center gap-2"><div class="flex-1 bg-gray-200 rounded-full h-2"><div class="'+(pct>=100?'bg-green-500':'bg-blue-500')+' h-2 rounded-full" style="width:'+pct+'%"></div></div><span class="text-xs font-bold">'+pct+'%</span></div></td></tr>'; }).join('')+'</tbody></table></div></div>'+
+        '<div class="bg-white rounded-2xl border p-6 mb-6"><h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-layer-group mr-2 text-shuttle-500"></i>종목별 현황</h3><div class="overflow-x-auto"><table class="w-full"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left text-sm font-semibold text-gray-600">종목</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">팀</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">전체</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">진행</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">완료</th><th class="px-3 py-2 text-left text-sm font-semibold text-gray-600">진행률</th></tr></thead><tbody class="divide-y divide-gray-100">'+(d.event_stats||[]).map(ev => { const pct=ev.total_matches>0?Math.round(ev.completed_matches/ev.total_matches*100):0; return '<tr class="hover:bg-gray-50"><td class="px-3 py-2 font-medium">'+ev.name+'</td><td class="px-3 py-2 text-center font-bold">'+ev.team_count+'</td><td class="px-3 py-2 text-center">'+ev.total_matches+'</td><td class="px-3 py-2 text-center text-green-600 font-bold">'+ev.playing_matches+'</td><td class="px-3 py-2 text-center text-${P}-600">'+ev.completed_matches+'</td><td class="px-3 py-2"><div class="flex items-center gap-2"><div class="flex-1 bg-gray-200 rounded-full h-2"><div class="'+(pct>=100?'bg-green-500':'bg-${P}-500')+' h-2 rounded-full" style="width:'+pct+'%"></div></div><span class="text-xs font-bold">'+pct+'%</span></div></td></tr>'; }).join('')+'</tbody></table></div></div>'+
         // 코트별
         '<div class="bg-white rounded-2xl border p-6 mb-6"><h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-th-large mr-2 text-green-500"></i>코트별 현황</h3><div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">'+(d.court_stats||[]).map(ct => '<div class="rounded-xl border '+(ct.playing>0?'border-green-300 bg-green-50':'border-gray-200 bg-gray-50')+' p-4 text-center"><div class="text-2xl font-extrabold '+(ct.playing>0?'text-green-600':'text-gray-400')+'">'+ct.court_number+'</div><div class="text-xs text-gray-500 mb-1">'+ct.court_number+'코트</div>'+(ct.playing>0?'<span class="badge bg-green-100 text-green-700 text-xs">진행중</span>':'')+'<div class="text-xs text-gray-500 mt-1">대기 '+ct.pending+' · 완료 '+ct.completed+'</div></div>').join('')+'</div></div>'+
         // 클럽별
-        ((d.club_stats||[]).length>0?'<div class="bg-white rounded-2xl border p-6 mb-6"><h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-building mr-2 text-teal-500"></i>클럽별 성적</h3><div class="overflow-x-auto"><table class="w-full"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left text-sm font-semibold text-gray-600">클럽</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">선수</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">팀</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">승</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">패</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">승률</th></tr></thead><tbody class="divide-y divide-gray-100">'+(d.club_stats||[]).sort((a,b)=>b.win_rate-a.win_rate).map((cl,i) => '<tr class="hover:bg-gray-50"><td class="px-3 py-2 font-medium text-teal-700">'+(i<3?['🥇','🥈','🥉'][i]+' ':'')+cl.club+'</td><td class="px-3 py-2 text-center">'+cl.player_count+'</td><td class="px-3 py-2 text-center">'+cl.team_count+'</td><td class="px-3 py-2 text-center text-green-600 font-bold">'+cl.wins+'</td><td class="px-3 py-2 text-center text-red-500">'+cl.losses+'</td><td class="px-3 py-2 text-center font-bold '+(cl.win_rate>=60?'text-green-600':cl.win_rate>=40?'text-blue-600':'text-gray-600')+'">'+cl.win_rate+'%</td></tr>').join('')+'</tbody></table></div></div>':'')+
+        ((d.club_stats||[]).length>0?'<div class="bg-white rounded-2xl border p-6 mb-6"><h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-building mr-2 text-teal-500"></i>클럽별 성적</h3><div class="overflow-x-auto"><table class="w-full"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left text-sm font-semibold text-gray-600">클럽</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">선수</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">팀</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">승</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">패</th><th class="px-3 py-2 text-center text-sm font-semibold text-gray-600">승률</th></tr></thead><tbody class="divide-y divide-gray-100">'+(d.club_stats||[]).sort((a,b)=>b.win_rate-a.win_rate).map((cl,i) => '<tr class="hover:bg-gray-50"><td class="px-3 py-2 font-medium text-teal-700">'+(i<3?['🥇','🥈','🥉'][i]+' ':'')+cl.club+'</td><td class="px-3 py-2 text-center">'+cl.player_count+'</td><td class="px-3 py-2 text-center">'+cl.team_count+'</td><td class="px-3 py-2 text-center text-green-600 font-bold">'+cl.wins+'</td><td class="px-3 py-2 text-center text-red-500">'+cl.losses+'</td><td class="px-3 py-2 text-center font-bold '+(cl.win_rate>=60?'text-green-600':cl.win_rate>=40?'text-${P}-600':'text-gray-600')+'">'+cl.win_rate+'%</td></tr>').join('')+'</tbody></table></div></div>':'')+
       '</div>';
     }
 
@@ -763,7 +784,7 @@ function getTimelineHtml(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🏸 코트별 타임라인</title>
+  <title>${E} 코트별 타임라인</title>
   <script src="/static/vendor/tailwind.js"></script>
   <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
   <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
@@ -771,7 +792,8 @@ function getTimelineHtml(): string {
   <script>
     tailwind.config = {
       theme: { extend: { colors: {
-        emerald: { 50:'#ecfdf5',100:'#d1fae5',200:'#a7f3d0',300:'#6ee7b7',400:'#34d399',500:'#10b981',600:'#059669',700:'#047857',800:'#065f46',900:'#064e3b' }
+        primary: ${themeColors},
+        court: ${courtColors}
       }}}
     }
   </script>
@@ -833,7 +855,7 @@ function getTimelineHtml(): string {
 
     function selPage(ts){
       return '<div class="max-w-lg mx-auto px-4 py-8 fade-in">'+
-        '<div class="text-center mb-8"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 mb-3 shadow-lg"><i class="fas fa-stream text-2xl text-white"></i></div>'+
+        '<div class="text-center mb-8"><div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-400 to-primary-600 mb-3 shadow-lg"><i class="fas fa-stream text-2xl text-white"></i></div>'+
         '<h1 class="text-2xl font-extrabold text-gray-900">코트별 타임라인</h1><p class="text-gray-500 mt-1">대회를 선택하세요</p></div>'+
         '<div class="space-y-3">'+ts.map(function(t){return '<a href="/timeline?tid='+t.id+'" class="block bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition"><h3 class="font-bold text-gray-900">'+t.name+'</h3><p class="text-sm text-gray-500">'+t.courts+'코트</p></a>';}).join('')+'</div>'+
         '<a href="/" class="block text-center mt-6 text-sm text-gray-500 hover:text-gray-700"><i class="fas fa-home mr-1"></i>메인으로</a></div>';
@@ -849,16 +871,16 @@ function getTimelineHtml(): string {
       h+='<div class="flex items-center justify-between flex-wrap gap-3">';
       h+='<div class="flex items-center gap-3">';
       h+='<a href="/" class="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 transition"><i class="fas fa-home text-gray-600 text-sm"></i></a>';
-      h+='<div><h1 class="text-lg font-bold text-gray-900"><i class="fas fa-stream mr-1.5 text-emerald-500"></i>코트별 타임라인</h1>';
+      h+='<div><h1 class="text-lg font-bold text-gray-900"><i class="fas fa-stream mr-1.5 text-primary-500"></i>코트별 타임라인</h1>';
       h+='<p class="text-xs text-gray-500">'+t.n+' · '+t.c+'코트</p></div></div>';
 
       // 통계 + 필터
       h+='<div class="flex items-center gap-2 flex-wrap">';
       h+='<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-50 border text-xs">';
-      h+='<div class="w-20 bg-gray-200 rounded-full h-1.5"><div class="h-1.5 rounded-full '+(prog>=100?'bg-emerald-500':prog>=50?'bg-blue-500':'bg-amber-500')+'" style="width:'+prog+'%"></div></div>';
-      h+='<span class="font-bold '+(prog>=100?'text-emerald-600':'text-gray-600')+'">'+prog+'%</span></div>';
+      h+='<div class="w-20 bg-gray-200 rounded-full h-1.5"><div class="h-1.5 rounded-full '+(prog>=100?'bg-primary-500':prog>=50?'bg-${P}-500':'bg-amber-500')+'" style="width:'+prog+'%"></div></div>';
+      h+='<span class="font-bold '+(prog>=100?'text-primary-600':'text-gray-600')+'">'+prog+'%</span></div>';
       h+='<div class="flex items-center gap-1 text-xs">';
-      h+='<span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold">'+s[0]+'완료</span>';
+      h+='<span class="px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 font-bold">'+s[0]+'완료</span>';
       h+='<span class="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-bold">'+s[1]+'진행</span>';
       h+='<span class="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-bold">'+s[2]+'대기</span></div>';
       // 필터
@@ -874,7 +896,7 @@ function getTimelineHtml(): string {
       // ─── 범례 ───
       h+='<div class="max-w-[1800px] mx-auto px-4 sm:px-6 pt-4 pb-2">';
       h+='<div class="flex items-center gap-3 text-xs text-gray-500 flex-wrap">';
-      h+='<span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>완료</span>';
+      h+='<span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-primary-500"></span>완료</span>';
       h+='<span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 pulse-live"></span>진행중</span>';
       h+='<span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-slate-200"></span>대기</span>';
       h+='<span class="text-gray-300">|</span>';
@@ -896,11 +918,11 @@ function getTimelineHtml(): string {
         // 코트 헤더
         h+='<div class="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-100">';
         h+='<div class="flex items-center gap-2.5">';
-        h+='<div class="w-9 h-9 rounded-lg '+(play>0?'bg-gradient-to-br from-amber-400 to-amber-500':done===mt&&mt>0?'bg-gradient-to-br from-emerald-400 to-emerald-500':'bg-gradient-to-br from-slate-400 to-slate-500')+' flex items-center justify-center text-white font-extrabold shadow-sm">'+(cn+1)+'</div>';
+        h+='<div class="w-9 h-9 rounded-lg '+(play>0?'bg-gradient-to-br from-amber-400 to-amber-500':done===mt&&mt>0?'bg-gradient-to-br from-primary-400 to-primary-500':'bg-gradient-to-br from-slate-400 to-slate-500')+' flex items-center justify-center text-white font-extrabold shadow-sm">'+(cn+1)+'</div>';
         h+='<div><span class="font-bold text-gray-900 text-sm">코트 '+(cn+1)+'</span>';
         h+='<span class="text-xs text-gray-400 ml-1.5">'+done+'/'+mt+'</span></div></div>';
         h+='<div class="flex items-center gap-1.5">';
-        h+='<div class="w-16 bg-gray-200 rounded-full h-1"><div class="h-1 rounded-full '+(cp>=100?'bg-emerald-500':'bg-blue-500')+'" style="width:'+cp+'%"></div></div>';
+        h+='<div class="w-16 bg-gray-200 rounded-full h-1"><div class="h-1 rounded-full '+(cp>=100?'bg-primary-500':'bg-${P}-500')+'" style="width:'+cp+'%"></div></div>';
         h+='<span class="text-xs font-bold text-gray-500">'+cp+'%</span></div></div>';
 
         // 타임라인 스크롤 — 컴팩트 노드
@@ -944,15 +966,15 @@ function getTimelineHtml(): string {
       var th='<div class="'+cc[0]+' border '+cc[1]+' rounded-xl p-3">';
       th+='<div class="flex items-center justify-between mb-1.5">';
       th+='<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold '+cc[0]+' '+cc[2]+' border '+cc[1]+'">'+(CAT_L[cat]||'')+' '+(g?g+'조':'')+'</span>';
-      th+='<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold '+(st==='completed'?'bg-emerald-500 text-white':st==='playing'?'bg-amber-400 text-amber-900':'bg-slate-200 text-slate-500')+'">'+(ST_L[st]||'')+'</span></div>';
+      th+='<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold '+(st==='completed'?'bg-primary-500 text-white':st==='playing'?'bg-amber-400 text-amber-900':'bg-slate-200 text-slate-500')+'">'+(ST_L[st]||'')+'</span></div>';
       th+='<div class="text-sm font-bold text-gray-900">'+t1+'</div>';
       th+='<div class="text-[10px] text-gray-400 my-0.5">vs</div>';
       th+='<div class="text-sm font-bold text-gray-900">'+t2+'</div>';
       if(st==='completed'){
         th+='<div class="mt-1.5 pt-1.5 border-t '+cc[1]+' text-center">';
-        th+='<span class="text-base font-extrabold '+(w===1?'text-emerald-600':'text-gray-500')+'">'+s1+'</span>';
+        th+='<span class="text-base font-extrabold '+(w===1?'text-primary-600':'text-gray-500')+'">'+s1+'</span>';
         th+='<span class="mx-1.5 text-gray-300">:</span>';
-        th+='<span class="text-base font-extrabold '+(w===2?'text-emerald-600':'text-gray-500')+'">'+s2+'</span></div>';
+        th+='<span class="text-base font-extrabold '+(w===2?'text-primary-600':'text-gray-500')+'">'+s2+'</span></div>';
       }
       th+='<div class="text-[9px] text-gray-400 mt-1">#'+ord+'</div></div>';
       tip.innerHTML=th;
@@ -984,9 +1006,9 @@ function getTimelineHtml(): string {
 }
 
 function getServiceWorkerJs(): string {
-  return `// Service Worker for Push Notifications - 배드민턴 대회 운영 시스템
+  return `// Service Worker for Push Notifications - ${SC.name}
 self.addEventListener('push', function(event) {
-  var data = { title: '🏸 배드민턴 대회', body: '알림이 있습니다.', tag: 'default' };
+  var data = { title: '${SC.notifications.defaultTitle}', body: '알림이 있습니다.', tag: 'default' };
   if (event.data) { try { data = event.data.json(); } catch(e) { data.body = event.data.text(); } }
   var options = {
     body: data.body || '', tag: data.tag || 'match-notification', renotify: true,
@@ -994,7 +1016,7 @@ self.addEventListener('push', function(event) {
     data: { url: data.url || '/', matchId: data.matchId, courtNumber: data.courtNumber, tournamentId: data.tournamentId },
     actions: data.actions || [{ action: 'open', title: '확인하기' }, { action: 'dismiss', title: '닫기' }]
   };
-  event.waitUntil(self.registration.showNotification(data.title || '🏸 배드민턴 대회', options));
+  event.waitUntil(self.registration.showNotification(data.title || '${SC.notifications.defaultTitle}', options));
 });
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
@@ -1018,7 +1040,7 @@ function getPrintHtml(): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🏸 대회 인쇄 센터 - 수기 운영 대비</title>
+<title>${E} 대회 인쇄 센터 - 수기 운영 대비</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -1339,7 +1361,7 @@ function renderAll() {
   // ③ 조별 대진표
   // ============================
   html += '<div class="print-section visible ps-matches page-break">';
-  html += '<div class="print-title">🏸 조별 대진표</div>';
+  html += '<div class="print-title">${E} 조별 대진표</div>';
   html += '<div class="print-subtitle">' + t.name + ' | 코트 ' + (t.courts || 6) + '면 | 출력일: ' + now + '</div>';
   
   // 종목별 > 조별 그룹핑
@@ -1435,7 +1457,7 @@ function renderAll() {
       const courtMatches = matchesByCourt[courtNum];
       courtMatches.sort((a,b) => (a.round - b.round) || (a.match_order - b.match_order));
       
-      html += '<div class="section-header" style="margin-top:5mm">🏸 ' + courtNum + '번 코트 (' + courtMatches.length + '경기)</div>';
+      html += '<div class="section-header" style="margin-top:5mm">${E} ' + courtNum + '번 코트 (' + courtMatches.length + '경기)</div>';
       
       courtMatches.forEach((m, i) => {
         const evName = (state.events.find(e => e.id === m.event_id) || {}).name || '';
@@ -1457,7 +1479,7 @@ function renderAll() {
     const numCourts = t.courts || 6;
     html += '<div style="text-align:center; padding:5mm; color:#666; font-size:10pt;">⚠ 시스템에서 경기가 아직 생성되지 않았습니다. 아래 빈 양식을 사용하세요.</div>';
     for (let c = 1; c <= numCourts; c++) {
-      html += '<div class="section-header" style="margin-top:5mm">🏸 ' + c + '번 코트</div>';
+      html += '<div class="section-header" style="margin-top:5mm">${E} ' + c + '번 코트</div>';
       for (let g = 0; g < 5; g++) {
         html += '<div class="score-sheet">';
         html += '<div class="match-header"><span>' + c + '코트 #' + (g+1) + '</span><span>종목: ___________</span><span>___조</span></div>';

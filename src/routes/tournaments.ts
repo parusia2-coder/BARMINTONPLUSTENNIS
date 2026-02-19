@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { sportConfig, badmintonConfig, tennisConfig } from '../config'
 
 type Bindings = { DB: D1Database }
 
@@ -28,19 +29,27 @@ tournamentRoutes.get('/:id', async (c) => {
 tournamentRoutes.post('/', async (c) => {
   const db = c.env.DB
   const body = await c.req.json()
-  const { name, description, format, games_per_player, courts, merge_threshold, admin_password } = body
+  const { name, description, format, games_per_player, courts, merge_threshold, admin_password, scoring_type, target_games, deuce_rule, sport } = body
 
   if (!name || !admin_password) {
     return c.json({ error: '대회명과 관리자 비밀번호는 필수입니다.' }, 400)
   }
 
+  // 선택된 종목에 맞는 config 사용
+  const selectedSport = (sport === 'tennis') ? 'tennis' : 'badminton'
+  const sc = selectedSport === 'tennis' ? tennisConfig : badmintonConfig
+
   const result = await db.prepare(
-    `INSERT INTO tournaments (name, description, format, games_per_player, courts, merge_threshold, admin_password)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO tournaments (name, description, format, sport, scoring_type, target_games, deuce_rule, games_per_player, courts, merge_threshold, admin_password)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     name,
     description || '',
     format || 'kdk',
+    selectedSport,
+    scoring_type || (sc.scoring.scoringTypes?.[0]?.value || ''),
+    target_games || sc.scoring.defaultTargetScore,
+    deuce_rule || (sc.scoring.deuceRules?.[0]?.value || ''),
     games_per_player || 4,
     courts || 2,
     merge_threshold || 4,
@@ -62,11 +71,16 @@ tournamentRoutes.put('/:id', async (c) => {
     return c.json({ error: '관리자 인증 실패' }, 403)
   }
 
-  const { name, description, format, status, games_per_player, courts, merge_threshold } = body
+  const { name, description, format, status, games_per_player, courts, merge_threshold, scoring_type, target_games, deuce_rule, sport } = body
+
+  // 선택된 종목에 맞는 config 사용
+  const selectedSport = sport || 'badminton'
+  const sc = selectedSport === 'tennis' ? tennisConfig : badmintonConfig
+
   await db.prepare(
-    `UPDATE tournaments SET name=?, description=?, format=?, status=?, games_per_player=?, courts=?, merge_threshold=?, updated_at=datetime('now')
+    `UPDATE tournaments SET name=?, description=?, format=?, status=?, sport=?, scoring_type=?, target_games=?, deuce_rule=?, games_per_player=?, courts=?, merge_threshold=?, updated_at=datetime('now')
      WHERE id=? AND deleted=0`
-  ).bind(name, description, format, status, games_per_player, courts, merge_threshold || 4, id).run()
+  ).bind(name, description, format, status, selectedSport, scoring_type || '', target_games || sc.scoring.defaultTargetScore, deuce_rule || '', games_per_player, courts, merge_threshold || 4, id).run()
 
   return c.json({ message: '대회가 수정되었습니다.' })
 })
@@ -227,7 +241,7 @@ tournamentRoutes.get('/:id/export', async (c) => {
     _meta: {
       version: '3.2',
       exported_at: new Date().toISOString(),
-      system: '배드민턴 대회 운영 시스템'
+      system: sportConfig.name
     },
     tournament,
     participants: participants.results || [],

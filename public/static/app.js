@@ -1,9 +1,63 @@
 // ==========================================
-// 배드민턴 대회 운영 시스템 - Frontend App
+// 대회 운영 시스템 - Frontend App (멀티스포츠)
 // ==========================================
+const ALL_CONFIGS = window.ALL_SPORT_CONFIGS || {};
+let SC = window.SPORT_CONFIG || {};
 const API = '/api';
-const CATEGORIES = { md: '남자복식', wd: '여자복식', xd: '혼합복식' };
+let CATEGORIES = SC.categories || { md: '남자복식', wd: '여자복식', xd: '혼합복식' };
+let SUPPORTS_SINGLES = SC.supportsSingles || false;
 const LEVELS = { s: 'S', a: 'A', b: 'B', c: 'C', d: 'D', e: 'E' };
+// ==========================================
+// 테마 헬퍼 (SC config 기반 동적 색상)
+// P = primary Tailwind 색상명 (blue / emerald)
+// ==========================================
+let P = (SC.theme && SC.theme.primaryClass) || 'blue';
+let EMOJI = SC.emoji || '🏸';
+let SCORE_UNIT = (SC.scoring && SC.scoring.scoreUnit) || '점';
+let SCORE_LABEL = (SC.scoring && SC.scoring.scoreLabel) || '점수';
+let SYSTEM_NAME = SC.name || '대회 운영 시스템';
+let T = {};
+
+function buildTheme(p, sc) {
+  return {
+    bg50: `bg-${p}-50`, bg100: `bg-${p}-100`, bg200: `bg-${p}-200`,
+    bg400: `bg-${p}-400`, bg500: `bg-${p}-500`, bg600: `bg-${p}-600`,
+    bg700: `bg-${p}-700`,
+    text400: `text-${p}-400`, text500: `text-${p}-500`, text600: `text-${p}-600`,
+    text700: `text-${p}-700`,
+    border100: `border-${p}-100`, border200: `border-${p}-200`,
+    border300: `border-${p}-300`, border500: `border-${p}-500`,
+    ring100: `ring-${p}-100`,
+    badge: `bg-${p}-50 text-${p}-700 border border-${p}-200`,
+    statusOpen: `bg-${p}-50 text-${p}-700 border border-${p}-200`,
+    dot: `bg-${p}-500`,
+    hoverBg50: `hover:bg-${p}-50`, hoverBg100: `hover:bg-${p}-100`,
+    hoverBorder: `hover:border-${p}-300`,
+    checkedBorder: `has-[:checked]:border-${p}-500`,
+    checkedBg: `has-[:checked]:bg-${p}-50`,
+    inputColor: `text-${p}-600`,
+    gradFrom: (sc.theme && sc.theme.gradientFrom) || 'from-blue-500',
+    gradTo: (sc.theme && sc.theme.gradientTo) || 'to-blue-600',
+  };
+}
+T = buildTheme(P, SC);
+
+// ==========================================
+// 종목 전환 함수 — 대회 진입 시 호출
+// ==========================================
+function switchSportConfig(sportName) {
+  const cfg = ALL_CONFIGS[sportName];
+  if (!cfg) return;
+  SC = cfg;
+  CATEGORIES = SC.categories || CATEGORIES;
+  SUPPORTS_SINGLES = SC.supportsSingles || false;
+  P = (SC.theme && SC.theme.primaryClass) || 'blue';
+  EMOJI = SC.emoji || '🏸';
+  SCORE_UNIT = (SC.scoring && SC.scoring.scoreUnit) || '점';
+  SCORE_LABEL = (SC.scoring && SC.scoring.scoreLabel) || '점수';
+  SYSTEM_NAME = SC.name || '대회 운영 시스템';
+  T = buildTheme(P, SC);
+}
 const LEVEL_COLORS = { s: 'bg-red-100 text-red-700', a: 'bg-orange-100 text-orange-700', b: 'bg-yellow-100 text-yellow-700', c: 'bg-green-100 text-green-700', d: 'bg-blue-100 text-blue-700', e: 'bg-gray-100 text-gray-600' };
 const AGE_GROUPS = [
   { value: 'open', label: '오픈 (전연령)' },
@@ -30,7 +84,7 @@ const state = {
   participants: [], events: [], currentEvent: null, teams: [],
   matches: [], standings: [], adminAuth: {}, adminPasswords: {},
   activeTab: 'participants', isOnline: navigator.onLine,
-  targetScore: 25, format: 'kdk',
+  targetScore: (SC.scoring && SC.scoring.defaultTargetScore) || 25, format: 'kdk',
   dashboardData: null
 };
 
@@ -50,7 +104,7 @@ async function api(path, options = {}) {
 // Toast
 function showToast(msg, type = 'info') {
   const t = document.createElement('div');
-  const c = { info: 'bg-blue-500', success: 'bg-green-500', error: 'bg-red-500', warning: 'bg-yellow-500 text-gray-900' };
+  const c = { info: T.bg500, success: 'bg-green-500', error: 'bg-red-500', warning: 'bg-yellow-500 text-gray-900' };
   const ic = { info: 'fa-info-circle', success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle' };
   t.className = `fixed top-4 right-4 z-[9999] px-5 py-3 rounded-lg text-white shadow-lg ${c[type]} fade-in flex items-center gap-2 max-w-md`;
   t.innerHTML = `<i class="fas ${ic[type]}"></i><span>${msg}</span>`;
@@ -58,7 +112,13 @@ function showToast(msg, type = 'info') {
   setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(() => t.remove(), 300); }, 4000);
 }
 
-function navigate(page, params = {}) { state.currentPage = page; Object.assign(state, params); render(); }
+function navigate(page, params = {}) {
+  state.currentPage = page;
+  Object.assign(state, params);
+  // 홈으로 돌아가면 기본 config(badminton)로 복원
+  if (page === 'home') switchSportConfig('badminton');
+  render();
+}
 
 // ==========================================
 // RENDER
@@ -89,10 +149,10 @@ function renderNav(transparent = false) {
     return `<nav class="glass-nav fixed top-0 left-0 right-0 z-40">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <a onclick="navigate('home')" class="flex items-center gap-3 cursor-pointer group">
-          <div class="w-9 h-9 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:shadow-emerald-500/40 transition-shadow">
-            <i class="fas fa-shuttlecock text-white text-sm"></i>
+          <div class="w-9 h-9 bg-gradient-to-br ${T.gradFrom} ${T.gradTo} rounded-xl flex items-center justify-center shadow-lg shadow-${P}-500/20 group-hover:shadow-${P}-500/40 transition-shadow">
+            <i class="fas ${SC.icon || "fa-trophy"} text-white text-sm"></i>
           </div>
-          <span class="font-bold text-white/90 group-hover:text-white transition-colors tracking-tight">배드민턴 대회</span>
+          <span class="font-bold text-white/90 group-hover:text-white transition-colors tracking-tight">${EMOJI} 대회</span>
         </a>
         <div class="flex items-center gap-2">
           <a href="/static/manual.html" target="_blank" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white/60 hover:text-white/90 hover:bg-white/10 transition-all">
@@ -105,10 +165,10 @@ function renderNav(transparent = false) {
   return `<nav class="bg-white/80 backdrop-blur-xl border-b border-gray-200/60 sticky top-0 z-40">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
       <a onclick="navigate('home')" class="flex items-center gap-3 cursor-pointer group">
-        <div class="w-9 h-9 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:shadow-emerald-500/40 transition-shadow">
-          <i class="fas fa-shuttlecock text-white text-sm"></i>
+        <div class="w-9 h-9 bg-gradient-to-br ${T.gradFrom} ${T.gradTo} rounded-xl flex items-center justify-center shadow-lg shadow-${P}-500/20 group-hover:shadow-${P}-500/40 transition-shadow">
+          <i class="fas ${SC.icon || "fa-trophy"} text-white text-sm"></i>
         </div>
-        <span class="font-bold text-gray-900 tracking-tight">배드민턴 대회</span>
+        <span class="font-bold text-gray-900 tracking-tight">${EMOJI} 대회</span>
       </a>
     </div>
   </nav>`;
@@ -125,18 +185,18 @@ function renderHome() {
     <div class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-16 pb-20 sm:pt-24 sm:pb-28">
       <div class="text-center fade-in">
         <!-- Logo Icon -->
-        <div class="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-br from-emerald-400 to-emerald-600 mb-8 shadow-2xl shadow-emerald-500/30 glow-emerald float-anim">
-          <i class="fas fa-shuttlecock text-4xl text-white"></i>
+        <div class="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-br ${T.gradFrom} ${T.gradTo} mb-8 shadow-2xl shadow-${P}-500/30 glow-${P} float-anim">
+          <i class="fas ${SC.icon || "fa-trophy"} text-4xl text-white"></i>
         </div>
         <!-- Title -->
         <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white mb-4 tracking-tight leading-tight">
-          배드민턴 대회<br class="sm:hidden"> <span class="text-emerald-400">운영 시스템</span>
+          ${EMOJI} 대회<br class="sm:hidden"> <span class="text-${P}-400">운영 시스템</span>
         </h1>
         <p class="text-lg sm:text-xl text-slate-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-          남복 · 여복 · 혼복 종목별, 연령별, 급수별<br class="hidden sm:inline"> 대진표 생성부터 실시간 점수 관리까지
+          ${Object.values(CATEGORIES).join(" · ")} 종목별, 연령별, 급수별<br class="hidden sm:inline"> 대진표 생성부터 실시간 ${SCORE_LABEL} 관리까지
         </p>
         <!-- CTA Button -->
-        <button onclick="navigate('create')" class="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-2xl font-bold text-lg hover:from-emerald-400 hover:to-emerald-500 transition-all shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:-translate-y-0.5 active:translate-y-0">
+        <button onclick="navigate('create')" class="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r ${T.gradFrom} ${T.gradTo} text-white rounded-2xl font-bold text-lg hover:opacity-90 transition-all shadow-xl shadow-${P}-500/25 hover:shadow-${P}-500/40 hover:-translate-y-0.5 active:translate-y-0">
           <i class="fas fa-plus"></i>새 대회 만들기
         </button>
       </div>
@@ -183,14 +243,14 @@ function renderHome() {
         <p class="text-xs text-gray-400">대회 운영에 필요한 각종 도구 바로가기</p>
       </div>
     </div>
-    <!-- Row 1: 코트점수판 / 내경기조회 / 코트타임라인 -->
+    <!-- Row 1: 코트 ${SC.terms ? SC.terms.scoreBoard : '점수판'} / 내경기조회 / 코트타임라인 -->
     <div class="grid grid-cols-3 gap-3 sm:gap-4 mb-3 sm:mb-4">
       <a href="/court" class="group rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 text-center cursor-pointer block hover:shadow-lg hover:border-green-300 transition-all">
         <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-400 to-green-600 mx-auto mb-3 flex items-center justify-center shadow-lg shadow-green-500/20">
           <i class="fas fa-tablet-alt text-white text-lg"></i>
         </div>
-        <h3 class="font-bold text-gray-900 text-sm sm:text-base mb-1 group-hover:text-green-600 transition">코트 점수판</h3>
-        <p class="text-gray-400 text-xs leading-relaxed hidden sm:block">태블릿으로 실시간<br>점수 입력</p>
+        <h3 class="font-bold text-gray-900 text-sm sm:text-base mb-1 group-hover:text-green-600 transition">코트 ${SC.terms ? SC.terms.scoreBoard : '점수판'}</h3>
+        <p class="text-gray-400 text-xs leading-relaxed hidden sm:block">태블릿으로 실시간<br>${SCORE_LABEL} 입력</p>
       </a>
       <a href="/my" class="group rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 text-center cursor-pointer block hover:shadow-lg hover:border-indigo-300 transition-all">
         <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 mx-auto mb-3 flex items-center justify-center shadow-lg shadow-indigo-500/20">
@@ -237,10 +297,10 @@ function renderHome() {
   <footer class="border-t border-gray-200 bg-white">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
       <div class="flex items-center gap-2 text-sm text-gray-400">
-        <div class="w-6 h-6 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center">
-          <i class="fas fa-shuttlecock text-white text-[8px]"></i>
+        <div class="w-6 h-6 bg-gradient-to-br ${T.gradFrom} ${T.gradTo} rounded-lg flex items-center justify-center">
+          <i class="fas ${SC.icon || "fa-trophy"} text-white text-[8px]"></i>
         </div>
-        <span>배드민턴 대회 운영 시스템</span>
+        <span>${SYSTEM_NAME}</span>
       </div>
       <div class="flex items-center gap-4 text-xs text-gray-400">
         <span>Hono + Cloudflare Workers</span>
@@ -254,8 +314,8 @@ function renderHome() {
 function renderTournamentCard(t) {
   const st = { 
     draft: { l: '준비중', c: 'bg-gray-100 text-gray-600', i: 'fa-pen', dot: 'bg-gray-400' }, 
-    open: { l: '접수중', c: 'bg-blue-50 text-blue-700 border border-blue-200', i: 'fa-door-open', dot: 'bg-blue-500' }, 
-    in_progress: { l: '진행중', c: 'bg-emerald-50 text-emerald-700 border border-emerald-200', i: 'fa-play', dot: 'bg-emerald-500 pulse-live' }, 
+    open: { l: '접수중', c: T.statusOpen, i: 'fa-door-open', dot: T.dot }, 
+    in_progress: { l: '진행중', c: 'bg-${P}-50 text-${P}-700 border border-${P}-200', i: 'fa-play', dot: 'bg-${P}-500 pulse-live' }, 
     completed: { l: '완료', c: 'bg-purple-50 text-purple-700 border border-purple-200', i: 'fa-flag-checkered', dot: 'bg-purple-500' }, 
     cancelled: { l: '취소', c: 'bg-red-50 text-red-600 border border-red-200', i: 'fa-ban', dot: 'bg-red-500' } 
   };
@@ -266,7 +326,7 @@ function renderTournamentCard(t) {
     <div class="p-5 pl-7">
       <div class="flex items-start justify-between mb-3">
         <div class="flex-1 min-w-0">
-          <h3 class="font-bold text-gray-900 text-lg group-hover:text-emerald-700 transition-colors truncate">${t.name}</h3>
+          <h3 class="font-bold text-gray-900 text-lg group-hover:text-${P}-700 transition-colors truncate">${t.name}</h3>
           <p class="text-sm text-gray-400 mt-0.5 truncate">${t.description || '대회 설명이 없습니다'}</p>
         </div>
         <span class="badge ${s.c} ml-3 whitespace-nowrap flex-shrink-0">
@@ -274,6 +334,9 @@ function renderTournamentCard(t) {
         </span>
       </div>
       <div class="flex items-center gap-3 text-xs">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${t.sport === 'tennis' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'} font-medium">
+          ${t.sport === 'tennis' ? '🎾 테니스' : '🏸 배드민턴'}
+        </span>
         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 text-slate-600 font-medium">
           <i class="fas ${fmtIcon[t.format] || 'fa-gamepad'} text-slate-400"></i>${fmt[t.format] || t.format}
         </span>
@@ -281,7 +344,7 @@ function renderTournamentCard(t) {
           <i class="fas fa-columns text-slate-400"></i>${t.courts}코트
         </span>
         <span class="inline-flex items-center gap-1.5 text-slate-400 ml-auto">
-          <i class="fas fa-arrow-right group-hover:translate-x-1 transition-transform text-emerald-500 opacity-0 group-hover:opacity-100"></i>
+          <i class="fas fa-arrow-right group-hover:translate-x-1 transition-transform text-${P}-500 opacity-0 group-hover:opacity-100"></i>
         </span>
       </div>
     </div>
@@ -297,33 +360,69 @@ function renderCreate() {
     <button onclick="navigate('home')" class="text-gray-500 hover:text-gray-700 mb-6 inline-flex items-center text-sm gap-2 group"><i class="fas fa-arrow-left group-hover:-translate-x-1 transition-transform"></i>돌아가기</button>
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
       <div class="flex items-center gap-3 mb-6">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center shadow-lg">
           <i class="fas fa-plus text-white"></i>
         </div>
         <h2 class="text-2xl font-bold text-gray-900">새 대회 만들기</h2>
       </div>
       <form id="create-form" class="space-y-5">
+        <!-- 종목 선택 (배드민턴/테니스) -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">종목 선택 <span class="text-red-500">*</span></label>
+          <div class="grid grid-cols-2 gap-3" id="sport-selector">
+            <label class="relative cursor-pointer">
+              <input type="radio" name="sport" value="badminton" class="sr-only peer" checked>
+              <div class="flex items-center gap-3 p-4 rounded-xl border-2 border-gray-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 transition-all hover:border-blue-300">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                  <span class="text-2xl">🏸</span>
+                </div>
+                <div>
+                  <div class="font-bold text-gray-900">배드민턴</div>
+                  <div class="text-xs text-gray-500">남복 · 여복 · 혼복</div>
+                </div>
+                <div class="ml-auto hidden peer-checked:block">
+                  <i class="fas fa-check-circle text-blue-500 text-lg"></i>
+                </div>
+              </div>
+            </label>
+            <label class="relative cursor-pointer">
+              <input type="radio" name="sport" value="tennis" class="sr-only peer">
+              <div class="flex items-center gap-3 p-4 rounded-xl border-2 border-gray-200 peer-checked:border-emerald-500 peer-checked:bg-emerald-50 transition-all hover:border-emerald-300">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                  <span class="text-2xl">🎾</span>
+                </div>
+                <div>
+                  <div class="font-bold text-gray-900">테니스</div>
+                  <div class="text-xs text-gray-500">남단 · 여단 · 남복 · 여복 · 혼복</div>
+                </div>
+                <div class="ml-auto hidden peer-checked:block">
+                  <i class="fas fa-check-circle text-emerald-500 text-lg"></i>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
         <div><label class="block text-sm font-semibold text-gray-700 mb-1">대회명 <span class="text-red-500">*</span></label>
-          <input name="name" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="예: 2026 안양시장배 배드민턴 대회"></div>
+          <input name="name" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="예: 2026 대회"></div>
         <div><label class="block text-sm font-semibold text-gray-700 mb-1">설명</label>
-          <textarea name="description" rows="2" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="대회 안내 사항"></textarea></div>
+          <textarea name="description" rows="2" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="대회 안내 사항"></textarea></div>
         <div class="grid grid-cols-2 gap-4">
           <div><label class="block text-sm font-semibold text-gray-700 mb-1">대회 방식</label>
-            <select name="format" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+            <select name="format" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
               <option value="kdk">KDK (랜덤 대진)</option><option value="league">풀리그</option><option value="tournament">토너먼트</option></select></div>
           <div><label class="block text-sm font-semibold text-gray-700 mb-1">코트 수</label>
-            <input name="courts" type="number" value="6" min="1" max="20" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"></div>
+            <input name="courts" type="number" value="6" min="1" max="20" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"></div>
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div><label class="block text-sm font-semibold text-gray-700 mb-1">팀당 경기 수 (KDK)</label>
-            <input name="games_per_player" type="number" value="4" min="1" max="20" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"></div>
+            <input name="games_per_player" type="number" value="4" min="1" max="20" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"></div>
           <div><label class="block text-sm font-semibold text-gray-700 mb-1">급수합병 기준 (팀 수)</label>
-            <input name="merge_threshold" type="number" value="4" min="2" max="20" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+            <input name="merge_threshold" type="number" value="4" min="2" max="20" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
             <p class="text-xs text-gray-400 mt-1">종목의 참가팀이 이 수 미만이면 인접 급수와 합병</p></div>
         </div>
         <div><label class="block text-sm font-semibold text-gray-700 mb-1">관리자 비밀번호 <span class="text-red-500">*</span></label>
-          <input name="admin_password" type="password" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="대회 관리용 비밀번호"></div>
-        <button type="submit" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-semibold hover:from-emerald-400 hover:to-emerald-500 transition-all shadow-lg shadow-emerald-500/20 text-lg"><i class="fas fa-rocket mr-2"></i>대회 생성</button>
+          <input name="admin_password" type="password" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="대회 관리용 비밀번호"></div>
+        <button type="submit" class="w-full py-3.5 bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-xl font-semibold hover:opacity-90 transition-all shadow-lg text-lg"><i class="fas fa-rocket mr-2"></i>대회 생성</button>
       </form>
     </div>
   </div>`;
@@ -346,7 +445,7 @@ function renderTournament() {
     draft: { label: '준비중', color: 'bg-gray-500', icon: 'fa-pencil-alt' },
     open: { label: '접수중', color: 'bg-yellow-500', icon: 'fa-door-open' },
     in_progress: { label: '진행중', color: 'bg-green-500', icon: 'fa-play-circle' },
-    completed: { label: '완료', color: 'bg-blue-500', icon: 'fa-check-circle' },
+    completed: { label: '완료', color: T.bg500, icon: 'fa-check-circle' },
     cancelled: { label: '취소됨', color: 'bg-red-500', icon: 'fa-ban' }
   };
   const st = statusMap[t.status] || statusMap.draft;
@@ -357,8 +456,8 @@ function renderTournament() {
   <!-- Hero Banner -->
   <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-gray-900 relative overflow-hidden">
     <div class="absolute inset-0 opacity-10">
-      <div class="absolute top-10 left-10 w-32 h-32 rounded-full bg-emerald-400 blur-3xl"></div>
-      <div class="absolute bottom-10 right-10 w-40 h-40 rounded-full bg-blue-400 blur-3xl"></div>
+      <div class="absolute top-10 left-10 w-32 h-32 rounded-full bg-${P}-400 blur-3xl"></div>
+      <div class="absolute bottom-10 right-10 w-40 h-40 rounded-full ${T.bg400} blur-3xl"></div>
     </div>
     <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 relative z-10">
       <!-- Top Bar -->
@@ -367,13 +466,13 @@ function renderTournament() {
           <i class="fas fa-arrow-left group-hover:-translate-x-0.5 transition-transform"></i>대회 목록
         </button>
         <div class="flex items-center gap-2">
-          ${!isAdmin ? `<button onclick="showAuthModal(${t.id})" class="px-3 py-1.5 bg-white/10 text-white/70 rounded-lg text-xs hover:bg-white/20 transition backdrop-blur"><i class="fas fa-lock mr-1.5"></i>관리자</button>` : `<span class="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-xs border border-emerald-500/30"><i class="fas fa-shield-alt mr-1.5"></i>관리자 모드</span>`}
+          ${!isAdmin ? `<button onclick="showAuthModal(${t.id})" class="px-3 py-1.5 bg-white/10 text-white/70 rounded-lg text-xs hover:bg-white/20 transition backdrop-blur"><i class="fas fa-lock mr-1.5"></i>관리자</button>` : `<span class="px-3 py-1.5 bg-${P}-500/20 text-${P}-400 rounded-lg text-xs border border-${P}-500/30"><i class="fas fa-shield-alt mr-1.5"></i>관리자 모드</span>`}
         </div>
       </div>
       <!-- Title -->
       <div class="flex items-center gap-4 mb-6">
-        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-xl shadow-emerald-500/20 flex-shrink-0">
-          <i class="fas fa-shuttlecock text-xl text-white"></i>
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br ${T.gradFrom} ${T.gradTo} flex items-center justify-center shadow-xl shadow-${P}-500/20 flex-shrink-0">
+          <i class="fas ${SC.icon || "fa-trophy"} text-xl text-white"></i>
         </div>
         <div class="min-w-0">
           <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight truncate">${t.name}</h1>
@@ -400,9 +499,9 @@ function renderTournament() {
           <div class="text-[11px] sm:text-xs text-white/50 mt-0.5">${playingMatches > 0 ? `<span class="w-1.5 h-1.5 inline-block rounded-full bg-green-400 pulse-live mr-0.5"></span>${playingMatches}진행중 ` : ''}<i class="fas fa-gamepad mr-0.5"></i>경기</div>
         </div>
         <div class="bg-white/[0.07] backdrop-blur-sm rounded-xl p-3 sm:p-4 text-center border border-white/10">
-          <div class="text-2xl sm:text-3xl font-extrabold ${progress >= 100 ? 'text-emerald-400' : progress >= 50 ? 'text-blue-400' : 'text-white'}">${progress}<span class="text-lg">%</span></div>
+          <div class="text-2xl sm:text-3xl font-extrabold ${progress >= 100 ? 'text-green-400' : progress >= 50 ? T.text400 : 'text-white'}">${progress}<span class="text-lg">%</span></div>
           <div class="text-[11px] sm:text-xs text-white/50 mt-0.5"><i class="fas fa-chart-pie mr-1"></i>진행률</div>
-          ${totalMatches > 0 ? `<div class="mt-1.5 w-full bg-white/10 rounded-full h-1"><div class="h-1 rounded-full transition-all ${progress >= 100 ? 'bg-emerald-400' : progress >= 50 ? 'bg-blue-400' : 'bg-yellow-400'}" style="width:${progress}%"></div></div>` : ''}
+          ${totalMatches > 0 ? `<div class="mt-1.5 w-full bg-white/10 rounded-full h-1"><div class="h-1 rounded-full transition-all ${progress >= 100 ? 'bg-green-400' : progress >= 50 ? T.bg400 : 'bg-yellow-400'}" style="width:${progress}%"></div></div>` : ''}
         </div>
       </div>
     </div>
@@ -422,7 +521,7 @@ function renderTournament() {
           <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-green-400 to-green-600 mx-auto mb-1.5 sm:mb-2 flex items-center justify-center shadow-md shadow-green-500/20">
             <i class="fas fa-tablet-alt text-white text-sm"></i>
           </div>
-          <span class="font-bold text-gray-800 text-xs group-hover:text-green-600 transition">코트 점수판</span>
+          <span class="font-bold text-gray-800 text-xs group-hover:text-green-600 transition">코트 ${SC.terms ? SC.terms.scoreBoard : '점수판'}</span>
         </button>
         <button onclick="loadDashboard(${t.id});navigate('dashboard')" class="group rounded-xl border border-gray-200 bg-white p-3 sm:p-4 text-center cursor-pointer hover:shadow-lg hover:border-orange-300 transition-all">
           <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 mx-auto mb-1.5 sm:mb-2 flex items-center justify-center shadow-md shadow-orange-500/20">
@@ -466,8 +565,8 @@ function renderTournament() {
       </button>
       <div id="admin-panel" class="hidden">
         <div class="flex flex-wrap gap-2 p-3 bg-white rounded-xl border border-gray-200">
-          <button onclick="navigate('scoreboard')" class="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 transition"><i class="fas fa-tv mr-1"></i>스코어보드</button>
-          <button onclick="exportTournament(${t.id})" class="px-3 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-100 transition"><i class="fas fa-download mr-1"></i>데이터 백업</button>
+          <button onclick="navigate('scoreboard')" class="px-3 py-2 ${T.bg50} ${T.text700} rounded-lg text-xs font-medium ${T.hoverBg100} transition"><i class="fas fa-tv mr-1"></i>스코어보드</button>
+          <button onclick="exportTournament(${t.id})" class="px-3 py-2 bg-${P}-50 text-${P}-700 rounded-lg text-xs font-medium hover:bg-${P}-100 transition"><i class="fas fa-download mr-1"></i>데이터 백업</button>
           <button onclick="showImportModal()" class="px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-100 transition"><i class="fas fa-upload mr-1"></i>데이터 복원</button>
           <button onclick="deleteTournament(${t.id})" class="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition"><i class="fas fa-trash-alt mr-1"></i>대회 삭제</button>
         </div>
@@ -476,9 +575,9 @@ function renderTournament() {
 
     <!-- Tabs -->
     <div class="flex gap-1 mb-6 bg-white p-1 rounded-xl shadow-sm border border-gray-200">
-      <button onclick="switchTab('participants')" id="tab-participants" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='participants' ? 'bg-emerald-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}"><i class="fas fa-users mr-1"></i>참가자 <span class="hidden sm:inline">(${state.participants.length})</span></button>
-      <button onclick="switchTab('events')" id="tab-events" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='events' ? 'bg-emerald-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}"><i class="fas fa-layer-group mr-1"></i>종목/팀 <span class="hidden sm:inline">(${state.events.length})</span></button>
-      <button onclick="switchTab('matches')" id="tab-matches" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='matches' ? 'bg-emerald-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}"><i class="fas fa-shuttlecock mr-1"></i>경기</button>
+      <button onclick="switchTab('participants')" id="tab-participants" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='participants' ? 'bg-${P}-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}"><i class="fas fa-users mr-1"></i>참가자 <span class="hidden sm:inline">(${state.participants.length})</span></button>
+      <button onclick="switchTab('events')" id="tab-events" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='events' ? 'bg-${P}-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}"><i class="fas fa-layer-group mr-1"></i>종목/팀 <span class="hidden sm:inline">(${state.events.length})</span></button>
+      <button onclick="switchTab('matches')" id="tab-matches" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='matches' ? 'bg-${P}-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}"><i class="fas ${SC.icon || "fa-trophy"} mr-1"></i>경기</button>
     </div>
     <div id="tab-content">${state.activeTab==='participants' ? renderParticipantsTab(isAdmin) : state.activeTab==='events' ? renderEventsTab(isAdmin) : renderMatchesTab(isAdmin)}</div>
   </div>
@@ -487,9 +586,9 @@ function renderTournament() {
   <!-- Auth Modal -->
   <div id="auth-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
     <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
-      <h3 class="text-lg font-bold mb-4"><i class="fas fa-lock mr-2 text-emerald-500"></i>관리자 인증</h3>
-      <input id="auth-password" type="password" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" class="w-full px-4 py-3 border rounded-xl mb-4 outline-none focus:ring-2 focus:ring-emerald-500" placeholder="관리자 비밀번호">
-      <div class="flex gap-2"><button onclick="closeAuthModal()" class="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition">취소</button><button onclick="authenticate()" class="flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-medium hover:from-emerald-400 hover:to-emerald-500 transition-all">확인</button></div>
+      <h3 class="text-lg font-bold mb-4"><i class="fas fa-lock mr-2 text-${P}-500"></i>관리자 인증</h3>
+      <input id="auth-password" type="password" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" class="w-full px-4 py-3 border rounded-xl mb-4 outline-none focus:ring-2 focus:ring-${P}-500" placeholder="관리자 비밀번호">
+      <div class="flex gap-2"><button onclick="closeAuthModal()" class="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition">취소</button><button onclick="authenticate()" class="flex-1 py-2.5 bg-gradient-to-r ${T.gradFrom} ${T.gradTo} text-white rounded-xl font-medium hover:opacity-90 transition-all">확인</button></div>
     </div>
   </div>`;
 }
@@ -597,7 +696,7 @@ function renderParticipantsTab(isAdmin) {
     <!-- Admin Registration (Collapsible) -->
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <button onclick="toggleParticipantForm()" class="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition">
-        <h3 class="font-semibold text-gray-800 flex items-center"><i class="fas fa-user-plus mr-2 text-emerald-500"></i>참가자 등록</h3>
+        <h3 class="font-semibold text-gray-800 flex items-center"><i class="fas fa-user-plus mr-2 text-${P}-500"></i>참가자 등록</h3>
         <div class="flex items-center gap-2">
           <button onclick="event.stopPropagation();showBulkModal()" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-100"><i class="fas fa-file-import mr-1"></i>일괄 등록</button>
           <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform" id="pform-arrow"></i>
@@ -605,19 +704,19 @@ function renderParticipantsTab(isAdmin) {
       </button>
       <div id="participant-form-panel" class="hidden border-t border-gray-100 p-4">
         <form id="add-participant-form" class="flex flex-wrap gap-3">
-          <input name="name" required placeholder="이름" class="flex-1 min-w-[80px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
-          <input name="phone" placeholder="연락처" class="flex-1 min-w-[90px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
-          <select name="gender" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"><option value="m">남</option><option value="f">여</option></select>
-          <input name="birth_year" type="number" placeholder="출생년도" min="1950" max="2010" class="w-[90px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
-          <select name="level" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+          <input name="name" required placeholder="이름" class="flex-1 min-w-[80px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-${P}-500">
+          <input name="phone" placeholder="연락처" class="flex-1 min-w-[90px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-${P}-500">
+          <select name="gender" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-${P}-500"><option value="m">남</option><option value="f">여</option></select>
+          <input name="birth_year" type="number" placeholder="출생년도" min="1950" max="2010" class="w-[90px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-${P}-500">
+          <select name="level" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-${P}-500">
             ${Object.entries(LEVELS).map(([k,v]) => `<option value="${k}" ${k==='c'?'selected':''}>${v}급</option>`).join('')}
           </select>
-          <input name="club" placeholder="소속 클럽" class="flex-1 min-w-[80px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+          <input name="club" placeholder="소속 클럽" class="flex-1 min-w-[80px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-${P}-500">
           <label class="flex items-center gap-1.5 px-3 py-2.5 border rounded-lg cursor-pointer hover:bg-purple-50 transition" title="혼합복식 참가 희망">
             <input type="checkbox" name="mixed_doubles" value="1" class="w-4 h-4 text-purple-600 rounded focus:ring-purple-500">
             <span class="text-sm font-medium text-purple-700"><i class="fas fa-venus-mars mr-0.5"></i>혼복</span>
           </label>
-          <button type="submit" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700"><i class="fas fa-plus mr-1"></i>등록</button>
+          <button type="submit" class="px-5 py-2.5 bg-${P}-600 text-white rounded-lg font-medium hover:bg-${P}-700"><i class="fas fa-plus mr-1"></i>등록</button>
         </form>
       </div>
     </div>` : ''}
@@ -627,7 +726,7 @@ function renderParticipantsTab(isAdmin) {
       <div class="flex flex-wrap gap-2 items-center">
         <div class="relative flex-1 min-w-[150px]">
           <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-          <input id="participant-search" type="text" placeholder="이름 또는 소속 검색..." oninput="filterParticipants()" class="w-full pl-8 pr-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+          <input id="participant-search" type="text" placeholder="이름 또는 소속 검색..." oninput="filterParticipants()" class="w-full pl-8 pr-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-${P}-500">
         </div>
         <select id="participant-filter-gender" onchange="filterParticipants()" class="px-2 py-2 border rounded-lg text-sm outline-none">
           <option value="">전체 성별</option><option value="m">남자</option><option value="f">여자</option>
@@ -670,7 +769,7 @@ function renderParticipantsTab(isAdmin) {
               <td class="px-2 py-2 text-xs text-gray-500">${p.club || '-'}</td>
               <td class="px-2 py-2 text-center">${isAdmin ? `<button onclick="toggleMixedDoubles(${p.id})" class="text-base ${p.mixed_doubles?'text-purple-500':'text-gray-300'} hover:scale-110">${p.mixed_doubles?'<i class="fas fa-venus-mars"></i>':'<i class="far fa-circle"></i>'}</button>` : (p.mixed_doubles?'<span class="text-purple-500"><i class="fas fa-venus-mars"></i></span>':'<span class="text-gray-300">-</span>')}</td>
               <td class="px-2 py-2 text-center">${isAdmin ? `<button onclick="togglePaid(${p.id})" class="text-base ${p.paid?'text-green-500':'text-gray-300'} hover:scale-110">${p.paid?'<i class="fas fa-check-circle"></i>':'<i class="far fa-circle"></i>'}</button>` : (p.paid?'<i class="fas fa-check-circle text-green-500"></i>':'<i class="fas fa-times-circle text-gray-300"></i>')}</td>
-              <td class="px-2 py-2 text-center">${isAdmin ? `<button onclick="toggleCheckin(${p.id})" class="text-base ${p.checked_in?'text-blue-500':'text-gray-300'} hover:scale-110">${p.checked_in?'<i class="fas fa-check-circle"></i>':'<i class="far fa-circle"></i>'}</button>` : (p.checked_in?'<i class="fas fa-check-circle text-blue-500"></i>':'<i class="fas fa-times-circle text-gray-300"></i>')}</td>
+              <td class="px-2 py-2 text-center">${isAdmin ? `<button onclick="toggleCheckin(${p.id})" class="text-base ${p.checked_in?T.text500:'text-gray-300'} hover:scale-110">${p.checked_in?'<i class="fas fa-check-circle"></i>':'<i class="far fa-circle"></i>'}</button>` : (p.checked_in?`<i class="fas fa-check-circle ${T.text500}"></i>`:'<i class="fas fa-times-circle text-gray-300"></i>')}</td>
               ${isAdmin ? `<td class="px-2 py-2 text-center"><button onclick="deleteParticipant(${p.id})" class="text-red-400 hover:text-red-600"><i class="fas fa-trash-alt"></i></button></td>` : ''}
             </tr>`;
           }).join('')}
@@ -692,7 +791,7 @@ function renderEventsTab(isAdmin) {
     <!-- Admin Event Management (Collapsible) -->
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <button onclick="toggleEventForm()" class="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition">
-        <h3 class="font-semibold text-gray-800 flex items-center"><i class="fas fa-plus-circle mr-2 text-emerald-500"></i>종목 추가</h3>
+        <h3 class="font-semibold text-gray-800 flex items-center"><i class="fas fa-plus-circle mr-2 text-${P}-500"></i>종목 추가</h3>
         <div class="flex items-center gap-2">
           <span class="text-xs text-gray-400"><i class="fas fa-mars mr-1 text-blue-400"></i>${maleP.length} <i class="fas fa-venus mr-1 ml-1 text-pink-400"></i>${femaleP.length} <i class="fas fa-venus-mars mr-1 ml-1 text-purple-400"></i>${Math.min(mixedMales.length, mixedFemales.length)}팀</span>
           <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform" id="eform-arrow"></i>
@@ -701,15 +800,15 @@ function renderEventsTab(isAdmin) {
       <div id="event-form-panel" class="hidden border-t border-gray-100 p-4 space-y-4">
         <form id="add-event-form" class="flex flex-wrap gap-3 items-end">
           <div><label class="block text-xs font-semibold text-gray-500 mb-1">종류</label>
-            <select name="category" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+            <select name="category" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-${P}-500">
               <option value="md">남자복식</option><option value="wd">여자복식</option><option value="xd">혼합복식</option></select></div>
           <div><label class="block text-xs font-semibold text-gray-500 mb-1">연령대</label>
-            <select name="age_group" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+            <select name="age_group" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-${P}-500">
               ${AGE_GROUPS.map(a => `<option value="${a.value}">${a.label}</option>`).join('')}</select></div>
           <div><label class="block text-xs font-semibold text-gray-500 mb-1">급수</label>
-            <select name="level_group" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+            <select name="level_group" class="px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-${P}-500">
               <option value="all">전체</option>${Object.entries(LEVELS).map(([k,v]) => `<option value="${k}">${v}급</option>`).join('')}</select></div>
-          <button type="submit" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700"><i class="fas fa-plus mr-1"></i>종목 추가</button>
+          <button type="submit" class="px-5 py-2.5 bg-${P}-600 text-white rounded-lg font-medium hover:bg-${P}-700"><i class="fas fa-plus mr-1"></i>종목 추가</button>
           <button type="button" onclick="showBulkEventModal()" class="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700"><i class="fas fa-th-large mr-1"></i>일괄 생성</button>
         </form>
       </div>
@@ -717,7 +816,7 @@ function renderEventsTab(isAdmin) {
     <!-- Admin Action Buttons -->
     <div class="flex flex-wrap gap-2">
       <button onclick="showTeamAssignModal()" class="px-4 py-2.5 bg-teal-500 text-white rounded-lg text-sm font-semibold hover:bg-teal-600 shadow-sm"><i class="fas fa-users-cog mr-1"></i>조편성 옵션</button>
-      <button onclick="showBracketOptionsModal()" class="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-lg text-sm font-semibold shadow-md hover:shadow-lg"><i class="fas fa-magic mr-1"></i>대진표 옵션</button>
+      <button onclick="showBracketOptionsModal()" class="px-4 py-2.5 bg-gradient-to-r ${T.gradFrom} ${T.gradTo} text-white rounded-lg text-sm font-semibold shadow-md hover:shadow-lg"><i class="fas fa-magic mr-1"></i>대진표 옵션</button>
       <button onclick="checkMerge()" class="px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-100"><i class="fas fa-compress-arrows-alt mr-1"></i>급수합병 체크</button>
       <button onclick="showManualMergeModal()" class="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600"><i class="fas fa-object-group mr-1"></i>수동 합병</button>
       <button onclick="bulkDeleteAssignments()" class="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 border border-red-200"><i class="fas fa-eraser mr-1"></i>조편성 일괄삭제</button>
@@ -739,12 +838,12 @@ function renderEventsTab(isAdmin) {
           </div>
           <div class="flex items-center gap-2">
             ${isAdmin && ev.merged_from ? `<button onclick="unmergeEvent(${ev.id})" class="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 border border-amber-200"><i class="fas fa-undo mr-1"></i>합병취소</button>` : ''}
-            ${isAdmin ? `<button onclick="showTeamModal(${ev.id}, '${ev.category}')" class="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-100"><i class="fas fa-user-plus mr-1"></i>팀 등록</button>` : ''}
+            ${isAdmin ? `<button onclick="showTeamModal(${ev.id}, '${ev.category}')" class="px-3 py-1.5 bg-${P}-50 text-${P}-700 rounded-lg text-xs font-medium hover:bg-${P}-100"><i class="fas fa-user-plus mr-1"></i>팀 등록</button>` : ''}
             ${isAdmin ? `<button onclick="deleteEvent(${ev.id})" class="text-red-400 hover:text-red-600 text-sm"><i class="fas fa-trash-alt"></i></button>` : ''}
           </div>
         </div>
         <div id="teams-${ev.id}" class="px-4 py-2 border-t border-gray-100">
-          <button onclick="loadTeams(${ev.id})" class="text-sm text-emerald-600 hover:text-emerald-800"><i class="fas fa-eye mr-1"></i>팀 목록 보기</button>
+          <button onclick="loadTeams(${ev.id})" class="text-sm text-${P}-600 hover:text-${P}-800"><i class="fas fa-eye mr-1"></i>팀 목록 보기</button>
         </div>
       </div>
     `;}).join('')}
@@ -812,10 +911,10 @@ function showBulkEventModal() {
     <div class="p-6 overflow-y-auto flex-1 space-y-5">
       <!-- 1. 종목 선택 -->
       <div>
-        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-gamepad mr-1 text-blue-500"></i>1. 종목 선택 (다중 선택)</h4>
+        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-gamepad mr-1 ${T.text500}"></i>1. 종목 선택 (다중 선택)</h4>
         <div class="grid grid-cols-3 gap-2">
-          <label class="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer hover:bg-blue-50 transition has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-            <input type="checkbox" name="bulk_cat" value="md" checked class="w-4 h-4 text-blue-600 rounded">
+          <label class="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer ${T.hoverBg50} transition ${T.checkedBorder} ${T.checkedBg}">
+            <input type="checkbox" name="bulk_cat" value="md" checked class="w-4 h-4 ${T.inputColor} rounded">
             <div><p class="font-bold text-sm text-blue-700"><i class="fas fa-mars mr-1"></i>남자복식</p></div>
           </label>
           <label class="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer hover:bg-pink-50 transition has-[:checked]:border-pink-500 has-[:checked]:bg-pink-50">
@@ -1087,7 +1186,7 @@ async function previewAssignment() {
                 <td class="px-2 py-1 text-center font-bold">${p.team_count}팀</td>
                 <td class="px-2 py-1 text-center">${assignGroups ? p.group_count + '조' : '-'}</td>
                 <td class="px-2 py-1 text-center">${p.estimated_matches}</td>
-                <td class="px-2 py-1 text-center"><span class="badge ${p.team_count <= 5 ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'} text-xs">${p.format_suggestion}</span></td>
+                <td class="px-2 py-1 text-center"><span class="badge ${p.team_count <= 5 ? 'bg-green-100 text-green-700' : T.bg100+' '+T.text700} text-xs">${p.format_suggestion}</span></td>
               </tr>`).join('')}
             </tbody>
           </table>
@@ -1144,33 +1243,33 @@ function showBracketOptionsModal() {
   modal.innerHTML = `<div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
     <div class="p-6 border-b border-gray-200">
       <div class="flex items-center justify-between">
-        <h3 class="text-lg font-bold text-gray-900"><i class="fas fa-magic mr-2 text-emerald-500"></i>대진표 옵션 설정</h3>
+        <h3 class="text-lg font-bold text-gray-900"><i class="fas fa-magic mr-2 text-${P}-500"></i>대진표 옵션 설정</h3>
         <button onclick="document.getElementById('bracket-options-modal').remove()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100"><i class="fas fa-times text-gray-400"></i></button>
       </div>
     </div>
     <div class="p-6 overflow-y-auto flex-1 space-y-5">
       <!-- 1. 대진 포맷 -->
       <div>
-        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-sitemap mr-1 text-emerald-500"></i>1. 대진 방식</h4>
+        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-sitemap mr-1 text-${P}-500"></i>1. 대진 방식</h4>
         <div class="space-y-2">
-          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-emerald-50 transition has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50">
-            <input type="radio" name="bracket_format" value="auto" checked class="mt-1 w-4 h-4 text-emerald-600">
+          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-${P}-50 transition has-[:checked]:border-${P}-500 has-[:checked]:bg-${P}-50">
+            <input type="radio" name="bracket_format" value="auto" checked class="mt-1 w-4 h-4 text-${P}-600">
             <div><p class="font-semibold text-sm">자동 결정 (권장)</p><p class="text-xs text-gray-500">팀 수와 조 배정 여부에 따라 자동으로 최적 방식 결정<br>• 조 배정 있으면 → 조별 리그 (같은 조끼리 풀리그)<br>• 5팀 이하 → 풀리그 / 그 외 → KDK</p></div>
           </label>
-          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-emerald-50 transition has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50">
-            <input type="radio" name="bracket_format" value="group_league" class="mt-1 w-4 h-4 text-emerald-600">
+          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-${P}-50 transition has-[:checked]:border-${P}-500 has-[:checked]:bg-${P}-50">
+            <input type="radio" name="bracket_format" value="group_league" class="mt-1 w-4 h-4 text-${P}-600">
             <div><p class="font-semibold text-sm">조별 리그 (Group Stage)</p><p class="text-xs text-gray-500">같은 조 팀끼리만 풀리그 진행 (4~5팀 풀리그 권장)</p></div>
           </label>
-          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-emerald-50 transition has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50">
-            <input type="radio" name="bracket_format" value="kdk" class="mt-1 w-4 h-4 text-emerald-600">
+          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-${P}-50 transition has-[:checked]:border-${P}-500 has-[:checked]:bg-${P}-50">
+            <input type="radio" name="bracket_format" value="kdk" class="mt-1 w-4 h-4 text-${P}-600">
             <div><p class="font-semibold text-sm">KDK (팀당 N경기)</p><p class="text-xs text-gray-500">모든 팀이 설정된 경기 수만큼 진행 (랜덤 대진)</p></div>
           </label>
-          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-emerald-50 transition has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50">
-            <input type="radio" name="bracket_format" value="league" class="mt-1 w-4 h-4 text-emerald-600">
+          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-${P}-50 transition has-[:checked]:border-${P}-500 has-[:checked]:bg-${P}-50">
+            <input type="radio" name="bracket_format" value="league" class="mt-1 w-4 h-4 text-${P}-600">
             <div><p class="font-semibold text-sm">풀리그</p><p class="text-xs text-gray-500">모든 팀이 다른 모든 팀과 한 번씩 대전 (소규모 종목)</p></div>
           </label>
-          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-emerald-50 transition has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50">
-            <input type="radio" name="bracket_format" value="tournament" class="mt-1 w-4 h-4 text-emerald-600">
+          <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-${P}-50 transition has-[:checked]:border-${P}-500 has-[:checked]:bg-${P}-50">
+            <input type="radio" name="bracket_format" value="tournament" class="mt-1 w-4 h-4 text-${P}-600">
             <div><p class="font-semibold text-sm">싱글 엘리미네이션 (토너먼트)</p><p class="text-xs text-gray-500">지면 탈락, 결승까지 승자끼리 대전</p></div>
           </label>
         </div>
@@ -1180,12 +1279,12 @@ function showBracketOptionsModal() {
         <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-cog mr-1 text-gray-500"></i>2. 대진 옵션</h4>
         <div class="space-y-3">
           <label class="flex items-center gap-3 p-3 border rounded-xl cursor-pointer hover:bg-gray-50">
-            <input type="checkbox" id="bracket-avoid-club" checked class="w-4 h-4 text-emerald-600 rounded">
+            <input type="checkbox" id="bracket-avoid-club" checked class="w-4 h-4 text-${P}-600 rounded">
             <div><p class="font-semibold text-sm">같은 클럽 대결 회피</p><p class="text-xs text-gray-500">같은 소속 팀끼리 가능한 한 대결하지 않도록 배정</p></div>
           </label>
           <div class="flex items-center gap-3 px-3">
             <label class="text-sm font-medium text-gray-700 w-28">팀당 경기 수</label>
-            <input type="number" id="bracket-games" value="${t?.games_per_player || 4}" min="2" max="10" class="w-20 px-3 py-2 border rounded-lg text-center focus:ring-2 focus:ring-emerald-500 outline-none">
+            <input type="number" id="bracket-games" value="${t?.games_per_player || 4}" min="2" max="10" class="w-20 px-3 py-2 border rounded-lg text-center focus:ring-2 focus:ring-${P}-500 outline-none">
             <span class="text-xs text-gray-500">(KDK 전용)</span>
           </div>
         </div>
@@ -1209,7 +1308,7 @@ function showBracketOptionsModal() {
     </div>
     <div class="p-6 border-t border-gray-200 flex gap-3">
       <button onclick="document.getElementById('bracket-options-modal').remove()" class="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200">취소</button>
-      <button onclick="executeBracketGeneration()" class="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-xl font-semibold shadow-md"><i class="fas fa-magic mr-2"></i>대진표 생성</button>
+      <button onclick="executeBracketGeneration()" class="flex-1 py-3 bg-gradient-to-r ${T.gradFrom} ${T.gradTo} text-white rounded-xl font-semibold shadow-md"><i class="fas fa-magic mr-2"></i>대진표 생성</button>
     </div>
   </div>`;
   document.body.appendChild(modal);
@@ -1274,7 +1373,7 @@ async function executeBracketGeneration() {
 function renderMatchesTab(isAdmin) {
   const matches = state.matches;
   if (matches.length === 0) return `<div class="text-center py-16 text-gray-400 bg-white rounded-xl border border-gray-200"><i class="fas fa-clipboard-list text-5xl mb-4 block text-gray-300"></i><p class="text-lg font-medium text-gray-500 mb-1">대진표가 아직 생성되지 않았습니다.</p><p class="text-sm text-gray-400 mb-4">종목/팀 탭에서 조편성 후 대진표를 생성하세요.</p>
-    ${isAdmin ? `<button onclick="showBracketOptionsModal()" class="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition"><i class="fas fa-magic mr-2"></i>대진표 생성하기</button>` : ''}
+    ${isAdmin ? `<button onclick="showBracketOptionsModal()" class="px-6 py-2.5 bg-gradient-to-r ${T.gradFrom} ${T.gradTo} text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition"><i class="fas fa-magic mr-2"></i>대진표 생성하기</button>` : ''}
   </div>`;
 
   // 결선 토너먼트 존재 여부 확인
@@ -1287,7 +1386,7 @@ function renderMatchesTab(isAdmin) {
   const scoreRuleHtml = `<div class="mb-4 flex flex-wrap gap-3">
     <div class="p-3 rounded-xl flex items-center gap-2 ${state.format === 'tournament' ? 'bg-red-50 text-red-700' : 'bg-yellow-50 text-yellow-700'}">
       <i class="fas fa-bullseye"></i>
-      <span class="text-sm font-bold">${state.targetScore}점 선취제 · 1세트 단판 (${state.format === 'tournament' ? '본선/토너먼트' : '예선'})</span>
+      <span class="text-sm font-bold">${state.targetScore}${SCORE_UNIT} 선취제 (${state.format === 'tournament' ? '본선/토너먼트' : '예선'})</span>
     </div>
     ${isAdmin && hasGroupMatches && !hasFinalsMatches ? `
     <button onclick="showFinalsModal()" class="px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl text-sm font-bold shadow-md hover:shadow-lg hover:from-red-600 hover:to-red-700 transition">
@@ -1325,7 +1424,7 @@ function renderMatchesTab(isAdmin) {
     <!-- 결선 토너먼트 -->
     <div class="bg-gradient-to-r from-red-50 to-orange-50 rounded-2xl border-2 border-red-200 p-5">
       <h2 class="text-xl font-extrabold text-red-700 mb-4 flex items-center gap-2">
-        <i class="fas fa-crown text-yellow-500"></i>결선 토너먼트 (21점 선취)
+        <i class="fas fa-crown text-yellow-500"></i>결선 토너먼트 (${SC.scoring ? SC.scoring.tournamentTargetScore : 21}${SCORE_UNIT} 선취)
       </h2>
       ${Object.entries(finalsByEvent).map(([eventName, rounds]) => `
         <div class="mb-4">
@@ -1345,7 +1444,7 @@ function renderMatchesTab(isAdmin) {
     ${hasFinals ? `<h2 class="text-lg font-bold text-gray-700 flex items-center gap-2"><i class="fas fa-th-large text-indigo-500"></i>조별 리그 (예선)</h2>` : ''}
     ${Object.entries(byEvent).map(([eventName, groups]) => `
       <div>
-        <h3 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2"><i class="fas fa-layer-group text-emerald-500"></i>${eventName}</h3>
+        <h3 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2"><i class="fas fa-layer-group text-${P}-500"></i>${eventName}</h3>
         ${Object.entries(groups).map(([groupName, rounds]) => `
           <div class="mb-4">
             ${groupName !== '전체' ? `<h4 class="text-sm font-bold text-indigo-600 mb-2 flex items-center gap-1"><i class="fas fa-th-large"></i>${groupName}</h4>` : ''}
@@ -1363,7 +1462,7 @@ function renderMatchesTab(isAdmin) {
 }
 
 function renderMatchCard(m, isAdmin) {
-  const st = { pending: { l: '대기', c: 'bg-gray-100 text-gray-600', bc: 'border-gray-200' }, playing: { l: '진행중', c: 'bg-green-100 text-green-700', bc: 'border-green-300 ring-2 ring-green-100' }, completed: { l: '완료', c: 'bg-blue-100 text-blue-700', bc: 'border-gray-200' } };
+  const st = { pending: { l: '대기', c: 'bg-gray-100 text-gray-600', bc: 'border-gray-200' }, playing: { l: '진행중', c: 'bg-green-100 text-green-700', bc: 'border-green-300 ring-2 ring-green-100' }, completed: { l: '완료', c: T.bg100+' '+T.text700, bc: 'border-gray-200' } };
   const s = st[m.status] || st.pending;
   const t1 = m.team1_name || 'BYE', t2 = m.team2_name || 'BYE';
   const t1T = m.team1_set1||0, t2T = m.team2_set1||0;
@@ -1373,13 +1472,13 @@ function renderMatchCard(m, isAdmin) {
       <div class="flex items-center gap-1">${m.status==='playing'?'<span class="w-2 h-2 rounded-full bg-green-500 pulse-live"></span>':''}<span class="badge ${s.c} text-xs">${s.l}</span></div>
     </div>
     <div class="space-y-1.5">
-      <div class="flex items-center justify-between ${m.winner_team===1?'font-bold text-emerald-700':''}"><span class="text-sm truncate mr-2">${m.winner_team===1?'🏆 ':''}${t1}</span><span class="scoreboard-num text-lg font-bold">${t1T}</span></div>
+      <div class="flex items-center justify-between ${m.winner_team===1?'font-bold text-${P}-700':''}"><span class="text-sm truncate mr-2">${m.winner_team===1?'🏆 ':''}${t1}</span><span class="scoreboard-num text-lg font-bold">${t1T}</span></div>
       <div class="h-px bg-gray-100"></div>
-      <div class="flex items-center justify-between ${m.winner_team===2?'font-bold text-emerald-700':''}"><span class="text-sm truncate mr-2">${m.winner_team===2?'🏆 ':''}${t2}</span><span class="scoreboard-num text-lg font-bold">${t2T}</span></div>
+      <div class="flex items-center justify-between ${m.winner_team===2?'font-bold text-${P}-700':''}"><span class="text-sm truncate mr-2">${m.winner_team===2?'🏆 ':''}${t2}</span><span class="scoreboard-num text-lg font-bold">${t2T}</span></div>
     </div>
     ${isAdmin && m.status!=='cancelled' ? `<div class="mt-2 pt-2 border-t border-gray-100 flex gap-2">
       ${m.status==='pending'?`<button onclick="startMatch(${m.id})" class="flex-1 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100"><i class="fas fa-play mr-1"></i>시작</button>`:''}
-      ${m.status==='playing'?`<button onclick="showScoreModal(${m.id})" class="flex-1 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-100"><i class="fas fa-edit mr-1"></i>점수</button>`:''}
+      ${m.status==='playing'?`<button onclick="showScoreModal(${m.id})" class="flex-1 py-1.5 bg-${P}-50 text-${P}-700 rounded-lg text-xs font-medium hover:bg-${P}-100"><i class="fas fa-edit mr-1"></i>점수</button>`:''}
       ${m.status==='completed'?`<button onclick="showScoreModal(${m.id})" class="flex-1 py-1.5 bg-gray-50 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-100"><i class="fas fa-edit mr-1"></i>수정</button>`:''}
       ${m.status!=='playing'?`<button onclick="showCourtChangeModal(${m.id})" class="py-1.5 px-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-100" title="코트 변경"><i class="fas fa-exchange-alt"></i></button>`:''}
     </div>` : ''}
@@ -1403,7 +1502,7 @@ function renderScoreboard() {
       <div class="grid grid-cols-3 gap-4 mb-8">
         <div class="bg-white/5 rounded-xl p-4 text-center"><div class="text-3xl font-extrabold text-green-400">${playing.length}</div><div class="text-xs text-gray-400">진행중</div></div>
         <div class="bg-white/5 rounded-xl p-4 text-center"><div class="text-3xl font-extrabold text-yellow-400">${pending.length}</div><div class="text-xs text-gray-400">대기중</div></div>
-        <div class="bg-white/5 rounded-xl p-4 text-center"><div class="text-3xl font-extrabold text-blue-400">${completed.length}</div><div class="text-xs text-gray-400">완료</div></div>
+        <div class="bg-white/5 rounded-xl p-4 text-center"><div class="text-3xl font-extrabold ${T.text400}">${completed.length}</div><div class="text-xs text-gray-400">완료</div></div>
       </div>
       ${completed.length > 0 ? `<h2 class="text-lg font-bold mb-4"><i class="fas fa-history mr-2"></i>최근 결과</h2>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">${completed.slice(-6).reverse().map(m => renderScoreCard(m)).join('')}</div>` : ''}
@@ -1418,7 +1517,7 @@ function renderScoreCard(m) {
   return `<div class="bg-white/10 rounded-xl p-3 ${live?'ring-2 ring-green-500/50':''}">
     <div class="flex justify-between mb-2">
       <span class="text-xs text-gray-400">${m.court_number ? m.court_number+'코트 ' : ''}#${m.match_order} ${m.event_name||''} ${m.group_num ? m.group_num+'조' : ''}</span>
-      ${live?'<span class="text-xs text-green-400 flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 pulse-live"></span>LIVE</span>':'<span class="text-xs text-blue-400">완료</span>'}
+      ${live?'<span class="text-xs text-green-400 flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 pulse-live"></span>LIVE</span>':`<span class="text-xs ${T.text400}">완료</span>`}
     </div>
     <div class="space-y-1">
       <div class="flex justify-between items-center ${m.winner_team===1?'text-yellow-400':''}"><span class="text-sm font-medium">${m.winner_team===1?'🏆 ':''}${t1}</span><span class="text-2xl font-extrabold scoreboard-num">${t1T}</span></div>
@@ -1562,7 +1661,7 @@ function renderResults() {
                 return `<tr class="${rowBg} hover:bg-gray-50 transition-colors">
                   <td class="px-3 py-3 text-center">${medalHtml}</td>
                   <td class="px-4 py-3 font-semibold text-gray-800">${s.team_name}</td>
-                  <td class="px-3 py-3 text-center"><span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 font-extrabold text-sm">${s.points}</span></td>
+                  <td class="px-3 py-3 text-center"><span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-${P}-100 text-${P}-700 font-extrabold text-sm">${s.points}</span></td>
                   <td class="px-3 py-3 text-center text-green-600 font-bold text-sm">${s.wins}</td>
                   <td class="px-3 py-3 text-center text-red-500 font-medium text-sm">${s.losses}</td>
                   <td class="px-3 py-3 text-center"><span class="font-bold text-sm ${s.goal_difference>0?'text-green-600':s.goal_difference<0?'text-red-500':'text-gray-400'}">${s.goal_difference>0?'+':''}${s.goal_difference}</span></td>
@@ -1633,6 +1732,9 @@ async function loadTournaments() {
 async function openTournament(id) {
   try {
     const d = await api(`/tournaments/${id}`); state.currentTournament = d.tournament;
+    // 대회의 종목에 맞게 config 전환
+    const tournamentSport = d.tournament.sport || 'badminton';
+    switchSportConfig(tournamentSport);
     await loadParticipants(id); await loadEvents(id); await loadMatches(id);
     state.activeTab = 'participants'; navigate('tournament');
   } catch(e){}
@@ -1667,15 +1769,15 @@ async function authenticate() {
   try { await api(`/tournaments/${state._authTid}/auth`, { method: 'POST', body: JSON.stringify({ admin_password: pw }) });
     state.adminAuth[state._authTid] = true; state.adminPasswords[state._authTid] = pw;
     // localStorage에 세션 저장
-    try { localStorage.setItem('badminton_admin_auth', JSON.stringify(state.adminAuth)); localStorage.setItem('badminton_admin_pw', JSON.stringify(state.adminPasswords)); } catch(e){}
+    try { localStorage.setItem('sport_admin_auth', JSON.stringify(state.adminAuth)); localStorage.setItem('sport_admin_pw', JSON.stringify(state.adminPasswords)); } catch(e){}
     closeAuthModal(); document.getElementById('auth-password').value = ''; showToast('관리자 인증 성공!', 'success'); render();
   } catch(e){ document.getElementById('auth-password').value = ''; document.getElementById('auth-password').focus(); }
 }
 // 세션 복원
 function restoreAdminSession() {
   try {
-    const auth = localStorage.getItem('badminton_admin_auth');
-    const pw = localStorage.getItem('badminton_admin_pw');
+    const auth = localStorage.getItem('sport_admin_auth');
+    const pw = localStorage.getItem('sport_admin_pw');
     if (auth) Object.assign(state.adminAuth, JSON.parse(auth));
     if (pw) Object.assign(state.adminPasswords, JSON.parse(pw));
   } catch(e){}
@@ -1702,11 +1804,11 @@ function showBulkModal() {
       </div>
     </div>
     <div class="p-6 overflow-y-auto flex-1">
-      <div class="mb-3 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+      <div class="mb-3 p-3 ${T.bg50} rounded-lg text-sm ${T.text700}">
         <p class="font-semibold mb-1"><i class="fas fa-info-circle mr-1"></i>입력 형식 안내</p>
         <p>한 줄에 한 명씩 · 탭(Tab) 또는 콤마(,)로 구분</p>
-        <p class="mt-1 font-mono text-xs bg-blue-100 rounded p-2">이름, 성별(남/여), 출생년도, 급수, 연락처, 혼복(O/X), 소속클럽<br>김민수, 남, 1985, A, 010-1234-5678, O, 안양시청<br>박서연, 여, 1992, B, , X, 만안클럽</p>
-        <p class="mt-1 text-xs text-blue-500">* 엑셀에서 복사(Ctrl+C)하여 바로 붙여넣기(Ctrl+V) 가능!</p>
+        <p class="mt-1 font-mono text-xs ${T.bg100} rounded p-2">이름, 성별(남/여), 출생년도, 급수, 연락처, 혼복(O/X), 소속클럽<br>김민수, 남, 1985, A, 010-1234-5678, O, 안양시청<br>박서연, 여, 1992, B, , X, 만안클럽</p>
+        <p class="mt-1 text-xs ${T.text500}">* 엑셀에서 복사(Ctrl+C)하여 바로 붙여넣기(Ctrl+V) 가능!</p>
       </div>
       <textarea id="bulk-text" rows="10" class="w-full px-4 py-3 border border-gray-300 rounded-xl font-mono text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-y" placeholder="김민수, 남, 1985, A, 010-1234-5678, O, 안양시청&#10;박서연, 여, 1992, B, , O, 동안셔틀&#10;이정호, 남, 1990, C, , , 만안클럽"></textarea>
       <div class="mt-2 flex items-center justify-between">
@@ -1874,19 +1976,19 @@ function showTeamModal(eid, category) {
   modal.id = 'team-modal';
   modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-overlay';
   modal.innerHTML = `<div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-    <h3 class="text-lg font-bold mb-4"><i class="fas fa-user-plus mr-2 text-emerald-500"></i>팀 등록 - ${CATEGORIES[category]}</h3>
+    <h3 class="text-lg font-bold mb-4"><i class="fas fa-user-plus mr-2 text-${P}-500"></i>팀 등록 - ${CATEGORIES[category]}</h3>
     <div class="space-y-3">
       <div><label class="block text-sm font-semibold text-gray-700 mb-1">${category==='xd'?'남자':'선수'} 1</label>
-        <select id="team-p1" class="w-full px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+        <select id="team-p1" class="w-full px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-${P}-500">
           ${(category==='xd'?state.participants.filter(p=>p.gender==='m'):filtered1).map(p => `<option value="${p.id}">${p.name} (${LEVELS[p.level]}급${p.club?' · '+p.club:''})</option>`).join('')}
         </select></div>
       <div><label class="block text-sm font-semibold text-gray-700 mb-1">${category==='xd'?'여자':'선수'} 2</label>
-        <select id="team-p2" class="w-full px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500">
+        <select id="team-p2" class="w-full px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-${P}-500">
           ${(category==='xd'?state.participants.filter(p=>p.gender==='f'):filtered2).map(p => `<option value="${p.id}">${p.name} (${LEVELS[p.level]}급${p.club?' · '+p.club:''})</option>`).join('')}
         </select></div>
     </div>
     <div class="flex gap-2 mt-5"><button onclick="document.getElementById('team-modal').remove()" class="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium">취소</button>
-      <button onclick="submitTeam(${eid})" class="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-medium">등록</button></div>
+      <button onclick="submitTeam(${eid})" class="flex-1 py-2.5 bg-${P}-600 text-white rounded-xl font-medium">등록</button></div>
   </div>`;
   document.body.appendChild(modal);
 }
@@ -2074,18 +2176,18 @@ function showScoreModal(mid) {
   modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-overlay';
   modal.innerHTML = `<div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
     <div class="flex items-center justify-between mb-3">
-      <h3 class="text-lg font-bold"><i class="fas fa-edit mr-2 text-emerald-500"></i>${isCompleted ? '점수 수정' : '점수 입력'}</h3>
+      <h3 class="text-lg font-bold"><i class="fas fa-edit mr-2 text-${P}-500"></i>${isCompleted ? SCORE_LABEL+' 수정' : SCORE_LABEL+' 입력'}</h3>
       <div class="flex items-center gap-2">
         ${m.court_number ? `<span class="text-xs px-2 py-1 bg-yellow-50 text-yellow-700 rounded-lg border border-yellow-200">${m.court_number}코트</span>` : ''}
-        <span class="text-xs px-2 py-1 rounded-lg ${isCompleted ? 'bg-blue-50 text-blue-600' : m.status==='playing' ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-500'}">${isCompleted ? '완료' : m.status==='playing' ? '진행중' : '대기'}</span>
+        <span class="text-xs px-2 py-1 rounded-lg ${isCompleted ? T.bg50+' '+T.text600 : m.status==='playing' ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-500'}">${isCompleted ? '완료' : m.status==='playing' ? '진행중' : '대기'}</span>
       </div>
     </div>
     ${isCompleted ? '<div class="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700"><i class="fas fa-exclamation-triangle mr-1"></i>완료된 경기를 수정하면 순위가 재계산됩니다.</div>' : ''}
-    <div class="text-center mb-4"><span class="font-semibold text-emerald-700">${m.team1_name||'팀1'}</span><span class="mx-2 text-gray-400">vs</span><span class="font-semibold text-red-600">${m.team2_name||'팀2'}</span></div>
+    <div class="text-center mb-4"><span class="font-semibold text-${P}-700">${m.team1_name||'팀1'}</span><span class="mx-2 text-gray-400">vs</span><span class="font-semibold text-red-600">${m.team2_name||'팀2'}</span></div>
     <div class="flex items-center gap-3">
       <div class="flex-1 text-center">
-        <label class="block text-sm font-medium text-emerald-700 mb-2">${m.team1_name||'팀1'}</label>
-        <input id="t1s1" type="number" min="0" max="${target+10}" value="${m.team1_set1||0}" class="w-full px-3 py-4 border-2 rounded-xl text-center text-3xl font-black outline-none focus:ring-2 focus:ring-emerald-500" inputmode="numeric">
+        <label class="block text-sm font-medium text-${P}-700 mb-2">${m.team1_name||'팀1'}</label>
+        <input id="t1s1" type="number" min="0" max="${target+10}" value="${m.team1_set1||0}" class="w-full px-3 py-4 border-2 rounded-xl text-center text-3xl font-black outline-none focus:ring-2 focus:ring-${P}-500" inputmode="numeric">
       </div>
       <span class="text-3xl text-gray-300 font-bold mt-6">:</span>
       <div class="flex-1 text-center">
@@ -2095,8 +2197,8 @@ function showScoreModal(mid) {
     </div>
     <div class="mt-4"><label class="block text-sm font-semibold text-gray-700 mb-2">승자</label>
       <div class="flex gap-2">
-        <button onclick="document.getElementById('winner-val').value=1;this.classList.add('ring-2','ring-emerald-500');this.nextElementSibling.classList.remove('ring-2','ring-emerald-500')" class="flex-1 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium ${m.winner_team===1?'ring-2 ring-emerald-500':''}">${m.team1_name||'팀1'}</button>
-        <button onclick="document.getElementById('winner-val').value=2;this.classList.add('ring-2','ring-emerald-500');this.previousElementSibling.classList.remove('ring-2','ring-emerald-500')" class="flex-1 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-medium ${m.winner_team===2?'ring-2 ring-emerald-500':''}">${m.team2_name||'팀2'}</button>
+        <button onclick="document.getElementById('winner-val').value=1;this.classList.add('ring-2','ring-${P}-500');this.nextElementSibling.classList.remove('ring-2','ring-${P}-500')" class="flex-1 py-2 bg-${P}-50 text-${P}-700 rounded-lg text-sm font-medium ${m.winner_team===1?'ring-2 ring-${P}-500':''}">${m.team1_name||'팀1'}</button>
+        <button onclick="document.getElementById('winner-val').value=2;this.classList.add('ring-2','ring-${P}-500');this.previousElementSibling.classList.remove('ring-2','ring-${P}-500')" class="flex-1 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-medium ${m.winner_team===2?'ring-2 ring-${P}-500':''}">${m.team2_name||'팀2'}</button>
       </div><input type="hidden" id="winner-val" value="${m.winner_team||''}"></div>
     <!-- 코트 변경 -->
     <div class="mt-4">
@@ -2109,7 +2211,7 @@ function showScoreModal(mid) {
     <div class="flex gap-2 mt-5">
       <button onclick="document.getElementById('score-modal').remove()" class="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium">취소</button>
       ${isCompleted ? `<button onclick="resetMatch(${mid})" class="py-2.5 px-4 bg-red-50 text-red-600 rounded-xl font-medium text-sm hover:bg-red-100"><i class="fas fa-undo mr-1"></i>리셋</button>` : ''}
-      <button onclick="submitScore(${mid})" class="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-medium">저장</button>
+      <button onclick="submitScore(${mid})" class="flex-1 py-2.5 bg-${P}-600 text-white rounded-xl font-medium">저장</button>
     </div>
   </div>`;
   document.body.appendChild(modal);
@@ -2127,7 +2229,7 @@ async function submitScore(mid) {
   if (courtVal && m && parseInt(courtVal) !== m.court_number && m.status !== 'playing') {
     try { await api(`/tournaments/${tid}/matches/${mid}/court`, { method: 'PATCH', body: JSON.stringify({ court_number: parseInt(courtVal) }) }); } catch(e){}
   }
-  try { await api(`/tournaments/${tid}/matches/${mid}/score`, { method: 'PUT', body: JSON.stringify(data) }); document.getElementById('score-modal').remove(); showToast('점수 저장!', 'success'); await loadMatches(tid); switchTab('matches'); } catch(e){}
+  try { await api(`/tournaments/${tid}/matches/${mid}/score`, { method: 'PUT', body: JSON.stringify(data) }); document.getElementById('score-modal').remove(); showToast('${SCORE_LABEL} 저장!', 'success'); await loadMatches(tid); switchTab('matches'); } catch(e){}
 }
 
 async function resetMatch(mid) {
@@ -2313,7 +2415,7 @@ function renderFinalsModal(data) {
         <h3 class="text-lg font-bold text-gray-900"><i class="fas fa-crown mr-2 text-yellow-500"></i>결선 토너먼트 생성</h3>
         <button onclick="document.getElementById('finals-modal').remove()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100"><i class="fas fa-times text-gray-400"></i></button>
       </div>
-      <p class="text-sm text-gray-500 mt-1">조별 리그 상위 팀이 결선 싱글 엘리미네이션 토너먼트(21점제)에 진출합니다.</p>
+      <p class="text-sm text-gray-500 mt-1">조별 리그 상위 팀이 결선 싱글 엘리미네이션 토너먼트(${SC.scoring ? SC.scoring.tournamentTargetScore : 21}${SCORE_UNIT}제)에 진출합니다.</p>
     </div>
     <div class="p-6 overflow-y-auto flex-1 space-y-5">
       <!-- 상위 N팀 선택 -->
@@ -2335,7 +2437,7 @@ function renderFinalsModal(data) {
       </label>
       <!-- 종목별 조별 현황 미리보기 -->
       <div>
-        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-chart-bar mr-1 text-blue-500"></i>종목별 조별 현황</h4>
+        <h4 class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-chart-bar mr-1 ${T.text500}"></i>종목별 조별 현황</h4>
         ${(data.events || []).map(ev => `
           <div class="mb-4 bg-gray-50 rounded-xl p-4">
             <div class="flex items-center justify-between mb-3">
@@ -2385,7 +2487,7 @@ function renderFinalsModal(data) {
 async function executeFinalsGeneration() {
   const topN = parseInt(document.querySelector('input[name="finals_topn"]:checked')?.value || '2');
   const avoidSameClub = document.getElementById('finals-avoid-club')?.checked;
-  if (!confirm(`조별 상위 ${topN}팀을 결선 토너먼트(21점제)에 진출시킵니다.\n\n기존 결선 경기가 있으면 재생성됩니다. 계속하시겠습니까?`)) return;
+  if (!confirm(`조별 상위 ${topN}팀을 결선 토너먼트(${SC.scoring ? SC.scoring.tournamentTargetScore : 21}${SCORE_UNIT}제)에 진출시킵니다.\n\n기존 결선 경기가 있으면 재생성됩니다. 계속하시겠습니까?`)) return;
 
   const tid = state.currentTournament.id;
   try {
@@ -2418,7 +2520,7 @@ function renderDashboard() {
   <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-gray-900 relative overflow-hidden">
     <div class="absolute inset-0 opacity-10">
       <div class="absolute top-10 right-20 w-32 h-32 rounded-full bg-orange-400 blur-3xl"></div>
-      <div class="absolute bottom-10 left-10 w-40 h-40 rounded-full bg-blue-400 blur-3xl"></div>
+      <div class="absolute bottom-10 left-10 w-40 h-40 rounded-full ${T.bg400} blur-3xl"></div>
     </div>
     <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 relative z-10">
       <!-- Top Bar -->
@@ -2457,19 +2559,19 @@ function renderDashboard() {
           <div class="text-[11px] sm:text-xs text-white/50 mt-0.5">${(ms.playing||0) > 0 ? `<span class="w-1.5 h-1.5 inline-block rounded-full bg-green-400 pulse-live mr-0.5"></span>${ms.playing}진행중 ` : ''}<i class="fas fa-gamepad mr-0.5"></i>경기</div>
         </div>
         <div class="bg-white/[0.07] backdrop-blur-sm rounded-xl p-3 sm:p-4 text-center border border-white/10">
-          <div class="text-2xl sm:text-3xl font-extrabold ${progress >= 100 ? 'text-emerald-400' : progress >= 50 ? 'text-blue-400' : 'text-white'}">${progress}<span class="text-lg">%</span></div>
+          <div class="text-2xl sm:text-3xl font-extrabold ${progress >= 100 ? 'text-green-400' : progress >= 50 ? T.text400 : 'text-white'}">${progress}<span class="text-lg">%</span></div>
           <div class="text-[11px] sm:text-xs text-white/50 mt-0.5"><i class="fas fa-chart-pie mr-1"></i>진행률</div>
-          ${(ms.total||0) > 0 ? `<div class="mt-1.5 w-full bg-white/10 rounded-full h-1"><div class="h-1 rounded-full transition-all ${progress >= 100 ? 'bg-emerald-400' : progress >= 50 ? 'bg-blue-400' : 'bg-yellow-400'}" style="width:${progress}%"></div></div>` : ''}
+          ${(ms.total||0) > 0 ? `<div class="mt-1.5 w-full bg-white/10 rounded-full h-1"><div class="h-1 rounded-full transition-all ${progress >= 100 ? 'bg-green-400' : progress >= 50 ? T.bg400 : 'bg-yellow-400'}" style="width:${progress}%"></div></div>` : ''}
         </div>
       </div>
       <!-- 경기 상세 현황 바 -->
       <div class="bg-white/[0.07] backdrop-blur-sm rounded-2xl p-4 border border-white/10">
         <div class="flex items-center justify-between mb-2">
           <span class="text-white/60 text-sm font-medium"><i class="fas fa-tasks mr-1.5"></i>경기 진행 현황</span>
-          <span class="text-2xl font-extrabold ${progress >= 100 ? 'text-emerald-400' : progress >= 50 ? 'text-blue-400' : 'text-yellow-400'}">${ms.completed||0}<span class="text-sm text-white/40">/${ms.total||0}</span></span>
+          <span class="text-2xl font-extrabold ${progress >= 100 ? 'text-green-400' : progress >= 50 ? T.text400 : 'text-yellow-400'}">${ms.completed||0}<span class="text-sm text-white/40">/${ms.total||0}</span></span>
         </div>
         <div class="w-full bg-white/10 rounded-full h-2.5 mb-3">
-          <div class="h-2.5 rounded-full transition-all duration-500 ${progress >= 100 ? 'bg-emerald-400' : progress >= 50 ? 'bg-blue-400' : 'bg-yellow-400'}" style="width:${progress}%"></div>
+          <div class="h-2.5 rounded-full transition-all duration-500 ${progress >= 100 ? 'bg-green-400' : progress >= 50 ? T.bg400 : 'bg-yellow-400'}" style="width:${progress}%"></div>
         </div>
         <div class="grid grid-cols-3 gap-3">
           <div class="flex items-center gap-2 justify-center">
@@ -2483,9 +2585,9 @@ function renderDashboard() {
             <span class="text-yellow-400 font-extrabold text-lg">${ms.pending || 0}</span>
           </div>
           <div class="flex items-center gap-2 justify-center">
-            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+            <span class="w-2 h-2 rounded-full ${T.bg400}"></span>
             <span class="text-white/60 text-xs">완료</span>
-            <span class="text-blue-400 font-extrabold text-lg">${ms.completed || 0}</span>
+            <span class="${T.text400} font-extrabold text-lg">${ms.completed || 0}</span>
           </div>
         </div>
       </div>
@@ -2506,7 +2608,7 @@ function renderDashboard() {
         <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center mr-2.5 shadow-md shadow-indigo-500/20"><i class="fas fa-users text-white text-xs"></i></div>참가자 현황</h3>
         <div class="grid grid-cols-3 gap-3 mb-4">
           <div class="text-center bg-gray-50 rounded-xl p-3 border border-gray-100 hover:border-gray-300 transition"><div class="text-xl font-extrabold">${ps.total || 0}</div><div class="text-xs text-gray-500">총 참가자</div></div>
-          <div class="text-center bg-blue-50 rounded-xl p-3 border border-blue-100 hover:border-blue-300 transition"><div class="text-xl font-extrabold text-blue-600">${ps.male || 0}</div><div class="text-xs text-gray-500">남자</div></div>
+          <div class="text-center ${T.bg50} rounded-xl p-3 border ${T.border100} ${T.hoverBorder} transition"><div class="text-xl font-extrabold ${T.text600}">${ps.male || 0}</div><div class="text-xs text-gray-500">남자</div></div>
           <div class="text-center bg-pink-50 rounded-xl p-3 border border-pink-100 hover:border-pink-300 transition"><div class="text-xl font-extrabold text-pink-600">${ps.female || 0}</div><div class="text-xs text-gray-500">여자</div></div>
         </div>
         <div class="space-y-3">
@@ -2515,8 +2617,8 @@ function renderDashboard() {
             <div class="flex items-center gap-2"><div class="w-28 bg-gray-200 rounded-full h-2"><div class="bg-green-500 h-2 rounded-full transition-all" style="width:${ps.total ? Math.round((ps.paid||0)/ps.total*100) : 0}%"></div></div><span class="font-bold text-sm">${ps.paid||0}<span class="text-gray-400 font-normal">/${ps.total||0}</span></span></div>
           </div>
           <div class="flex items-center justify-between text-sm">
-            <span class="text-gray-600"><i class="fas fa-check-circle mr-1.5 text-blue-500"></i>체크인</span>
-            <div class="flex items-center gap-2"><div class="w-28 bg-gray-200 rounded-full h-2"><div class="bg-blue-500 h-2 rounded-full transition-all" style="width:${ps.total ? Math.round((ps.checked_in||0)/ps.total*100) : 0}%"></div></div><span class="font-bold text-sm">${ps.checked_in||0}<span class="text-gray-400 font-normal">/${ps.total||0}</span></span></div>
+            <span class="text-gray-600"><i class="fas fa-check-circle mr-1.5 ${T.text500}"></i>체크인</span>
+            <div class="flex items-center gap-2"><div class="w-28 bg-gray-200 rounded-full h-2"><div class="${T.bg500} h-2 rounded-full transition-all" style="width:${ps.total ? Math.round((ps.checked_in||0)/ps.total*100) : 0}%"></div></div><span class="font-bold text-sm">${ps.checked_in||0}<span class="text-gray-400 font-normal">/${ps.total||0}</span></span></div>
           </div>
           <div class="flex items-center justify-between text-sm">
             <span class="text-gray-600"><i class="fas fa-venus-mars mr-1.5 text-purple-500"></i>혼합복식 참가</span>
@@ -2547,7 +2649,7 @@ function renderDashboard() {
 
     <!-- 종목별 경기 현황 -->
     <div class="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 mb-4 sm:mb-6 shadow-sm hover:shadow-md transition-shadow">
-      <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center mr-2.5 shadow-md shadow-emerald-500/20"><i class="fas fa-layer-group text-white text-xs"></i></div>종목별 현황</h3>
+      <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br ${T.gradFrom} ${T.gradTo} flex items-center justify-center mr-2.5 shadow-md shadow-${P}-500/20"><i class="fas fa-layer-group text-white text-xs"></i></div>종목별 현황</h3>
       ${(d.event_stats || []).length > 0 ? `<div class="overflow-x-auto rounded-xl border border-gray-100">
         <table class="w-full">
           <thead class="bg-gray-50 border-b border-gray-200"><tr>
@@ -2569,8 +2671,8 @@ function renderDashboard() {
                 <td class="px-3 py-3 text-center font-bold text-sm">${ev.team_count}</td>
                 <td class="px-3 py-3 text-center text-sm text-gray-600">${ev.total_matches}</td>
                 <td class="px-3 py-3 text-center text-sm"><span class="${ev.playing_matches > 0 ? 'text-green-600 font-bold' : 'text-gray-400'}">${ev.playing_matches}</span></td>
-                <td class="px-3 py-3 text-center text-sm text-blue-600 font-medium">${ev.completed_matches}</td>
-                <td class="px-3 py-3"><div class="flex items-center gap-2"><div class="flex-1 bg-gray-200 rounded-full h-2"><div class="${evPct >= 100 ? 'bg-emerald-500' : 'bg-blue-500'} h-2 rounded-full transition-all" style="width:${evPct}%"></div></div><span class="text-xs font-bold w-9 text-right ${evPct >= 100 ? 'text-emerald-600' : 'text-gray-600'}">${evPct}%</span></div></td>
+                <td class="px-3 py-3 text-center text-sm ${T.text600} font-medium">${ev.completed_matches}</td>
+                <td class="px-3 py-3"><div class="flex items-center gap-2"><div class="flex-1 bg-gray-200 rounded-full h-2"><div class="${evPct >= 100 ? 'bg-green-500' : T.bg500} h-2 rounded-full transition-all" style="width:${evPct}%"></div></div><span class="text-xs font-bold w-9 text-right ${evPct >= 100 ? 'text-green-600' : 'text-gray-600'}">${evPct}%</span></div></td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -2591,7 +2693,7 @@ function renderDashboard() {
             ${ct.playing > 0 ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-bold border border-green-200"><span class="w-1.5 h-1.5 rounded-full bg-green-500 pulse-live"></span>경기중</span>' : '<span class="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs font-medium border border-gray-200">대기</span>'}
             <div class="flex items-center justify-center gap-3 text-xs text-gray-500 mt-2">
               <span><i class="fas fa-clock mr-0.5 text-yellow-500"></i>${ct.pending}</span>
-              <span><i class="fas fa-check mr-0.5 text-blue-500"></i>${ct.completed}</span>
+              <span><i class="fas fa-check mr-0.5 ${T.text500}"></i>${ct.completed}</span>
             </div>
           </div>
         `).join('')}
@@ -2621,7 +2723,7 @@ function renderDashboard() {
                 <td class="px-3 py-3 text-center text-sm">${cl.team_count}</td>
                 <td class="px-3 py-3 text-center text-sm text-green-600 font-bold">${cl.wins}</td>
                 <td class="px-3 py-3 text-center text-sm text-red-500 font-medium">${cl.losses}</td>
-                <td class="px-3 py-3 text-center"><div class="inline-flex items-center gap-1.5"><div class="w-12 bg-gray-200 rounded-full h-1.5"><div class="${cl.win_rate >= 60 ? 'bg-green-500' : cl.win_rate >= 40 ? 'bg-blue-500' : 'bg-gray-400'} h-1.5 rounded-full" style="width:${cl.win_rate}%"></div></div><span class="font-bold text-sm ${cl.win_rate >= 60 ? 'text-green-600' : cl.win_rate >= 40 ? 'text-blue-600' : 'text-gray-600'}">${cl.win_rate}%</span></div></td>
+                <td class="px-3 py-3 text-center"><div class="inline-flex items-center gap-1.5"><div class="w-12 bg-gray-200 rounded-full h-1.5"><div class="${cl.win_rate >= 60 ? 'bg-green-500' : cl.win_rate >= 40 ? T.bg500 : 'bg-gray-400'} h-1.5 rounded-full" style="width:${cl.win_rate}%"></div></div><span class="font-bold text-sm ${cl.win_rate >= 60 ? 'text-green-600' : cl.win_rate >= 40 ? T.text600 : 'text-gray-600'}">${cl.win_rate}%</span></div></td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -2733,7 +2835,7 @@ function renderMyResult(data) {
         </div>
         <div class="flex items-center gap-2 flex-shrink-0 sm:ml-auto">
           ${p.paid ? '<span class="inline-flex items-center gap-1 px-2.5 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-bold border border-green-200"><i class="fas fa-check-circle text-[10px]"></i>참가비 완납</span>' : '<span class="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-200"><i class="fas fa-times-circle text-[10px]"></i>미납</span>'}
-          ${p.checked_in ? '<span class="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold border border-blue-200"><i class="fas fa-check text-[10px]"></i>체크인</span>' : ''}
+          ${p.checked_in ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 ${T.bg100} ${T.text700} rounded-lg text-xs font-bold border ${T.border200}"><i class="fas fa-check text-[10px]"></i>체크인</span>` : ''}
         </div>
       </div>
     </div>
@@ -2755,9 +2857,9 @@ function renderMyResult(data) {
         <div class="text-xl sm:text-2xl font-extrabold text-red-500">${rec.losses || 0}</div>
         <div class="text-[11px] text-gray-500 mt-0.5">패</div>
       </div>
-      <div class="bg-white rounded-xl border border-blue-200 p-3 sm:p-4 text-center shadow-sm hover:shadow-md transition-shadow">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 mx-auto mb-1.5 flex items-center justify-center shadow-md"><i class="fas fa-chart-line text-white text-xs"></i></div>
-        <div class="text-xl sm:text-2xl font-extrabold text-blue-600">${rec.total_score && rec.total_lost ? `${rec.total_score > rec.total_lost ? '+' : ''}${rec.total_score - rec.total_lost}` : '0'}</div>
+      <div class="bg-white rounded-xl border ${T.border200} p-3 sm:p-4 text-center shadow-sm hover:shadow-md transition-shadow">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br ${T.gradFrom} ${T.gradTo} mx-auto mb-1.5 flex items-center justify-center shadow-md"><i class="fas fa-chart-line text-white text-xs"></i></div>
+        <div class="text-xl sm:text-2xl font-extrabold ${T.text600}">${rec.total_score && rec.total_lost ? `${rec.total_score > rec.total_lost ? '+' : ''}${rec.total_score - rec.total_lost}` : '0'}</div>
         <div class="text-[11px] text-gray-500 mt-0.5">득실차</div>
       </div>
     </div>
@@ -2767,16 +2869,16 @@ function renderMyResult(data) {
     <div class="bg-white rounded-2xl border border-gray-200 p-4 mb-4 sm:mb-6 shadow-sm">
       <div class="flex items-center justify-between mb-2">
         <span class="text-sm font-semibold text-gray-600"><i class="fas fa-percentage mr-1.5 text-indigo-500"></i>승률</span>
-        <span class="text-lg font-extrabold ${winRate >= 60 ? 'text-green-600' : winRate >= 40 ? 'text-blue-600' : 'text-red-500'}">${winRate}%</span>
+        <span class="text-lg font-extrabold ${winRate >= 60 ? 'text-green-600' : winRate >= 40 ? T.text600 : 'text-red-500'}">${winRate}%</span>
       </div>
       <div class="w-full bg-gray-200 rounded-full h-2.5">
-        <div class="${winRate >= 60 ? 'bg-green-500' : winRate >= 40 ? 'bg-blue-500' : 'bg-red-400'} h-2.5 rounded-full transition-all duration-500" style="width:${winRate}%"></div>
+        <div class="${winRate >= 60 ? 'bg-green-500' : winRate >= 40 ? T.bg500 : 'bg-red-400'} h-2.5 rounded-full transition-all duration-500" style="width:${winRate}%"></div>
       </div>
     </div>` : ''}
 
     <!-- 소속 팀 -->
     <div class="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 mb-4 sm:mb-6 shadow-sm hover:shadow-md transition-shadow">
-      <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center mr-2.5 shadow-md shadow-emerald-500/20"><i class="fas fa-users text-white text-xs"></i></div>소속 팀</h3>
+      <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br ${T.gradFrom} ${T.gradTo} flex items-center justify-center mr-2.5 shadow-md shadow-${P}-500/20"><i class="fas fa-users text-white text-xs"></i></div>소속 팀</h3>
       ${teams.length === 0 ? '<div class="text-center py-6 text-gray-400"><i class="fas fa-user-friends text-2xl mb-2"></i><p class="text-sm">배정된 팀이 없습니다.</p></div>' : `<div class="space-y-2.5">
         ${teams.map(t => {
           const catBg = t.event_name?.includes('남자') ? 'border-l-blue-500' : t.event_name?.includes('여자') ? 'border-l-pink-500' : t.event_name?.includes('혼합') ? 'border-l-purple-500' : 'border-l-gray-400';
@@ -2834,7 +2936,7 @@ function renderMyResult(data) {
     <!-- 완료된 경기 결과 -->
     ${completed.length > 0 ? `
     <div class="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
-      <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center mr-2.5 shadow-md shadow-blue-500/20"><i class="fas fa-history text-white text-xs"></i></div>경기 결과 <span class="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">${completed.length}</span></h3>
+      <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><div class="w-8 h-8 rounded-lg bg-gradient-to-br ${T.gradFrom} ${T.gradTo} flex items-center justify-center mr-2.5 shadow-md shadow-${P}-500/20"><i class="fas fa-history text-white text-xs"></i></div>경기 결과 <span class="ml-2 px-2 py-0.5 ${T.bg100} ${T.text700} rounded-full text-xs font-bold">${completed.length}</span></h3>
       <div class="space-y-3">
         ${completed.map(m => {
           const isTeam1 = teams.some(t => t.id === m.team1_id);

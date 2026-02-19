@@ -1,3 +1,4 @@
+import { sportConfig } from '../config'
 // ═══════════════════════════════════════════════
 // Push 알림 서비스 — 경기 알림 발송 핵심 로직
 // ═══════════════════════════════════════════════
@@ -42,7 +43,7 @@ export async function sendMatchNotifications(
 
     const isStarting = notificationType === 'match_starting'
     const payload = JSON.stringify({
-      title: isStarting ? '🏸 경기 시작!' : '🏸 다음 경기 준비',
+      title: isStarting ? sportConfig.notifications.matchStart : sportConfig.notifications.matchReady,
       body: isStarting
         ? `코트 ${courtNumber}에서 경기가 시작됩니다!\n${team1Name} vs ${team2Name}`
         : `코트 ${courtNumber} 다음 경기에 출전합니다. 준비해주세요!\n${team1Name} vs ${team2Name}`,

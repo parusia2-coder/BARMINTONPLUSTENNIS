@@ -48,7 +48,7 @@ bracketRoutes.post('/:tid/brackets/generate', async (c) => {
       `SELECT t.*, t.group_num, p1.club as p1_club, p2.club as p2_club
        FROM teams t
        JOIN participants p1 ON t.player1_id = p1.id
-       JOIN participants p2 ON t.player2_id = p2.id
+       LEFT JOIN participants p2 ON t.player2_id = p2.id
        WHERE t.event_id=? ORDER BY t.group_num ASC, t.id ASC`
     ).bind(eid).all()
 
@@ -414,7 +414,7 @@ bracketRoutes.post('/:tid/brackets/generate-finals', async (c) => {
               p1.club as p1_club, p2.club as p2_club
        FROM teams t
        JOIN participants p1 ON t.player1_id = p1.id
-       JOIN participants p2 ON t.player2_id = p2.id
+       LEFT JOIN participants p2 ON t.player2_id = p2.id
        WHERE t.event_id=? AND t.group_num IS NOT NULL
        ORDER BY t.group_num ASC`
     ).bind(eid).all()

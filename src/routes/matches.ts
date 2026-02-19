@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { sendMatchNotifications } from '../services/pushService'
+import { sportConfig } from '../config'
 
 type Bindings = {
   DB: D1Database
@@ -41,7 +42,7 @@ matchRoutes.get('/:tid/matches', async (c) => {
   const tournament = await db.prepare(
     `SELECT format FROM tournaments WHERE id=? AND deleted=0`
   ).bind(tid).first() as any
-  const targetScore = tournament?.format === 'tournament' ? 21 : 25
+  const targetScore = tournament?.target_games || (tournament?.format === 'tournament' ? sportConfig.scoring.tournamentTargetScore : sportConfig.scoring.defaultTargetScore)
 
   return c.json({ matches: results, target_score: targetScore, format: tournament?.format })
 })
@@ -338,8 +339,8 @@ matchRoutes.get('/:tid/court/:courtNum', async (c) => {
     `SELECT name, courts, format FROM tournaments WHERE id=? AND deleted=0`
   ).bind(tid).first()
 
-  // 점수 규칙: 예선(kdk/league) = 25점, 본선(tournament) = 21점
-  const targetScore = (tournament as any)?.format === 'tournament' ? 21 : 25
+  // 점수 규칙: 대회 설정 또는 sportConfig 기본값 사용
+  const targetScore = tournament?.target_games || (tournament?.format === 'tournament' ? sportConfig.scoring.tournamentTargetScore : sportConfig.scoring.defaultTargetScore)
 
   return c.json({
     tournament,
@@ -428,7 +429,7 @@ matchRoutes.get('/:tid/courts/overview', async (c) => {
 
   if (!tournament) return c.json({ error: '대회를 찾을 수 없습니다.' }, 404)
 
-  const targetScore = tournament.format === 'tournament' ? 21 : 25
+  const targetScore = tournament.target_games || (tournament.format === 'tournament' ? sportConfig.scoring.tournamentTargetScore : sportConfig.scoring.defaultTargetScore)
 
   const courts: any[] = []
   for (let i = 1; i <= (tournament.courts || 2); i++) {
@@ -669,7 +670,7 @@ matchRoutes.get('/:tid/my-matches', async (c) => {
     FROM teams t
     JOIN events e ON t.event_id = e.id
     JOIN participants p1 ON t.player1_id = p1.id
-    JOIN participants p2 ON t.player2_id = p2.id
+    LEFT JOIN participants p2 ON t.player2_id = p2.id
     WHERE (t.player1_id=? OR t.player2_id=?) AND t.tournament_id=?
   `).bind(participant.id, participant.id, tid).all()
 
@@ -740,7 +741,7 @@ matchRoutes.get('/:tid/my-matches-by-id/:pid', async (c) => {
     FROM teams t
     JOIN events e ON t.event_id = e.id
     JOIN participants p1 ON t.player1_id = p1.id
-    JOIN participants p2 ON t.player2_id = p2.id
+    LEFT JOIN participants p2 ON t.player2_id = p2.id
     WHERE (t.player1_id=? OR t.player2_id=?) AND t.tournament_id=?
   `).bind(pid, pid, tid).all()
 

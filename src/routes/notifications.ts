@@ -1,3 +1,4 @@
+import { sportConfig } from '../config'
 import { Hono } from 'hono'
 import { sendWebPush } from '../utils/crypto'
 
@@ -85,7 +86,7 @@ notificationRoutes.post('/:tid/push/test', async (c) => {
   if (!subs.results?.length) return c.json({ error: '등록된 알림 구독이 없습니다' }, 404)
 
   const payload = JSON.stringify({
-    title: '🏸 알림 테스트',
+    title: sportConfig.notifications.testTitle,
     body: `${name}님, 알림이 정상적으로 작동합니다!`,
     tag: 'test',
     url: `/my?tid=${tid}`

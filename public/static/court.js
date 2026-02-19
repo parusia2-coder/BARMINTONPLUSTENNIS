@@ -1,9 +1,17 @@
 // ==========================================
-// 코트 전용 점수판 - Court Scoreboard
-// 좌우 레이아웃 + 터치 점수 입력 + 자동 코트 교체
-// 1세트 단판 경기 전용
+// 코트 전용 스코어보드 - Court Scoreboard
+// 좌우 레이아웃 + 터치 스코어 입력 + 자동 체인지오버
 // ==========================================
 const API = '/api';
+const SC = window.SPORT_CONFIG || {};
+const P = (SC.theme && SC.theme.primaryClass) || 'blue';
+const SCORE_UNIT = (SC.scoring && SC.scoring.scoreUnit) || '점';
+const SWAP_LABEL = (SC.scoring && SC.scoring.swapLabel) || '교체';
+const SWAP_DESC = (SC.scoring && SC.scoring.swapDescription) || '중간 교체';
+const EMOJI = SC.emoji || '🏸';
+const BOARD_NAME = (SC.terms && SC.terms.scoreBoard) || '점수판';
+const HALF1 = (SC.terms && SC.terms.half1) || '전반';
+const HALF2 = (SC.terms && SC.terms.half2) || '후반';
 
 const courtState = {
   tournamentId: null,
@@ -35,9 +43,15 @@ const courtState = {
   autoNext: true       // 경기 종료 후 자동으로 다음 경기 로딩
 };
 
-// 중간 교체 점수 계산
+// 중간 교체(체인지오버) 점수 계산
 function getSwapScore() {
-  return courtState.targetScore === 21 ? 11 : 13;
+  const swapInterval = SC.scoring && SC.scoring.swapInterval;
+  if (swapInterval && swapInterval > 0) {
+    // 테니스: 매 N게임마다 (예: 2게임마다 → 첫 교체는 2 이후)
+    return swapInterval;
+  }
+  // 배드민턴: 중간점 자동 계산 (21→11, 25→13)
+  return courtState.targetScore === 21 ? 11 : Math.ceil(courtState.targetScore / 2);
 }
 
 // 실제 팀 점수 ↔ left/right 매핑
@@ -70,7 +84,7 @@ async function courtApi(path, options = {}) {
 // Toast
 function showCourtToast(msg, type = 'info') {
   const t = document.createElement('div');
-  const c = { info: 'bg-blue-600', success: 'bg-green-600', error: 'bg-red-600', warning: 'bg-yellow-500 text-gray-900' };
+  const c = { info: `bg-${P}-600`, success: 'bg-green-600', error: 'bg-red-600', warning: 'bg-yellow-500 text-gray-900' };
   t.className = `fixed top-4 left-1/2 -translate-x-1/2 z-[9999] px-6 py-3 rounded-2xl text-white shadow-2xl ${c[type]} text-lg font-bold fade-in`;
   t.textContent = msg;
   document.body.appendChild(t);
@@ -110,7 +124,7 @@ function renderCourtSelect() {
     <div class="flex items-center justify-between px-6 py-4 border-b border-white/10">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center"><svg viewBox="0 0 32 32" fill="white" width="22" height="22"><ellipse cx="16" cy="8" rx="5" ry="6"/><path d="M11 12c0 0-3 4-3 10 0 2 1.5 4 4 5l4 1 4-1c2.5-1 4-3 4-5 0-6-3-10-3-10" fill="white" opacity="0.85"/><line x1="13" y1="14" x2="13" y2="26" stroke="white" stroke-width="0.5" opacity="0.4"/><line x1="16" y1="12" x2="16" y2="28" stroke="white" stroke-width="0.5" opacity="0.4"/><line x1="19" y1="14" x2="19" y2="26" stroke="white" stroke-width="0.5" opacity="0.4"/></svg></div>
-        <div><h1 class="text-xl font-bold">코트 점수판</h1><p class="text-xs text-gray-400">Court Scoreboard</p></div>
+        <div><h1 class="text-xl font-bold">코트 ${BOARD_NAME}</h1><p class="text-xs text-gray-400">Court Scoreboard</p></div>
       </div>
       <a href="/" class="text-sm text-gray-400 hover:text-white"><i class="fas fa-home mr-1"></i>메인</a>
     </div>
@@ -120,7 +134,7 @@ function renderCourtSelect() {
           <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-green-400 to-green-600 mb-4 shadow-lg">
             <i class="fas fa-tv text-3xl text-white"></i>
           </div>
-          <h2 class="text-3xl font-extrabold mb-2">코트 점수판</h2>
+          <h2 class="text-3xl font-extrabold mb-2">코트 ${BOARD_NAME}</h2>
           <p class="text-gray-400">코트에 배치할 태블릿에서 사용하세요</p>
           <div class="mt-3 flex flex-wrap justify-center gap-2">
             <span class="text-xs text-gray-500">고정 URL: /court?tid=대회ID&court=코트번호&locked=1</span>
@@ -191,17 +205,17 @@ function renderSideSelect() {
     <!-- 메인 -->
     <div class="flex-1 flex flex-col items-center justify-center px-6">
       <div class="text-center mb-6">
-        <div class="w-20 h-20 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto mb-4">
-          <i class="fas fa-arrows-alt-h text-4xl text-blue-400"></i>
+        <div class="w-20 h-20 rounded-full bg-${P}-500/20 flex items-center justify-center mx-auto mb-4">
+          <i class="fas fa-arrows-alt-h text-4xl text-${P}-400"></i>
         </div>
         <h2 class="text-2xl sm:text-3xl font-extrabold mb-2">코트 사이드 선택</h2>
         <p class="text-gray-400 text-sm sm:text-base">각 팀이 시작할 코트 위치를 선택하세요</p>
         <div class="mt-3 flex flex-wrap justify-center gap-2">
           <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold ${target === 21 ? 'bg-red-500/20 text-red-300' : 'bg-yellow-500/20 text-yellow-300'}">
-            <i class="fas fa-bullseye"></i>${target}점 선취 · ${courtState.format === 'tournament' ? '본선' : '예선'}
+            <i class="fas fa-bullseye"></i>${target}${SCORE_UNIT} 선취 · ${courtState.format === 'tournament' ? '본선' : '예선'}
           </span>
           <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300">
-            <i class="fas fa-exchange-alt"></i>${swapPt}점 도달 시 코트 교체
+            <i class="fas fa-exchange-alt"></i>${swapPt}${SCORE_UNIT} 도달 시 ${SWAP_LABEL}
           </span>
         </div>
       </div>
@@ -212,12 +226,12 @@ function renderSideSelect() {
           <!-- 코트 시각화 -->
           <div class="flex">
             <!-- 왼쪽 -->
-            <div class="flex-1 p-5 sm:p-8 text-center border-r border-white/10 bg-blue-500/5">
+            <div class="flex-1 p-5 sm:p-8 text-center border-r border-white/10 bg-${P}-500/5">
               <p class="text-xs text-gray-500 mb-2 uppercase tracking-wider">왼쪽 코트</p>
-              <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-blue-500/20 border-2 border-blue-500/40 flex items-center justify-center mx-auto mb-2">
-                <i class="fas fa-user-friends text-xl sm:text-2xl text-blue-400"></i>
+              <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-${P}-500/20 border-2 border-${P}-500/40 flex items-center justify-center mx-auto mb-2">
+                <i class="fas fa-user-friends text-xl sm:text-2xl text-${P}-400"></i>
               </div>
-              <p class="text-lg sm:text-xl font-bold text-blue-400" id="side-left-name">${courtState.leftTeam === 1 ? team1Name : team2Name}</p>
+              <p class="text-lg sm:text-xl font-bold text-${P}-400" id="side-left-name">${courtState.leftTeam === 1 ? team1Name : team2Name}</p>
             </div>
             <!-- 네트 -->
             <div class="flex items-center">
@@ -287,8 +301,8 @@ function renderCourtScoreboard() {
   const rightName = getRightName();
 
   // 교체 진행 표시
-  const halfLabel = courtState.swapDone ? '후반' : '전반';
-  const swapInfo = courtState.swapDone ? '교체완료' : `${swapPt}점 교체`;
+  const halfLabel = courtState.swapDone ? HALF2 : HALF1;
+  const swapInfo = courtState.swapDone ? '교체완료' : `${swapPt}${SCORE_UNIT} ${SWAP_LABEL}`;
 
   return `<div class="h-screen bg-gray-900 text-white flex flex-col select-none" style="touch-action:manipulation;overflow:hidden;">
     <!-- 상단 정보 바 -->
@@ -315,12 +329,12 @@ function renderCourtScoreboard() {
       
       <!-- 왼쪽 팀 (터치 영역) -->
       <div id="left-zone" class="flex-1 flex flex-col items-center justify-center relative cursor-pointer touch-area
-        ${sL > sR ? 'bg-gradient-to-r from-blue-900/30 to-transparent' : ''}
+        ${sL > sR ? 'bg-gradient-to-r from-${P}-900/30 to-transparent' : ''}
         ${sL >= target ? 'winner-glow-left' : ''}"
         style="border-right: 3px solid rgba(255,255,255,0.1);">
         
         <div class="absolute top-3 left-0 right-0 text-center">
-          <p class="text-lg sm:text-xl font-bold text-blue-400 truncate px-4">${leftName}</p>
+          <p class="text-lg sm:text-xl font-bold text-${P}-400 truncate px-4">${leftName}</p>
         </div>
 
         <div class="text-center" id="left-score-display">
@@ -387,7 +401,7 @@ function renderCourtScoreboard() {
         <button onclick="undoLastAction()" class="flex-1 py-2.5 bg-white/10 rounded-xl text-xs sm:text-sm font-medium hover:bg-white/20 active:scale-95 transition">
           <i class="fas fa-undo mr-1"></i>취소
         </button>
-        <button onclick="saveCurrentScore()" class="flex-1 py-2.5 bg-blue-600 rounded-xl text-xs sm:text-sm font-bold hover:bg-blue-500 shadow-lg active:scale-95 transition">
+        <button onclick="saveCurrentScore()" class="flex-1 py-2.5 bg-${P}-600 rounded-xl text-xs sm:text-sm font-bold hover:bg-${P}-500 shadow-lg active:scale-95 transition">
           <i class="fas fa-save mr-1"></i>저장
         </button>
         <button onclick="showFinishModal()" class="flex-1 py-2.5 bg-green-600 rounded-xl text-xs sm:text-sm font-bold hover:bg-green-500 shadow-lg active:scale-95 transition">
@@ -422,13 +436,13 @@ function renderSwapModal() {
         <div class="w-24 h-24 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
           <i class="fas fa-exchange-alt text-5xl text-purple-400 animate-pulse"></i>
         </div>
-        <h3 class="text-3xl font-extrabold text-purple-300">코트 교체!</h3>
-        <p class="text-gray-400 mt-2 text-base">${swapPt}점 도달 — 후반전을 위해 코트를 교체합니다</p>
+        <h3 class="text-3xl font-extrabold text-purple-300">${SWAP_LABEL}!</h3>
+        <p class="text-gray-400 mt-2 text-base">${swapPt}${SCORE_UNIT} 도달 — ${SWAP_LABEL}합니다</p>
       </div>
       <div class="bg-white/5 rounded-2xl p-5 mb-5">
         <div class="flex items-center justify-center gap-5">
           <div class="text-center flex-1">
-            <p class="text-sm text-blue-400 font-bold mb-1">${leftName}</p>
+            <p class="text-sm text-${P}-400 font-bold mb-1">${leftName}</p>
             <p class="text-3xl font-black">${courtState.score.left}</p>
             <p class="text-xs text-gray-500 mt-1">→ 오른쪽으로</p>
           </div>
@@ -444,7 +458,7 @@ function renderSwapModal() {
       </div>
       <button onclick="executeAutoSwap()" 
         class="w-full py-5 bg-gradient-to-r from-purple-600 to-purple-500 rounded-2xl text-xl font-bold shadow-xl active:scale-95 transition hover:from-purple-500 hover:to-purple-400">
-        <i class="fas fa-exchange-alt mr-2"></i>코트 교체 확인
+        <i class="fas fa-exchange-alt mr-2"></i>${SWAP_LABEL} 확인
       </button>
     </div>
   </div>`;
@@ -472,7 +486,7 @@ function executeAutoSwap() {
   courtState.swapDone = true;
 
   renderCourt();
-  showCourtToast('🔄 코트 교체 완료!', 'success');
+  showCourtToast('🔄 ${SWAP_LABEL} 완료!', 'success');
 }
 
 function renderFinishModal() {
@@ -489,7 +503,7 @@ function renderFinishModal() {
       <div class="mb-6">
         <div class="flex items-center justify-between bg-white/5 rounded-xl px-6 py-4">
           <div class="text-center flex-1">
-            <p class="text-sm text-blue-400 font-medium mb-1">${leftName}</p>
+            <p class="text-sm text-${P}-400 font-medium mb-1">${leftName}</p>
             <p class="text-4xl font-black ${sL > sR ? 'text-yellow-400' : ''}">${sL}</p>
           </div>
           <span class="text-2xl text-gray-600 font-bold mx-4">:</span>
@@ -502,8 +516,8 @@ function renderFinishModal() {
       <div class="mb-6">
         <p class="text-sm text-gray-400 mb-3 text-center">승자를 선택하세요</p>
         <div class="grid grid-cols-2 gap-3">
-          <button onclick="selectWinner('left')" id="winner-btn-left" class="py-4 bg-blue-600/30 border-2 border-blue-500/30 rounded-2xl text-center hover:bg-blue-600/50 transition">
-            <p class="font-bold text-blue-400">${leftName}</p>
+          <button onclick="selectWinner('left')" id="winner-btn-left" class="py-4 bg-${P}-600/30 border-2 border-${P}-500/30 rounded-2xl text-center hover:bg-${P}-600/50 transition">
+            <p class="font-bold text-${P}-400">${leftName}</p>
             <p class="text-3xl font-black mt-1">${sL}</p>
           </button>
           <button onclick="selectWinner('right')" id="winner-btn-right" class="py-4 bg-orange-600/30 border-2 border-orange-500/30 rounded-2xl text-center hover:bg-orange-600/50 transition">
@@ -549,10 +563,10 @@ function renderWaitingScreen() {
         <p class="text-gray-400">다음 경기를 시작해주세요</p>
         <div class="mt-3 flex flex-wrap justify-center gap-2">
           <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold ${courtState.targetScore === 21 ? 'bg-red-500/20 text-red-300' : 'bg-yellow-500/20 text-yellow-300'}">
-            <i class="fas fa-bullseye"></i>${courtState.targetScore}점 선취제 · 1세트 단판
+            <i class="fas fa-bullseye"></i>${courtState.targetScore}${SCORE_UNIT} 선취제
           </span>
           <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300">
-            <i class="fas fa-exchange-alt"></i>${swapPt}점 코트 교체
+            <i class="fas fa-exchange-alt"></i>${swapPt}${SCORE_UNIT} ${SWAP_LABEL}
           </span>
         </div>
       </div>
@@ -655,7 +669,7 @@ function getProgressLabel() {
   if (sL >= target && sL > sR) return '경기 종료!';
   if (sR >= target && sR > sL) return '경기 종료!';
   if (maxScore === target - 1) return '매치포인트!';
-  if (maxScore >= target - 3) return `${target - maxScore}점 남음`;
+  if (maxScore >= target - 3) return `${target - maxScore}${SCORE_UNIT} 남음`;
   return `${sL} : ${sR}`;
 }
 
@@ -686,7 +700,7 @@ function manualSwapSides() {
 
   courtState.swapped = !courtState.swapped;
 
-  showCourtToast('🔄 좌우 교체!', 'info');
+  showCourtToast('🔄 좌우 ${SWAP_LABEL}!', 'info');
   renderCourt();
 }
 
@@ -793,7 +807,7 @@ async function saveCurrentScore() {
     await courtApi(`/tournaments/${courtState.tournamentId}/matches/${m.id}/score`, {
       method: 'PUT', body: JSON.stringify(data)
     });
-    showCourtToast('점수 저장됨!', 'success');
+    showCourtToast('${SC.scoring?.scoreLabel || '점수'} 저장됨!', 'success');
   } catch(e) {}
 }
 
@@ -828,7 +842,7 @@ function selectWinner(side) {
   const confirmBtn = document.getElementById('confirm-finish-btn');
   
   if (btnL && btnR) {
-    btnL.className = `py-4 rounded-2xl text-center transition ${side === 'left' ? 'bg-blue-600 border-2 border-blue-400 ring-4 ring-blue-500/30 shadow-xl' : 'bg-white/5 border-2 border-white/10'}`;
+    btnL.className = `py-4 rounded-2xl text-center transition ${side === 'left' ? 'bg-${P}-600 border-2 border-${P}-400 ring-4 ring-${P}-500/30 shadow-xl' : 'bg-white/5 border-2 border-white/10'}`;
     btnR.className = `py-4 rounded-2xl text-center transition ${side === 'right' ? 'bg-orange-600 border-2 border-orange-400 ring-4 ring-orange-500/30 shadow-xl' : 'bg-white/5 border-2 border-white/10'}`;
   }
   if (confirmBtn) confirmBtn.disabled = false;
@@ -948,16 +962,16 @@ function renderSignatureScreen() {
         <div class="w-6 border-t border-white/20 self-center"></div>
         <div class="flex items-center gap-1.5">
           <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
-            ${signatureStep === 'loser' ? 'bg-blue-500 text-white' : signaturePads.loser ? 'bg-green-500 text-white' : 'bg-white/10 text-gray-500'}">
+            ${signatureStep === 'loser' ? 'bg-${P}-500 text-white' : signaturePads.loser ? 'bg-green-500 text-white' : 'bg-white/10 text-gray-500'}">
             ${signaturePads.loser ? '✓' : '2'}
           </div>
-          <span class="text-xs ${signatureStep === 'loser' ? 'text-blue-300 font-bold' : 'text-gray-500'}">패배팀</span>
+          <span class="text-xs ${signatureStep === 'loser' ? 'text-${P}-300 font-bold' : 'text-gray-500'}">패배팀</span>
         </div>
       </div>
 
       <!-- 현재 서명 대상 -->
       <div class="text-center mb-2 shrink-0">
-        <p class="text-base font-bold ${signatureStep === 'winner' ? 'text-yellow-400' : 'text-blue-400'}">
+        <p class="text-base font-bold ${signatureStep === 'winner' ? 'text-yellow-400' : 'text-${P}-400'}">
           <i class="fas fa-pen-fancy mr-1"></i>
           ${signatureStep === 'winner' ? `${names.winner} (승리팀)` : signatureStep === 'loser' ? `${names.loser} (패배팀)` : ''} 서명
         </p>
@@ -965,7 +979,7 @@ function renderSignatureScreen() {
       </div>
 
       <!-- 캔버스 (터치 서명 영역) -->
-      <div class="flex-1 relative rounded-2xl overflow-hidden border-2 ${signatureStep === 'winner' ? 'border-yellow-500/40' : 'border-blue-500/40'} bg-white min-h-0" id="sig-container" style="max-height:45vh;">
+      <div class="flex-1 relative rounded-2xl overflow-hidden border-2 ${signatureStep === 'winner' ? 'border-yellow-500/40' : 'border-${P}-500/40'} bg-white min-h-0" id="sig-container" style="max-height:45vh;">
         <canvas id="sig-canvas" class="w-full h-full" style="touch-action:none;"></canvas>
         <!-- 가이드 라인 -->
         <div class="absolute bottom-[30%] left-[10%] right-[10%] border-b border-dashed border-gray-300 pointer-events-none"></div>
@@ -984,7 +998,7 @@ function renderSignatureScreen() {
           <i class="fas fa-eraser mr-1"></i>다시 쓰기
         </button>
         ${signatureStep !== 'done' ? `
-        <button onclick="confirmSignature()" id="sig-confirm-btn" class="flex-1 py-4 ${signatureStep === 'winner' ? 'bg-yellow-500 text-black' : 'bg-blue-500 text-white'} rounded-xl text-base font-black hover:opacity-90 shadow-lg active:scale-95 transition disabled:opacity-30" disabled>
+        <button onclick="confirmSignature()" id="sig-confirm-btn" class="flex-1 py-4 ${signatureStep === 'winner' ? 'bg-yellow-500 text-black' : 'bg-${P}-500 text-white'} rounded-xl text-base font-black hover:opacity-90 shadow-lg active:scale-95 transition disabled:opacity-30" disabled>
           <i class="fas fa-arrow-right mr-2"></i>${signatureStep === 'winner' ? '승리팀 서명 완료 →' : '패배팀 서명 완료 → 경기 종료'}
         </button>
         ` : ''}
@@ -1276,11 +1290,11 @@ async function loadTournamentList() {
     
     el.innerHTML = data.tournaments.map(t => {
       const st = { draft: '준비중', open: '접수중', in_progress: '진행중', completed: '완료' };
-      const stColor = { draft: 'text-gray-400', open: 'text-blue-400', in_progress: 'text-green-400', completed: 'text-purple-400' };
+      const stColor = { draft: 'text-gray-400', open: `text-${P}-400`, in_progress: 'text-green-400', completed: 'text-purple-400' };
       const targetPt = t.format === 'tournament' ? 21 : 25;
       return `<button onclick="selectTournament(${t.id})" class="w-full text-left bg-white/5 rounded-xl p-4 hover:bg-white/10 transition border border-white/5">
         <div class="flex items-center justify-between">
-          <div><h4 class="font-bold text-lg">${t.name}</h4><p class="text-sm text-gray-500">${t.courts}코트 · ${({kdk:'KDK',league:'풀리그',tournament:'토너먼트'})[t.format]} · ${targetPt}점제</p></div>
+          <div><h4 class="font-bold text-lg">${t.name}</h4><p class="text-sm text-gray-500">${t.courts}코트 · ${({kdk:'KDK',league:'풀리그',tournament:'토너먼트'})[t.format]} · ${targetPt}${SCORE_UNIT}제</p></div>
           <span class="text-sm font-medium ${stColor[t.status]||''}">${st[t.status]||t.status}</span>
         </div>
       </button>`;
@@ -1350,7 +1364,7 @@ function showQRModal() {
       <button onclick="document.getElementById('qr-modal').remove()" class="text-gray-400 hover:text-white"><i class="fas fa-times text-lg"></i></button>
     </div>
     <div class="p-4 overflow-y-auto flex-1">
-      <p class="text-sm text-gray-400 mb-4">각 코트에 배치할 태블릿에서 아래 QR코드를 스캔하면 해당 코트 점수판으로 바로 이동합니다.</p>
+      <p class="text-sm text-gray-400 mb-4">각 코트에 배치할 태블릿에서 아래 QR코드를 스캔하면 해당 코트 ${BOARD_NAME}으로 바로 이동합니다.</p>
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
         ${Array.from({length: numCourts}, (_, i) => {
           const courtUrl = `${baseUrl}?tid=${courtState.tournamentId}&court=${i+1}&locked=1`;
@@ -1358,14 +1372,14 @@ function showQRModal() {
             <div class="font-bold text-gray-900 mb-2">${i+1}코트</div>
             <div id="qr-court-${i+1}" class="flex items-center justify-center" style="min-height:120px;"></div>
             <p class="text-xs text-gray-500 mt-2 break-all">${courtUrl}</p>
-            <button onclick="copyToClipboard('${courtUrl}')" class="mt-1 text-xs text-blue-600 hover:text-blue-800">
+            <button onclick="copyToClipboard('${courtUrl}')" class="mt-1 text-xs text-${P}-600 hover:text-${P}-800">
               <i class="fas fa-copy mr-1"></i>URL 복사
             </button>
           </div>`;
         }).join('')}
       </div>
       <div class="mt-4 p-3 bg-white/5 rounded-xl text-xs text-gray-400">
-        <p><i class="fas fa-info-circle mr-1 text-blue-400"></i><b>URL 파라미터 설명:</b></p>
+        <p><i class="fas fa-info-circle mr-1 text-${P}-400"></i><b>URL 파라미터 설명:</b></p>
         <p class="mt-1"><code>locked=1</code> : 코트 고정 (나가기 버튼 숨김)</p>
         <p><code>mode=view</code> : 읽기 전용 (관중 모니터용, 터치 비활성화)</p>
         <p><code>autonext=0</code> : 자동 다음 경기 비활성화</p>

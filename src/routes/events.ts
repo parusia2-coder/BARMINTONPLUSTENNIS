@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
+import { sportConfig } from '../config'
 
 type Bindings = { DB: D1Database }
 
 export const eventRoutes = new Hono<{ Bindings: Bindings }>()
 
-const CATEGORY_LABELS: Record<string, string> = { md: '남자복식', wd: '여자복식', xd: '혼합복식' }
+const CATEGORY_LABELS: Record<string, string> = sportConfig.categories
 const LEVEL_LABELS: Record<string, string> = { s: 'S', a: 'A', b: 'B', c: 'C', d: 'D', e: 'E', all: '전체' }
 const LEVEL_ORDER: Record<string, number> = { s: 0, a: 1, b: 2, c: 3, d: 4, e: 5 }
 
@@ -187,41 +188,65 @@ eventRoutes.delete('/:tid/events/:eid', async (c) => {
   return c.json({ message: '종목이 삭제되었습니다.' })
 })
 
-// 종목에 팀 등록
+// 종목에 팀(선수) 등록
 eventRoutes.post('/:tid/events/:eid/teams', async (c) => {
   const tid = c.req.param('tid')
   const eid = c.req.param('eid')
   const db = c.env.DB
   const { player1_id, player2_id } = await c.req.json()
 
-  if (!player1_id || !player2_id) return c.json({ error: '두 명의 선수를 선택해주세요.' }, 400)
-  if (player1_id === player2_id) return c.json({ error: '서로 다른 선수를 선택해주세요.' }, 400)
+  if (!player1_id) return c.json({ error: '선수를 선택해주세요.' }, 400)
 
   const event = await db.prepare(`SELECT * FROM events WHERE id=? AND tournament_id=?`).bind(eid, tid).first() as any
   if (!event) return c.json({ error: '종목을 찾을 수 없습니다.' }, 404)
 
+  const isSingles = sportConfig.supportsSingles && (event.category === 'ms' || event.category === 'ws')
+
   const p1 = await db.prepare(`SELECT * FROM participants WHERE id=? AND tournament_id=? AND deleted=0`).bind(player1_id, tid).first() as any
-  const p2 = await db.prepare(`SELECT * FROM participants WHERE id=? AND tournament_id=? AND deleted=0`).bind(player2_id, tid).first() as any
-  if (!p1 || !p2) return c.json({ error: '선수 정보를 찾을 수 없습니다.' }, 404)
+  if (!p1) return c.json({ error: '선수 정보를 찾을 수 없습니다.' }, 404)
 
-  if (event.category === 'md' && (p1.gender !== 'm' || p2.gender !== 'm')) return c.json({ error: '남자복식에는 남자 선수만 등록 가능합니다.' }, 400)
-  if (event.category === 'wd' && (p1.gender !== 'f' || p2.gender !== 'f')) return c.json({ error: '여자복식에는 여자 선수만 등록 가능합니다.' }, 400)
-  if (event.category === 'xd') {
-    if (!((p1.gender === 'm' && p2.gender === 'f') || (p1.gender === 'f' && p2.gender === 'm')))
-      return c.json({ error: '혼합복식에는 남녀 한 명씩 등록해야 합니다.' }, 400)
+  if (isSingles) {
+    // 단식: player2_id 불필요
+    if (event.category === 'ms' && p1.gender !== 'm') return c.json({ error: '남자단식에는 남자 선수만 등록 가능합니다.' }, 400)
+    if (event.category === 'ws' && p1.gender !== 'f') return c.json({ error: '여자단식에는 여자 선수만 등록 가능합니다.' }, 400)
+
+    const dup = await db.prepare(
+      `SELECT id FROM teams WHERE event_id=? AND player1_id=? AND player2_id IS NULL`
+    ).bind(eid, player1_id).first()
+    if (dup) return c.json({ error: '이미 등록된 선수입니다.' }, 400)
+
+    const teamName = p1.name
+    const result = await db.prepare(
+      `INSERT INTO teams (event_id, tournament_id, player1_id, player2_id, team_name) VALUES (?, ?, ?, NULL, ?)`
+    ).bind(eid, tid, player1_id, teamName).run()
+    return c.json({ id: result.meta.last_row_id, team_name: teamName, message: '선수가 등록되었습니다.' }, 201)
+  } else {
+    // 복식
+    if (!player2_id) return c.json({ error: '복식은 두 명의 선수를 선택해주세요.' }, 400)
+    if (player1_id === player2_id) return c.json({ error: '서로 다른 선수를 선택해주세요.' }, 400)
+
+    const p2 = await db.prepare(`SELECT * FROM participants WHERE id=? AND tournament_id=? AND deleted=0`).bind(player2_id, tid).first() as any
+    if (!p2) return c.json({ error: '선수 정보를 찾을 수 없습니다.' }, 404)
+
+    if (event.category === 'md' && (p1.gender !== 'm' || p2.gender !== 'm')) return c.json({ error: '남자복식에는 남자 선수만 등록 가능합니다.' }, 400)
+    if (event.category === 'wd' && (p1.gender !== 'f' || p2.gender !== 'f')) return c.json({ error: '여자복식에는 여자 선수만 등록 가능합니다.' }, 400)
+    if (event.category === 'xd') {
+      if (!((p1.gender === 'm' && p2.gender === 'f') || (p1.gender === 'f' && p2.gender === 'm')))
+        return c.json({ error: '혼합복식에는 남녀 한 명씩 등록해야 합니다.' }, 400)
+    }
+
+    const dup = await db.prepare(
+      `SELECT id FROM teams WHERE event_id=? AND ((player1_id=? AND player2_id=?) OR (player1_id=? AND player2_id=?))`
+    ).bind(eid, player1_id, player2_id, player2_id, player1_id).first()
+    if (dup) return c.json({ error: '이미 등록된 팀 조합입니다.' }, 400)
+
+    const teamName = `${p1.name} · ${p2.name}`
+    const result = await db.prepare(
+      `INSERT INTO teams (event_id, tournament_id, player1_id, player2_id, team_name) VALUES (?, ?, ?, ?, ?)`
+    ).bind(eid, tid, player1_id, player2_id, teamName).run()
+
+    return c.json({ id: result.meta.last_row_id, team_name: teamName, message: '팀이 등록되었습니다.' }, 201)
   }
-
-  const dup = await db.prepare(
-    `SELECT id FROM teams WHERE event_id=? AND ((player1_id=? AND player2_id=?) OR (player1_id=? AND player2_id=?))`
-  ).bind(eid, player1_id, player2_id, player2_id, player1_id).first()
-  if (dup) return c.json({ error: '이미 등록된 팀 조합입니다.' }, 400)
-
-  const teamName = `${p1.name} · ${p2.name}`
-  const result = await db.prepare(
-    `INSERT INTO teams (event_id, tournament_id, player1_id, player2_id, team_name) VALUES (?, ?, ?, ?, ?)`
-  ).bind(eid, tid, player1_id, player2_id, teamName).run()
-
-  return c.json({ id: result.meta.last_row_id, team_name: teamName, message: '팀이 등록되었습니다.' }, 201)
 })
 
 // 종목의 팀 목록 조회 (클럽·조 정보 포함)
@@ -234,7 +259,7 @@ eventRoutes.get('/:tid/events/:eid/teams', async (c) => {
             p2.name as p2_name, p2.level as p2_level, p2.gender as p2_gender, p2.birth_year as p2_birth_year, p2.club as p2_club
      FROM teams t
      JOIN participants p1 ON t.player1_id = p1.id
-     JOIN participants p2 ON t.player2_id = p2.id
+     LEFT JOIN participants p2 ON t.player2_id = p2.id
      WHERE t.event_id=?
      ORDER BY t.group_num ASC, t.created_at ASC`
   ).bind(eid).all()
@@ -617,7 +642,7 @@ eventRoutes.post('/:tid/events/:eid/assign-groups', async (c) => {
     `SELECT t.*, p1.club as p1_club, p2.club as p2_club
      FROM teams t
      JOIN participants p1 ON t.player1_id = p1.id
-     JOIN participants p2 ON t.player2_id = p2.id
+     LEFT JOIN participants p2 ON t.player2_id = p2.id
      WHERE t.event_id=?
      ORDER BY t.id`
   ).bind(eid).all()
@@ -668,7 +693,7 @@ eventRoutes.post('/:tid/events/assign-groups-all', async (c) => {
       `SELECT t.*, p1.club as p1_club, p2.club as p2_club
        FROM teams t
        JOIN participants p1 ON t.player1_id = p1.id
-       JOIN participants p2 ON t.player2_id = p2.id
+       LEFT JOIN participants p2 ON t.player2_id = p2.id
        WHERE t.event_id=?
        ORDER BY t.id`
     ).bind(event.id).all()
@@ -940,7 +965,7 @@ eventRoutes.post('/:tid/events/execute-merge', async (c) => {
       `SELECT t.*, p1.club as p1_club, p2.club as p2_club
        FROM teams t
        JOIN participants p1 ON t.player1_id = p1.id
-       JOIN participants p2 ON t.player2_id = p2.id
+       LEFT JOIN participants p2 ON t.player2_id = p2.id
        WHERE t.event_id=?
        ORDER BY t.id`
     ).bind(newEventId).all()
