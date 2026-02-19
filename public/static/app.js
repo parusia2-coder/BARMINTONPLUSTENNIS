@@ -685,6 +685,7 @@ function renderParticipantsTab(isAdmin) {
     <!-- Detail Badges -->
     <div class="flex flex-wrap gap-1.5">
       ${mixedCount > 0 ? `<span class="text-xs px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200"><i class="fas fa-venus-mars mr-1"></i>혼복 ${mixedCount}명</span>` : ''}
+      ${(() => { const partnerCount = state.participants.filter(p => p.partner_name && p.partner_name.trim()).length; return partnerCount > 0 ? `<span class="text-xs px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200"><i class="fas fa-handshake mr-1"></i>파트너지정 ${partnerCount}명</span>` : ''; })()}
       ${['20대','30대','40대','50대','55대','60대'].map(ag => {
         const cnt = state.participants.filter(p => getAgeGroup(p.birth_year) === ag).length;
         return cnt > 0 ? `<span class="text-xs px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">${ag} ${cnt}명</span>` : '';
@@ -712,6 +713,7 @@ function renderParticipantsTab(isAdmin) {
             ${Object.entries(LEVELS).map(([k,v]) => `<option value="${k}" ${k==='c'?'selected':''}>${v}급</option>`).join('')}
           </select>
           <input name="club" placeholder="소속 클럽" class="flex-1 min-w-[80px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-${P}-500">
+          <input name="partner_name" placeholder="희망 파트너" class="flex-1 min-w-[80px] px-3 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-orange-400" title="자동 팀편성 시 이 파트너와 우선 매칭됩니다">
           <label class="flex items-center gap-1.5 px-3 py-2.5 border rounded-lg cursor-pointer hover:bg-purple-50 transition" title="혼합복식 참가 희망">
             <input type="checkbox" name="mixed_doubles" value="1" class="w-4 h-4 text-purple-600 rounded focus:ring-purple-500">
             <span class="text-sm font-medium text-purple-700"><i class="fas fa-venus-mars mr-0.5"></i>혼복</span>
@@ -751,13 +753,14 @@ function renderParticipantsTab(isAdmin) {
           <th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">연령대</th>
           <th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">급수</th>
           <th class="px-2 py-3 text-left text-xs font-semibold text-gray-500">소속</th>
+          <th class="px-2 py-3 text-left text-xs font-semibold text-gray-500">파트너</th>
           <th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">혼복</th>
           <th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">참가비</th>
           <th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">체크인</th>
           ${isAdmin ? '<th class="px-2 py-3 text-center text-xs font-semibold text-gray-500">관리</th>' : ''}
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
-          ${state.participants.length === 0 ? `<tr><td colspan="${isAdmin?10:9}" class="px-4 py-8 text-center text-gray-400">등록된 참가자가 없습니다.</td></tr>` : ''}
+          ${state.participants.length === 0 ? `<tr><td colspan="${isAdmin?11:10}" class="px-4 py-8 text-center text-gray-400">등록된 참가자가 없습니다.</td></tr>` : ''}
           ${state.participants.map((p, i) => {
             const lv = LEVEL_COLORS[p.level] || LEVEL_COLORS.c;
             return `<tr class="hover:bg-gray-50 participant-row" data-name="${(p.name||'').toLowerCase()}" data-club="${(p.club||'').toLowerCase()}" data-gender="${p.gender}" data-level="${p.level}">
@@ -767,6 +770,7 @@ function renderParticipantsTab(isAdmin) {
               <td class="px-2 py-2 text-center"><span class="badge text-xs bg-amber-50 text-amber-700">${getAgeGroup(p.birth_year)}</span></td>
               <td class="px-2 py-2 text-center"><span class="badge text-xs ${lv}">${LEVELS[p.level]||'C'}</span></td>
               <td class="px-2 py-2 text-xs text-gray-500">${p.club || '-'}</td>
+              <td class="px-2 py-2 text-xs ${p.partner_name ? 'text-orange-600 font-semibold' : 'text-gray-300'}">${p.partner_name || '-'}</td>
               <td class="px-2 py-2 text-center">${isAdmin ? `<button onclick="toggleMixedDoubles(${p.id})" class="text-base ${p.mixed_doubles?'text-purple-500':'text-gray-300'} hover:scale-110">${p.mixed_doubles?'<i class="fas fa-venus-mars"></i>':'<i class="far fa-circle"></i>'}</button>` : (p.mixed_doubles?'<span class="text-purple-500"><i class="fas fa-venus-mars"></i></span>':'<span class="text-gray-300">-</span>')}</td>
               <td class="px-2 py-2 text-center">${isAdmin ? `<button onclick="togglePaid(${p.id})" class="text-base ${p.paid?'text-green-500':'text-gray-300'} hover:scale-110">${p.paid?'<i class="fas fa-check-circle"></i>':'<i class="far fa-circle"></i>'}</button>` : (p.paid?'<i class="fas fa-check-circle text-green-500"></i>':'<i class="fas fa-times-circle text-gray-300"></i>')}</td>
               <td class="px-2 py-2 text-center">${isAdmin ? `<button onclick="toggleCheckin(${p.id})" class="text-base ${p.checked_in?T.text500:'text-gray-300'} hover:scale-110">${p.checked_in?'<i class="fas fa-check-circle"></i>':'<i class="far fa-circle"></i>'}</button>` : (p.checked_in?`<i class="fas fa-check-circle ${T.text500}"></i>`:'<i class="fas fa-times-circle text-gray-300"></i>')}</td>
@@ -1807,10 +1811,10 @@ function showBulkModal() {
       <div class="mb-3 p-3 ${T.bg50} rounded-lg text-sm ${T.text700}">
         <p class="font-semibold mb-1"><i class="fas fa-info-circle mr-1"></i>입력 형식 안내</p>
         <p>한 줄에 한 명씩 · 탭(Tab) 또는 콤마(,)로 구분</p>
-        <p class="mt-1 font-mono text-xs ${T.bg100} rounded p-2">이름, 성별(남/여), 출생년도, 급수, 연락처, 혼복(O/X), 소속클럽<br>김민수, 남, 1985, A, 010-1234-5678, O, 안양시청<br>박서연, 여, 1992, B, , X, 만안클럽</p>
+        <p class="mt-1 font-mono text-xs ${T.bg100} rounded p-2">이름, 성별(남/여), 출생년도, 급수, 연락처, 혼복(O/X), 소속클럽, 희망파트너<br>김민수, 남, 1985, A, 010-1234-5678, O, 안양시청, 이정호<br>박서연, 여, 1992, B, , X, 만안클럽, </p>
         <p class="mt-1 text-xs ${T.text500}">* 엑셀에서 복사(Ctrl+C)하여 바로 붙여넣기(Ctrl+V) 가능!</p>
       </div>
-      <textarea id="bulk-text" rows="10" class="w-full px-4 py-3 border border-gray-300 rounded-xl font-mono text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-y" placeholder="김민수, 남, 1985, A, 010-1234-5678, O, 안양시청&#10;박서연, 여, 1992, B, , O, 동안셔틀&#10;이정호, 남, 1990, C, , , 만안클럽"></textarea>
+      <textarea id="bulk-text" rows="10" class="w-full px-4 py-3 border border-gray-300 rounded-xl font-mono text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-y" placeholder="김민수, 남, 1985, A, 010-1234-5678, O, 안양시청, 이정호&#10;박서연, 여, 1992, B, , O, 동안셔틀&#10;이정호, 남, 1990, C, , , 만안클럽, 김민수"></textarea>
       <div class="mt-2 flex items-center justify-between">
         <span id="bulk-count" class="text-sm text-gray-400">0명 감지</span>
         <button onclick="previewBulk()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"><i class="fas fa-eye mr-1"></i>미리보기</button>
@@ -1821,7 +1825,7 @@ function showBulkModal() {
           <table class="w-full text-sm">
             <thead class="bg-gray-50 sticky top-0"><tr>
               <th class="px-2 py-2 text-left text-xs">#</th><th class="px-2 py-2 text-left text-xs">이름</th><th class="px-2 py-2 text-center text-xs">성별</th>
-              <th class="px-2 py-2 text-center text-xs">급수</th><th class="px-2 py-2 text-left text-xs">소속</th><th class="px-2 py-2 text-center text-xs">혼복</th><th class="px-2 py-2 text-center text-xs">상태</th>
+              <th class="px-2 py-2 text-center text-xs">급수</th><th class="px-2 py-2 text-left text-xs">소속</th><th class="px-2 py-2 text-left text-xs">파트너</th><th class="px-2 py-2 text-center text-xs">혼복</th><th class="px-2 py-2 text-center text-xs">상태</th>
             </tr></thead>
             <tbody id="preview-body" class="divide-y divide-gray-100"></tbody>
           </table>
@@ -1859,11 +1863,20 @@ function parseBulkText(text) {
     parts = parts.map(p => p.trim()).filter(p => p);
     if (parts.length === 0) return null;
 
-    const result = { name: '', gender: '', birth_year: null, level: 'c', phone: '', mixed_doubles: false, club: '', valid: true, error: '' };
+    const result = { name: '', gender: '', birth_year: null, level: 'c', phone: '', mixed_doubles: false, club: '', partner_name: '', valid: true, error: '' };
     result.name = parts[0] || '';
 
-    for (let i = 1; i < parts.length; i++) {
-      const val = parts[i].trim();
+    // 마지막 필드가 파트너 이름인지 확인 (8번째 필드)
+    let remainingParts = parts.slice(1);
+    // 파트너 이름은 마지막 필드로 처리 (7개 이상일 때)
+    let potentialPartner = '';
+    if (parts.length >= 8) {
+      potentialPartner = parts[7].trim();
+      remainingParts = parts.slice(1, 7);
+    }
+
+    for (let i = 0; i < remainingParts.length; i++) {
+      const val = remainingParts[i].trim();
       const valLower = val.toLowerCase();
       if (genderMap[val] || genderMap[valLower]) { result.gender = genderMap[val] || genderMap[valLower]; continue; }
       const mixedMap = { 'o': true, 'x': false, '혼복': true, 'yes': true, 'no': false, '1': true, '0': false, 'y': true, 'n': false };
@@ -1874,6 +1887,11 @@ function parseBulkText(text) {
       if (val.includes('-') || (val.startsWith('0') && val.length >= 10)) { result.phone = val; continue; }
       // 남은 문자열은 클럽명으로
       if (val.length >= 2 && !result.club) { result.club = val; continue; }
+    }
+
+    // 파트너 이름 설정
+    if (potentialPartner) {
+      result.partner_name = potentialPartner;
     }
 
     if (!result.name) { result.valid = false; result.error = '이름 없음'; }
@@ -1900,6 +1918,7 @@ function previewBulk() {
       <td class="px-2 py-1.5 text-center">${gLabel}</td>
       <td class="px-2 py-1.5 text-center"><span class="badge ${LEVEL_COLORS[p.level]||''}">${LEVELS[p.level]||'C'}</span></td>
       <td class="px-2 py-1.5 text-gray-500">${p.club || '-'}</td>
+      <td class="px-2 py-1.5 text-orange-600 font-medium">${p.partner_name || '-'}</td>
       <td class="px-2 py-1.5 text-center">${p.mixed_doubles ? '<span class="text-purple-500"><i class="fas fa-venus-mars"></i></span>' : '-'}</td>
       <td class="px-2 py-1.5 text-center">${status}</td>
     </tr>`;
@@ -1915,7 +1934,7 @@ async function submitBulk() {
   btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>등록 중...';
   const tid = state.currentTournament.id;
   try {
-    const data = valid.map(p => ({ name: p.name, gender: p.gender, birth_year: p.birth_year, level: p.level, phone: p.phone, mixed_doubles: p.mixed_doubles ? 1 : 0, club: p.club }));
+    const data = valid.map(p => ({ name: p.name, gender: p.gender, birth_year: p.birth_year, level: p.level, phone: p.phone, mixed_doubles: p.mixed_doubles ? 1 : 0, club: p.club, partner_name: p.partner_name || '' }));
     const res = await api(`/tournaments/${tid}/participants/bulk`, { method: 'POST', body: JSON.stringify({ participants: data }) });
     closeBulkModal(); showToast(res.message, 'success');
     await loadParticipants(tid); render();

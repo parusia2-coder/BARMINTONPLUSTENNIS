@@ -340,14 +340,90 @@ function getAgeFilter(event: any): string {
 // 팀 편성 옵션 엔진 (핵심!)
 // =============================================
 
+// ★ 공통: 지정 파트너 우선 매칭 (모든 모드에서 가장 먼저 실행)
+function pairDesignatedPartners(players: any[]): { teams: { p1: any; p2: any }[]; remaining: any[] } {
+  const teams: { p1: any; p2: any }[] = []
+  const used = new Set<number>()
+  const nameMap: Record<string, any> = {}
+
+  // 이름 → 참가자 매핑 (소문자 정규화)
+  for (const p of players) {
+    nameMap[p.name.trim().toLowerCase()] = p
+  }
+
+  // partner_name이 설정된 참가자를 찾아서 매칭
+  for (const p of players) {
+    if (used.has(p.id)) continue
+    const partnerName = (p.partner_name || '').trim().toLowerCase()
+    if (!partnerName) continue
+
+    const partner = nameMap[partnerName]
+    if (!partner || partner.id === p.id || used.has(partner.id)) continue
+
+    // 상호 지정 또는 일방 지정 모두 허용
+    teams.push({ p1: p, p2: partner })
+    used.add(p.id)
+    used.add(partner.id)
+  }
+
+  const remaining = players.filter(p => !used.has(p.id))
+  return { teams, remaining }
+}
+
+// ★ 혼합복식용: 지정 파트너 우선 매칭 (남녀 교차)
+function pairDesignatedPartnersXD(males: any[], females: any[]): { teams: { p1: any; p2: any }[]; remainingM: any[]; remainingF: any[] } {
+  const teams: { p1: any; p2: any }[] = []
+  const usedM = new Set<number>()
+  const usedF = new Set<number>()
+
+  // 남자→여자, 여자→남자 이름 매핑
+  const maleNameMap: Record<string, any> = {}
+  const femaleNameMap: Record<string, any> = {}
+  for (const m of males) maleNameMap[m.name.trim().toLowerCase()] = m
+  for (const f of females) femaleNameMap[f.name.trim().toLowerCase()] = f
+
+  // 남자가 여자 파트너를 지정한 경우
+  for (const m of males) {
+    if (usedM.has(m.id)) continue
+    const partnerName = (m.partner_name || '').trim().toLowerCase()
+    if (!partnerName) continue
+    const partner = femaleNameMap[partnerName]
+    if (!partner || usedF.has(partner.id)) continue
+    teams.push({ p1: m, p2: partner })
+    usedM.add(m.id)
+    usedF.add(partner.id)
+  }
+
+  // 여자가 남자 파트너를 지정한 경우 (아직 매칭되지 않은 경우)
+  for (const f of females) {
+    if (usedF.has(f.id)) continue
+    const partnerName = (f.partner_name || '').trim().toLowerCase()
+    if (!partnerName) continue
+    const partner = maleNameMap[partnerName]
+    if (!partner || usedM.has(partner.id)) continue
+    teams.push({ p1: partner, p2: f })
+    usedM.add(partner.id)
+    usedF.add(f.id)
+  }
+
+  const remainingM = males.filter(m => !usedM.has(m.id))
+  const remainingF = females.filter(f => !usedF.has(f.id))
+  return { teams, remainingM, remainingF }
+}
+
 // 옵션1: 같은 클럽 우선 팀 편성
 function pairWithClubPriority(players: any[]): { p1: any; p2: any }[] {
   const teams: { p1: any; p2: any }[] = []
   const used = new Set<number>()
 
+  // 0단계: 지정 파트너 우선 매칭
+  const { teams: designatedTeams, remaining: afterDesignated } = pairDesignatedPartners(players)
+  teams.push(...designatedTeams)
+  for (const t of designatedTeams) { used.add(t.p1.id); used.add(t.p2.id) }
+
   // 1단계: 같은 클럽 멤버끼리 우선 매칭
   const byClub: Record<string, any[]> = {}
-  for (const p of players) {
+  for (const p of afterDesignated) {
     const club = (p.club || '').trim()
     if (club) {
       if (!byClub[club]) byClub[club] = []
@@ -364,7 +440,7 @@ function pairWithClubPriority(players: any[]): { p1: any; p2: any }[] {
   }
 
   // 2단계: 남은 선수들 급수 순 매칭
-  const remaining = players.filter(p => !used.has(p.id))
+  const remaining = afterDesignated.filter(p => !used.has(p.id))
   remaining.sort((a, b) => (LEVEL_ORDER[a.level] || 3) - (LEVEL_ORDER[b.level] || 3))
   const shuffledRem = shuffle(remaining)
   shuffledRem.sort((a, b) => (LEVEL_ORDER[a.level] || 3) - (LEVEL_ORDER[b.level] || 3))
@@ -376,8 +452,9 @@ function pairWithClubPriority(players: any[]): { p1: any; p2: any }[] {
 
 // 옵션2: 같은 급수끼리 팀 편성 (클럽 무시)
 function pairByLevel(players: any[]): { p1: any; p2: any }[] {
-  const teams: { p1: any; p2: any }[] = []
-  const shuffled = shuffle(players)
+  // 0단계: 지정 파트너 우선 매칭
+  const { teams, remaining } = pairDesignatedPartners(players)
+  const shuffled = shuffle(remaining)
   shuffled.sort((a, b) => (LEVEL_ORDER[a.level] || 3) - (LEVEL_ORDER[b.level] || 3))
   for (let i = 0; i + 1 < shuffled.length; i += 2) {
     teams.push({ p1: shuffled[i], p2: shuffled[i + 1] })
@@ -387,8 +464,9 @@ function pairByLevel(players: any[]): { p1: any; p2: any }[] {
 
 // 옵션3: 랜덤 팀 편성
 function pairRandom(players: any[]): { p1: any; p2: any }[] {
-  const teams: { p1: any; p2: any }[] = []
-  const shuffled = shuffle(players)
+  // 0단계: 지정 파트너 우선 매칭
+  const { teams, remaining } = pairDesignatedPartners(players)
+  const shuffled = shuffle(remaining)
   for (let i = 0; i + 1 < shuffled.length; i += 2) {
     teams.push({ p1: shuffled[i], p2: shuffled[i + 1] })
   }
@@ -493,8 +571,11 @@ eventRoutes.post('/:tid/events/:eid/auto-assign', async (c) => {
     ).bind(tid).all()
 
     if (teamMode === 'club_priority') {
-      const usedM = new Set<number>(), usedF = new Set<number>()
-      const mList = males || [], fList = females || []
+      // 0단계: 지정 파트너 우선 매칭
+      const { teams: designatedTeams, remainingM: afterDesM, remainingF: afterDesF } = pairDesignatedPartnersXD(males || [], females || [])
+      teams.push(...designatedTeams)
+      const usedM = new Set<number>(designatedTeams.map(t => t.p1.id)), usedF = new Set<number>(designatedTeams.map(t => t.p2.id))
+      const mList = afterDesM, fList = afterDesF
       // 같은 클럽 남녀 우선
       for (const m of mList) {
         if (usedM.has(m.id)) continue
@@ -507,12 +588,16 @@ eventRoutes.post('/:tid/events/:eid/auto-assign', async (c) => {
       const c2 = Math.min(remM.length, remF.length)
       for (let i = 0; i < c2; i++) { teams.push({ p1: remM[i], p2: remF[i] }) }
     } else if (teamMode === 'level_match') {
-      const mSorted = shuffle(males || []).sort((a, b) => (LEVEL_ORDER[a.level] || 3) - (LEVEL_ORDER[b.level] || 3))
-      const fSorted = shuffle(females || []).sort((a, b) => (LEVEL_ORDER[a.level] || 3) - (LEVEL_ORDER[b.level] || 3))
+      const { teams: designatedTeams, remainingM, remainingF } = pairDesignatedPartnersXD(males || [], females || [])
+      teams.push(...designatedTeams)
+      const mSorted = shuffle(remainingM).sort((a, b) => (LEVEL_ORDER[a.level] || 3) - (LEVEL_ORDER[b.level] || 3))
+      const fSorted = shuffle(remainingF).sort((a, b) => (LEVEL_ORDER[a.level] || 3) - (LEVEL_ORDER[b.level] || 3))
       const cnt = Math.min(mSorted.length, fSorted.length)
       for (let i = 0; i < cnt; i++) teams.push({ p1: mSorted[i], p2: fSorted[i] })
     } else {
-      const mShuf = shuffle(males || []), fShuf = shuffle(females || [])
+      const { teams: designatedTeams, remainingM, remainingF } = pairDesignatedPartnersXD(males || [], females || [])
+      teams.push(...designatedTeams)
+      const mShuf = shuffle(remainingM), fShuf = shuffle(remainingF)
       const cnt = Math.min(mShuf.length, fShuf.length)
       for (let i = 0; i < cnt; i++) teams.push({ p1: mShuf[i], p2: fShuf[i] })
     }
@@ -580,8 +665,11 @@ eventRoutes.post('/:tid/events/auto-assign-all', async (c) => {
         `SELECT * FROM participants WHERE tournament_id=? AND deleted=0 AND gender='f' AND mixed_doubles=1 ${levelFilter} ${ageFilter} ORDER BY level, RANDOM()`
       ).bind(tid).all()
       if (teamMode === 'club_priority') {
-        const usedM = new Set<number>(), usedF = new Set<number>()
-        const mList = males || [], fList = females || []
+        // 0단계: 지정 파트너 우선 매칭
+        const { teams: designatedTeams, remainingM: afterDesM, remainingF: afterDesF } = pairDesignatedPartnersXD(males || [], females || [])
+        teams.push(...designatedTeams)
+        const usedM = new Set<number>(designatedTeams.map(t => t.p1.id)), usedF = new Set<number>(designatedTeams.map(t => t.p2.id))
+        const mList = afterDesM, fList = afterDesF
         for (const m of mList) {
           if (usedM.has(m.id)) continue
           const club = (m.club || '').trim()
@@ -592,11 +680,15 @@ eventRoutes.post('/:tid/events/auto-assign-all', async (c) => {
         const remM = mList.filter(m => !usedM.has(m.id)), remF = fList.filter(f => !usedF.has(f.id))
         for (let i = 0; i < Math.min(remM.length, remF.length); i++) teams.push({ p1: remM[i], p2: remF[i] })
       } else if (teamMode === 'level_match') {
-        const mS = shuffle(males || []).sort((a, b) => (LEVEL_ORDER[a.level] || 3) - (LEVEL_ORDER[b.level] || 3))
-        const fS = shuffle(females || []).sort((a, b) => (LEVEL_ORDER[a.level] || 3) - (LEVEL_ORDER[b.level] || 3))
+        const { teams: designatedTeams, remainingM, remainingF } = pairDesignatedPartnersXD(males || [], females || [])
+        teams.push(...designatedTeams)
+        const mS = shuffle(remainingM).sort((a, b) => (LEVEL_ORDER[a.level] || 3) - (LEVEL_ORDER[b.level] || 3))
+        const fS = shuffle(remainingF).sort((a, b) => (LEVEL_ORDER[a.level] || 3) - (LEVEL_ORDER[b.level] || 3))
         for (let i = 0; i < Math.min(mS.length, fS.length); i++) teams.push({ p1: mS[i], p2: fS[i] })
       } else {
-        const mR = shuffle(males || []), fR = shuffle(females || [])
+        const { teams: designatedTeams, remainingM, remainingF } = pairDesignatedPartnersXD(males || [], females || [])
+        teams.push(...designatedTeams)
+        const mR = shuffle(remainingM), fR = shuffle(remainingF)
         for (let i = 0; i < Math.min(mR.length, fR.length); i++) teams.push({ p1: mR[i], p2: fR[i] })
       }
     } else {
