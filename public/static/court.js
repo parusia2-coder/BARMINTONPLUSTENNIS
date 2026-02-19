@@ -49,7 +49,7 @@ const courtState = {
   nextMatches: [],
   recentMatches: [],
   tournament: null,
-  page: 'select', // select | side-select | court | signature
+  page: 'select', // select | side-select | court | signature | dashboard
   courts: [],
   stats: null,
   autoRefreshTimer: null,
@@ -470,6 +470,7 @@ function renderCourt() {
     case 'side-select': app.innerHTML = renderSideSelect(); break;
     case 'court': app.innerHTML = renderCourtScoreboard(); bindScoreboardEvents(); break;
     case 'signature': app.innerHTML = renderSignatureScreen(); initSignaturePads(); break;
+    case 'dashboard': renderDashboardView(); break;
     default: app.innerHTML = renderCourtSelect();
   }
 }
@@ -521,10 +522,13 @@ function renderCourtPicker() {
       <span class="mr-1">${EMOJI}</span>${courtState.tournament?.name || '대회'}
     </h3>
     <p class="text-center text-gray-400 mb-4">코트를 선택하세요</p>
-    <!-- QR 코드 생성 버튼 -->
-    <div class="text-center mb-4">
-      <button onclick="showQRModal()" class="px-4 py-2 bg-purple-500/20 text-purple-300 rounded-lg text-sm hover:bg-purple-500/30">
-        <i class="fas fa-qrcode mr-1"></i>코트별 QR 코드 생성
+    <!-- 모드 안내 + QR -->
+    <div class="flex justify-center gap-2 mb-4 flex-wrap">
+      <button onclick="enterDashboardMode()" class="px-3 py-1.5 bg-blue-500/20 text-blue-300 rounded-lg text-xs hover:bg-blue-500/30">
+        <i class="fas fa-tv mr-1"></i>대형 전광판
+      </button>
+      <button onclick="showQRModal()" class="px-3 py-1.5 bg-purple-500/20 text-purple-300 rounded-lg text-xs hover:bg-purple-500/30">
+        <i class="fas fa-qrcode mr-1"></i>QR 코드 생성
       </button>
     </div>
     <div id="court-grid" class="grid grid-cols-2 gap-4">
@@ -2154,7 +2158,7 @@ async function loadCourtGrid() {
     el.innerHTML = data.courts.map(c => {
       const hasMatch = !!c.current_match;
       const color = hasMatch ? 'from-green-600 to-green-500' : 'from-gray-700 to-gray-600';
-      return `<button onclick="selectCourtNumber(${c.court_number})" 
+      return `<button onclick="showCourtModeModal(${c.court_number})" 
         class="bg-gradient-to-br ${color} rounded-2xl p-6 text-center hover:scale-[1.02] transition shadow-lg active:scale-95">
         <div class="text-4xl font-black mb-2">${c.court_number}</div>
         <div class="text-sm font-medium opacity-80">${c.court_number}코트</div>
@@ -2172,6 +2176,107 @@ async function loadCourtGrid() {
   } catch(e) {}
 }
 
+// ==========================================
+// 코트 모드 선택 모달
+// ==========================================
+function showCourtModeModal(courtNum) {
+  // 기존 모달 제거
+  const old = document.getElementById('court-mode-modal');
+  if (old) old.remove();
+
+  const baseUrl = window.location.origin + '/court';
+  const tid = courtState.tournamentId;
+
+  const modal = document.createElement('div');
+  modal.id = 'court-mode-modal';
+  modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md';
+  modal.innerHTML = `
+    <div class="bg-gray-800 rounded-3xl shadow-2xl w-full max-w-sm mx-4 p-6 border border-white/10">
+      <div class="text-center mb-5">
+        <div class="w-16 h-16 rounded-full bg-${P}-500/20 flex items-center justify-center mx-auto mb-3">
+          <span class="text-3xl font-black text-${P}-400">${courtNum}</span>
+        </div>
+        <h3 class="text-xl font-extrabold">${courtNum}코트</h3>
+        <p class="text-sm text-gray-400 mt-1">사용 모드를 선택하세요</p>
+      </div>
+
+      <div class="space-y-3">
+        <!-- 심판용 (점수 입력) -->
+        <button onclick="enterCourtMode(${courtNum}, 'scorer')"
+          class="w-full py-4 px-4 bg-gradient-to-r from-green-600 to-green-500 rounded-2xl text-left hover:from-green-500 hover:to-green-400 active:scale-[0.98] transition shadow-lg">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+              <i class="fas fa-hand-pointer text-xl"></i>
+            </div>
+            <div>
+              <p class="font-bold text-base">🏓 심판용 (점수 입력)</p>
+              <p class="text-xs text-white/70 mt-0.5">터치로 점수 입력 · 코트 태블릿용</p>
+            </div>
+          </div>
+        </button>
+
+        <!-- 관람용 전광판 -->
+        <button onclick="enterCourtMode(${courtNum}, 'viewer')"
+          class="w-full py-4 px-4 bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl text-left hover:from-blue-500 hover:to-blue-400 active:scale-[0.98] transition shadow-lg">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+              <i class="fas fa-tv text-xl"></i>
+            </div>
+            <div>
+              <p class="font-bold text-base">📺 관람용 전광판</p>
+              <p class="text-xs text-white/70 mt-0.5">점수 자동 갱신 · 터치 잠금 · TV/모니터용</p>
+            </div>
+          </div>
+        </button>
+
+        <!-- 심판용 (고정) -->
+        <button onclick="enterCourtMode(${courtNum}, 'locked')"
+          class="w-full py-3 px-4 bg-white/10 rounded-2xl text-left hover:bg-white/15 active:scale-[0.98] transition border border-white/10">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center shrink-0">
+              <i class="fas fa-lock text-lg text-yellow-400"></i>
+            </div>
+            <div>
+              <p class="font-bold text-sm">🔒 심판용 (코트 고정)</p>
+              <p class="text-xs text-gray-400 mt-0.5">점수 입력 + 나가기 버튼 숨김</p>
+            </div>
+          </div>
+        </button>
+      </div>
+
+      <button onclick="document.getElementById('court-mode-modal').remove()" 
+        class="w-full mt-4 py-3 bg-white/5 text-gray-400 rounded-xl text-sm hover:bg-white/10">
+        <i class="fas fa-times mr-1"></i>취소
+      </button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  
+  // 배경 클릭 시 닫기
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) modal.remove();
+  });
+}
+
+function enterCourtMode(courtNum, mode) {
+  // 모달 닫기
+  const modal = document.getElementById('court-mode-modal');
+  if (modal) modal.remove();
+
+  if (mode === 'viewer') {
+    // 관람용: 새 탭으로 열기 (locked + mode=view)
+    const url = '/court?tid=' + courtState.tournamentId + '&court=' + courtNum + '&locked=1&mode=view';
+    window.open(url, '_blank');
+  } else if (mode === 'locked') {
+    // 고정 심판용: 새 탭으로 열기 (locked)
+    const url = '/court?tid=' + courtState.tournamentId + '&court=' + courtNum + '&locked=1';
+    window.open(url, '_blank');
+  } else {
+    // 일반 심판용: 현재 탭에서 진입
+    selectCourtNumber(courtNum);
+  }
+}
+
 function selectCourtNumber(num) {
   courtState.courtNumber = num;
   const url = new URL(window.location);
@@ -2181,7 +2286,7 @@ function selectCourtNumber(num) {
   refreshCourtData();
 }
 
-// QR 코드 모달
+// QR 코드 모달 (심판용 + 관람용)
 function showQRModal() {
   const t = courtState.tournament;
   if (!t) return;
@@ -2190,44 +2295,93 @@ function showQRModal() {
   const modal = document.createElement('div');
   modal.id = 'qr-modal';
   modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md';
-  modal.innerHTML = `<div class="bg-gray-800 rounded-3xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
-    <div class="p-4 border-b border-white/10 flex items-center justify-between">
-      <h3 class="text-lg font-bold text-white"><i class="fas fa-qrcode mr-2 text-purple-400"></i>코트별 QR 코드</h3>
-      <button onclick="document.getElementById('qr-modal').remove()" class="text-gray-400 hover:text-white"><i class="fas fa-times text-lg"></i></button>
-    </div>
-    <div class="p-4 overflow-y-auto flex-1">
-      <p class="text-sm text-gray-400 mb-4">각 코트에 배치할 태블릿에서 아래 QR코드를 스캔하면 해당 코트 ${BOARD_NAME}으로 바로 이동합니다.</p>
-      <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        ${Array.from({length: numCourts}, (_, i) => {
-          const courtUrl = `${baseUrl}?tid=${courtState.tournamentId}&court=${i+1}&locked=1`;
-          return `<div class="bg-white rounded-xl p-3 text-center">
-            <div class="font-bold text-gray-900 mb-2">${i+1}코트</div>
-            <div id="qr-court-${i+1}" class="flex items-center justify-center" style="min-height:120px;"></div>
-            <p class="text-xs text-gray-500 mt-2 break-all">${courtUrl}</p>
-            <button onclick="copyToClipboard('${courtUrl}')" class="mt-1 text-xs text-${P}-600 hover:text-${P}-800">
-              <i class="fas fa-copy mr-1"></i>URL 복사
-            </button>
-          </div>`;
-        }).join('')}
-      </div>
-      <div class="mt-4 p-3 bg-white/5 rounded-xl text-xs text-gray-400">
-        <p><i class="fas fa-info-circle mr-1 text-${P}-400"></i><b>URL 파라미터 설명:</b></p>
-        <p class="mt-1"><code>locked=1</code> : 코트 고정 (나가기 버튼 숨김)</p>
-        <p><code>mode=view</code> : 읽기 전용 (관중 모니터용, 터치 비활성화)</p>
-        <p><code>autonext=0</code> : 자동 다음 경기 비활성화</p>
-      </div>
-    </div>
-  </div>`;
-  document.body.appendChild(modal);
-  // QR 코드 생성 (간단한 QR 라이브러리 대용 - 텍스트로 표시)
-  for (let i = 1; i <= numCourts; i++) {
-    const el = document.getElementById(`qr-court-${i}`);
-    if (el) {
-      const url = `${baseUrl}?tid=${courtState.tournamentId}&court=${i}&locked=1`;
-      el.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(url)}" 
-        alt="QR ${i}코트" class="w-[120px] h-[120px]" loading="lazy">`;
+
+  // 모드 탭 상태
+  let qrMode = 'scorer'; // scorer | viewer | dashboard
+
+  function renderQRContent(mode) {
+    // 대시보드 모드: 단일 QR
+    if (mode === 'dashboard') {
+      const dashUrl = baseUrl + '?tid=' + courtState.tournamentId + '&locked=1&mode=view';
+      return '<p class="text-sm text-gray-400 mb-3"><span class="font-bold text-white">🖥️ 대형 전광판 대시보드</span> — 전 코트 실시간 현황 · TV/프로젝터용</p>' +
+        '<div class="flex justify-center">' +
+          '<div class="bg-white rounded-xl p-6 text-center max-w-xs">' +
+            '<div class="font-bold text-gray-900 mb-3 text-lg">전체 코트 대시보드</div>' +
+            '<div class="flex items-center justify-center" style="min-height:160px;">' +
+              '<img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=' + encodeURIComponent(dashUrl) + '" alt="Dashboard QR" class="w-[160px] h-[160px]" loading="lazy">' +
+            '</div>' +
+            '<p class="text-xs text-gray-500 mt-3">전 코트 경기 현황을 한 화면에 표시</p>' +
+            '<div class="flex gap-2 mt-3 justify-center">' +
+              '<button onclick="copyToClipboard(\'' + dashUrl.replace(/'/g, "\\'") + '\')" class="text-xs text-purple-600 hover:text-purple-800 px-3 py-1.5 rounded-lg bg-gray-100 font-bold">' +
+                '<i class="fas fa-copy mr-1"></i>URL 복사</button>' +
+              '<button onclick="window.open(\'' + dashUrl.replace(/'/g, "\\'") + '\', \'_blank\')" class="text-xs text-blue-600 hover:text-blue-800 px-3 py-1.5 rounded-lg bg-gray-100 font-bold">' +
+                '<i class="fas fa-external-link-alt mr-1"></i>열기</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
     }
+
+    const suffix = mode === 'viewer' ? '&locked=1&mode=view' : '&locked=1';
+    const modeLabel = mode === 'viewer' ? '📺 관람용 전광판' : '🏓 심판용 (코트 고정)';
+    const modeDesc = mode === 'viewer' 
+      ? '관중 모니터에서 스캔 — 점수 자동 갱신, 터치 잠금' 
+      : '코트 태블릿에서 스캔 — 터치로 점수 입력';
+
+    let cards = '';
+    for (let i = 1; i <= numCourts; i++) {
+      const courtUrl = baseUrl + '?tid=' + courtState.tournamentId + '&court=' + i + suffix;
+      cards += '<div class="bg-white rounded-xl p-3 text-center">' +
+        '<div class="font-bold text-gray-900 mb-2">' + i + '코트</div>' +
+        '<div id="qr-court-' + mode + '-' + i + '" class="flex items-center justify-center" style="min-height:120px;">' +
+          '<img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(courtUrl) + '" alt="QR ' + i + '코트" class="w-[120px] h-[120px]" loading="lazy">' +
+        '</div>' +
+        '<div class="flex gap-1 mt-2 justify-center">' +
+          '<button onclick="copyToClipboard(\'' + courtUrl.replace(/'/g, "\\'") + '\')" class="text-xs text-' + P + '-600 hover:text-' + P + '-800 px-2 py-1 rounded bg-gray-100">' +
+            '<i class="fas fa-copy mr-0.5"></i>복사</button>' +
+          '<button onclick="window.open(\'' + courtUrl.replace(/'/g, "\\'") + '\', \'_blank\')" class="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded bg-gray-100">' +
+            '<i class="fas fa-external-link-alt mr-0.5"></i>열기</button>' +
+        '</div>' +
+      '</div>';
+    }
+    return '<p class="text-sm text-gray-400 mb-3"><span class="font-bold text-white">' + modeLabel + '</span> — ' + modeDesc + '</p>' +
+      '<div class="grid grid-cols-2 sm:grid-cols-3 gap-4">' + cards + '</div>';
   }
+
+  modal.innerHTML = '<div class="bg-gray-800 rounded-3xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">' +
+    '<div class="p-4 border-b border-white/10 flex items-center justify-between">' +
+      '<h3 class="text-lg font-bold text-white"><i class="fas fa-qrcode mr-2 text-purple-400"></i>코트별 QR 코드</h3>' +
+      '<button onclick="document.getElementById(\'qr-modal\').remove()" class="text-gray-400 hover:text-white"><i class="fas fa-times text-lg"></i></button>' +
+    '</div>' +
+    '<div class="px-4 pt-3 pb-1 flex gap-2 shrink-0">' +
+      '<button id="qr-tab-scorer" onclick="switchQRTab(\'scorer\')" class="flex-1 py-2.5 rounded-xl text-sm font-bold transition bg-green-600 text-white">' +
+        '🏓 심판용</button>' +
+      '<button id="qr-tab-viewer" onclick="switchQRTab(\'viewer\')" class="flex-1 py-2.5 rounded-xl text-sm font-bold transition bg-white/10 text-gray-400 hover:bg-white/15">' +
+        '📺 관람용</button>' +
+      '<button id="qr-tab-dashboard" onclick="switchQRTab(\'dashboard\')" class="flex-1 py-2.5 rounded-xl text-sm font-bold transition bg-white/10 text-gray-400 hover:bg-white/15">' +
+        '🖥️ 대시보드</button>' +
+    '</div>' +
+    '<div class="p-4 overflow-y-auto flex-1" id="qr-content">' +
+      renderQRContent('scorer') +
+    '</div>' +
+  '</div>';
+  document.body.appendChild(modal);
+
+  // 탭 전환 함수를 전역으로 노출
+  window.switchQRTab = function(mode) {
+    qrMode = mode;
+    var content = document.getElementById('qr-content');
+    if (content) content.innerHTML = renderQRContent(mode);
+    var tabScorer = document.getElementById('qr-tab-scorer');
+    var tabViewer = document.getElementById('qr-tab-viewer');
+    var tabDash = document.getElementById('qr-tab-dashboard');
+    var inactiveClass = 'bg-white/10 text-gray-400 hover:bg-white/15';
+    if (tabScorer) tabScorer.className = 'flex-1 py-2.5 rounded-xl text-sm font-bold transition ' + 
+      (mode === 'scorer' ? 'bg-green-600 text-white' : inactiveClass);
+    if (tabViewer) tabViewer.className = 'flex-1 py-2.5 rounded-xl text-sm font-bold transition ' + 
+      (mode === 'viewer' ? 'bg-blue-600 text-white' : inactiveClass);
+    if (tabDash) tabDash.className = 'flex-1 py-2.5 rounded-xl text-sm font-bold transition ' + 
+      (mode === 'dashboard' ? 'bg-purple-600 text-white' : inactiveClass);
+  };
 }
 
 function copyToClipboard(text) {
@@ -2240,6 +2394,384 @@ function copyToClipboard(text) {
     document.execCommand('copy'); document.body.removeChild(ta);
     showCourtToast('URL이 복사되었습니다!', 'success');
   });
+}
+
+// ==========================================
+// 대형 전광판 대시보드 (전 코트 통합 뷰)
+// ==========================================
+let dashboardTimer = null;
+let dashboardData = null;     // 마지막 API 응답 캐시
+let dashboardPrevState = {};  // 코트별 이전 상태 (경기종료→결과 전환용)
+
+function startDashboardRefresh() {
+  if (dashboardTimer) clearInterval(dashboardTimer);
+  dashboardTimer = setInterval(async () => {
+    if (courtState.page !== 'dashboard') return;
+    await fetchDashboardData();
+  }, 3000);
+}
+
+function enterDashboardMode() {
+  courtState.page = 'dashboard';
+  courtState.readOnly = true;
+  courtState.locked = true;
+  dashboardData = null;
+  dashboardPrevState = {};
+  // URL 업데이트
+  const url = new URL(window.location);
+  url.searchParams.set('tid', courtState.tournamentId);
+  url.searchParams.delete('court');
+  url.searchParams.set('mode', 'view');
+  url.searchParams.set('locked', '1');
+  window.history.pushState({}, '', url);
+  renderDashboardView();
+  startDashboardRefresh();
+}
+
+async function fetchDashboardData() {
+  try {
+    const data = await courtApi(`/tournaments/${courtState.tournamentId}/courts/overview`);
+    // 경기 종료 감지: 이전에 playing이었는데 지금 current_match가 없으면 → 종료 전환
+    if (dashboardData) {
+      data.courts.forEach((c, idx) => {
+        const prev = dashboardData.courts[idx];
+        if (prev && prev.current_match && !c.current_match) {
+          // 경기가 방금 끝남 → 결과 표시 모드
+          dashboardPrevState[c.court_number] = {
+            phase: 'result',
+            match: prev.current_match,
+            recent: c.recent_match,
+            timestamp: Date.now()
+          };
+        }
+      });
+    }
+    dashboardData = data;
+    courtState.tournament = data.tournament;
+    courtState.stats = data.stats;
+    renderDashboardView();
+  } catch(e) { console.error('Dashboard fetch error', e); }
+}
+
+function renderDashboardView() {
+  const app = document.getElementById('app');
+  if (!dashboardData) {
+    app.innerHTML = `<div class="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div class="text-center"><i class="fas fa-spinner fa-spin text-4xl text-${P}-400 mb-4"></i>
+      <p class="text-gray-400">대시보드 로딩 중...</p></div></div>`;
+    fetchDashboardData();
+    return;
+  }
+
+  const t = dashboardData.tournament;
+  const courts = dashboardData.courts;
+  const stats = dashboardData.stats;
+  const numCourts = courts.length;
+  const sport = t.sport || 'badminton';
+  const emoji = sport === 'tennis' ? '🎾' : '🏸';
+
+  // 그리드 레이아웃: 코트 수에 따라 결정
+  let gridCols = 'grid-cols-2';
+  let cardMaxH = '';
+  if (numCourts <= 2) { gridCols = 'grid-cols-2'; }
+  else if (numCourts <= 3) { gridCols = 'grid-cols-3'; }
+  else if (numCourts <= 4) { gridCols = 'grid-cols-2 lg:grid-cols-4'; }
+  else if (numCourts <= 6) { gridCols = 'grid-cols-2 lg:grid-cols-3'; }
+  else { gridCols = 'grid-cols-2 lg:grid-cols-4'; }
+
+  // 상단 바
+  const topBar = `
+    <div class="flex items-center justify-between px-6 py-3 border-b border-white/10 bg-gray-900/80 backdrop-blur-lg">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">${emoji}</span>
+        <div>
+          <h1 class="text-xl font-extrabold text-white tracking-tight">${t.name || '대회'}</h1>
+          <p class="text-xs text-gray-400">${sport === 'tennis' ? 'Tennis' : 'Badminton'} Tournament Dashboard</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2 text-xs">
+          <span class="px-2 py-1 rounded-full bg-green-500/20 text-green-400 font-bold">
+            <i class="fas fa-play mr-1"></i>${stats?.playing || 0} 경기중
+          </span>
+          <span class="px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400 font-bold">
+            <i class="fas fa-clock mr-1"></i>${stats?.pending || 0} 대기
+          </span>
+          <span class="px-2 py-1 rounded-full bg-gray-500/20 text-gray-400 font-bold">
+            <i class="fas fa-check mr-1"></i>${stats?.completed || 0} 완료
+          </span>
+        </div>
+        <div class="flex items-center gap-1 text-green-400 text-xs">
+          <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> LIVE
+        </div>
+      </div>
+    </div>`;
+
+  // 코트 카드들
+  const courtCards = courts.map(c => renderDashboardCourtCard(c, sport, t)).join('');
+
+  // 하단 바
+  const bottomBar = `
+    <div class="flex items-center justify-between px-6 py-2 border-t border-white/10 bg-gray-900/60 text-xs text-gray-500">
+      <span>${emoji} ${t.name} — ${numCourts}코트 운영</span>
+      <span>자동 갱신 3초 <i class="fas fa-sync-alt ml-1 animate-spin" style="animation-duration:3s"></i></span>
+    </div>`;
+
+  app.innerHTML = `
+    <div class="min-h-screen bg-gray-950 flex flex-col">
+      ${topBar}
+      <div class="flex-1 p-4 lg:p-6 overflow-auto">
+        <div class="grid ${gridCols} gap-4 lg:gap-5 auto-rows-fr">
+          ${courtCards}
+        </div>
+      </div>
+      ${bottomBar}
+    </div>`;
+}
+
+function renderDashboardCourtCard(court, sport, tournament) {
+  const cn = court.court_number;
+  const m = court.current_match;
+  const next = court.next_match;
+  const recent = court.recent_match;
+  const pending = court.pending_count;
+  const isTen = sport === 'tennis';
+  const targetScore = dashboardData.target_score || 21;
+
+  // 경기 종료 전환 상태 체크
+  const prevState = dashboardPrevState[cn];
+  if (prevState && prevState.phase === 'result') {
+    const elapsed = Date.now() - prevState.timestamp;
+    if (elapsed < 8000) {
+      // 8초간 결과 표시
+      return renderDashboardCardResult(cn, prevState, isTen);
+    } else {
+      // 전환 완료 → 정리
+      delete dashboardPrevState[cn];
+    }
+  }
+
+  if (m) {
+    return renderDashboardCardPlaying(cn, m, isTen, targetScore, tournament);
+  } else if (next) {
+    return renderDashboardCardNext(cn, next, pending, isTen);
+  } else {
+    return renderDashboardCardEmpty(cn, pending, recent);
+  }
+}
+
+// --- 경기중 카드 ---
+function renderDashboardCardPlaying(cn, m, isTen, targetScore, tournament) {
+  const s1 = m.team1_set1 || 0;
+  const s2 = m.team2_set1 || 0;
+  
+  // 점수 진행률
+  const maxScore = Math.max(s1, s2, 1);
+  const progress = Math.min(maxScore / targetScore * 100, 100);
+  
+  // 매치포인트 감지
+  const isMatchPoint = (s1 === targetScore - 1 && s1 > s2) || (s2 === targetScore - 1 && s2 > s1);
+  const isCloseGame = Math.abs(s1 - s2) <= 1 && (s1 >= targetScore - 3 || s2 >= targetScore - 3);
+  
+  let borderColor = 'border-green-500/50';
+  let glowClass = '';
+  let badge = '';
+  if (isMatchPoint) {
+    borderColor = 'border-red-500/80';
+    glowClass = 'shadow-[0_0_25px_rgba(239,68,68,0.3)]';
+    badge = `<span class="absolute top-2 right-2 px-2 py-0.5 text-[10px] font-black bg-red-500 text-white rounded-full animate-pulse tracking-wider">MATCH POINT</span>`;
+  } else if (isCloseGame) {
+    borderColor = 'border-yellow-500/60';
+    badge = `<span class="absolute top-2 right-2 px-2 py-0.5 text-[10px] font-bold bg-yellow-500/80 text-black rounded-full">접전</span>`;
+  }
+
+  // 테니스: 세트 스코어 표시
+  let setInfo = '';
+  if (isTen) {
+    const sets = [];
+    if (m.team1_set2 || m.team2_set2) sets.push(`S1: ${m.team1_set1||0}-${m.team2_set1||0}`);
+    if (m.team1_set3 || m.team2_set3) sets.push(`S2: ${m.team1_set2||0}-${m.team2_set2||0}`);
+    if (sets.length > 0) {
+      setInfo = `<div class="text-[10px] text-gray-400 mt-1 text-center">${sets.join(' / ')}</div>`;
+    }
+  }
+
+  // 이벤트/라운드 정보
+  const eventInfo = m.event_name || '';
+  const roundInfo = m.round ? `R${m.round}` : '';
+
+  return `
+    <div class="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border-2 ${borderColor} ${glowClass} p-4 flex flex-col transition-all duration-500 overflow-hidden">
+      ${badge}
+      <!-- 코트 번호 + 상태 -->
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-xl bg-green-500/20 flex items-center justify-center text-green-400 font-black text-sm">${cn}</span>
+          <span class="text-xs font-bold text-green-400 tracking-wider">경기중</span>
+        </div>
+        <div class="text-[10px] text-gray-500 text-right leading-tight">
+          ${eventInfo ? `<div>${eventInfo}</div>` : ''}
+          ${roundInfo ? `<div>${roundInfo} #${m.match_order || ''}</div>` : ''}
+        </div>
+      </div>
+
+      <!-- 스코어보드 -->
+      <div class="flex-1 flex flex-col justify-center">
+        <!-- 팀1 -->
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-sm font-bold text-white truncate flex-1 mr-2" title="${m.team1_name||''}">${truncateName(m.team1_name||'팀1', 10)}</span>
+          <span class="text-3xl lg:text-4xl font-black ${s1 > s2 ? 'text-white' : 'text-gray-400'} tabular-nums min-w-[2ch] text-right">${s1}</span>
+        </div>
+        
+        <!-- 구분선 + VS -->
+        <div class="flex items-center gap-2 my-1">
+          <div class="flex-1 h-px bg-white/10"></div>
+          <span class="text-[10px] text-gray-600 font-bold">VS</span>
+          <div class="flex-1 h-px bg-white/10"></div>
+        </div>
+
+        <!-- 팀2 -->
+        <div class="flex items-center justify-between mt-1">
+          <span class="text-sm font-bold text-white truncate flex-1 mr-2" title="${m.team2_name||''}">${truncateName(m.team2_name||'팀2', 10)}</span>
+          <span class="text-3xl lg:text-4xl font-black ${s2 > s1 ? 'text-white' : 'text-gray-400'} tabular-nums min-w-[2ch] text-right">${s2}</span>
+        </div>
+
+        ${setInfo}
+      </div>
+
+      <!-- 프로그레스 바 -->
+      <div class="mt-3">
+        <div class="h-1 rounded-full bg-gray-700 overflow-hidden">
+          <div class="h-full rounded-full transition-all duration-1000 ${isMatchPoint ? 'bg-red-500 animate-pulse' : isCloseGame ? 'bg-yellow-500' : 'bg-green-500'}" style="width:${progress}%"></div>
+        </div>
+        <div class="text-[10px] text-gray-500 mt-1 text-center">${isTen ? `${targetScore}게임 목표` : `${targetScore}점 목표`}</div>
+      </div>
+    </div>`;
+}
+
+// --- 경기 종료 결과 카드 (전환 애니메이션) ---
+function renderDashboardCardResult(cn, prevState, isTen) {
+  const r = prevState.recent || prevState.match;
+  if (!r) return renderDashboardCardEmpty(cn, 0, null);
+  
+  const s1 = r.team1_set1 || 0;
+  const s2 = r.team2_set1 || 0;
+  const winnerName = r.winner_name || (s1 > s2 ? r.team1_name : r.team2_name) || '?';
+  const elapsed = Date.now() - prevState.timestamp;
+  const fadeClass = elapsed > 6000 ? 'opacity-70' : 'opacity-100';
+
+  return `
+    <div class="relative bg-gradient-to-br from-yellow-900/30 to-amber-900/20 rounded-2xl border-2 border-yellow-500/50 p-4 flex flex-col transition-all duration-700 ${fadeClass} overflow-hidden">
+      <div class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2240%22%20height%3D%2240%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M20%200L40%2020L20%2040L0%2020Z%22%20fill%3D%22%23fbbf24%22%20fill-opacity%3D%220.03%22%2F%3E%3C%2Fsvg%3E')] opacity-50"></div>
+      <!-- 코트 번호 -->
+      <div class="flex items-center justify-between mb-2 relative z-10">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-xl bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-black text-sm">${cn}</span>
+          <span class="text-xs font-bold text-yellow-400 tracking-wider">경기 종료</span>
+        </div>
+        <span class="text-lg">🏆</span>
+      </div>
+
+      <!-- 결과 -->
+      <div class="flex-1 flex flex-col justify-center items-center relative z-10 py-2">
+        <div class="text-[10px] text-yellow-500/70 font-bold mb-1 tracking-widest">WINNER</div>
+        <div class="text-base lg:text-lg font-black text-yellow-300 text-center leading-tight mb-2">${winnerName}</div>
+        <div class="flex items-center gap-3 text-2xl font-black">
+          <span class="${s1 > s2 ? 'text-yellow-300' : 'text-gray-500'}">${s1}</span>
+          <span class="text-gray-600 text-sm">:</span>
+          <span class="${s2 > s1 ? 'text-yellow-300' : 'text-gray-500'}">${s2}</span>
+        </div>
+        <div class="text-[10px] text-gray-500 mt-1">${r.event_name || ''}</div>
+      </div>
+
+      <!-- 전환 인디케이터 -->
+      <div class="mt-2 relative z-10">
+        <div class="h-1 rounded-full bg-yellow-900/50 overflow-hidden">
+          <div class="h-full rounded-full bg-yellow-500/60 transition-all duration-1000" style="width:${Math.min(((Date.now() - prevState.timestamp) / 8000) * 100, 100)}%"></div>
+        </div>
+        <div class="text-[10px] text-gray-600 mt-1 text-center">다음 경기로 전환 중...</div>
+      </div>
+    </div>`;
+}
+
+// --- 다음 경기 대기 카드 ---
+function renderDashboardCardNext(cn, next, pending, isTen) {
+  return `
+    <div class="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border-2 border-blue-500/30 p-4 flex flex-col overflow-hidden">
+      <!-- 코트 번호 -->
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 font-black text-sm">${cn}</span>
+          <span class="text-xs font-bold text-blue-400 tracking-wider">다음 경기</span>
+        </div>
+        <span class="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] rounded-full font-bold">
+          대기 ${pending}경기
+        </span>
+      </div>
+
+      <!-- 다음 선수 정보 -->
+      <div class="flex-1 flex flex-col justify-center">
+        <div class="text-center mb-3">
+          <div class="text-[10px] text-gray-500 font-bold tracking-widest mb-2">NEXT MATCH</div>
+          <div class="text-sm lg:text-base font-bold text-white leading-relaxed">
+            ${truncateName(next.team1_name || 'TBD', 12)}
+          </div>
+          <div class="text-xs text-gray-500 font-bold my-1">VS</div>
+          <div class="text-sm lg:text-base font-bold text-white leading-relaxed">
+            ${truncateName(next.team2_name || 'TBD', 12)}
+          </div>
+        </div>
+        <div class="text-center">
+          <span class="inline-block px-2 py-0.5 bg-white/5 rounded-md text-[10px] text-gray-400">
+            ${next.event_name || ''} ${next.round ? 'R' + next.round : ''}
+          </span>
+        </div>
+      </div>
+
+      <!-- 호출 알림 -->
+      <div class="mt-3 py-2 bg-blue-500/10 rounded-xl text-center">
+        <span class="text-xs text-blue-300 font-bold">
+          <i class="fas fa-bullhorn mr-1"></i>선수 호출 대기중
+        </span>
+      </div>
+    </div>`;
+}
+
+// --- 빈 코트 카드 ---
+function renderDashboardCardEmpty(cn, pending, recent) {
+  let recentInfo = '';
+  if (recent) {
+    recentInfo = `
+      <div class="mt-2 text-center">
+        <div class="text-[10px] text-gray-600 mb-1">최근 결과</div>
+        <div class="text-xs text-gray-500">${truncateName(recent.team1_name||'',8)} ${recent.team1_set1||0}:${recent.team2_set1||0} ${truncateName(recent.team2_name||'',8)}</div>
+        ${recent.winner_name ? `<div class="text-[10px] text-yellow-600 mt-0.5">🏆 ${recent.winner_name}</div>` : ''}
+      </div>`;
+  }
+
+  return `
+    <div class="relative bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl border-2 border-gray-700/30 p-4 flex flex-col overflow-hidden opacity-60">
+      <!-- 코트 번호 -->
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-xl bg-gray-700/50 flex items-center justify-center text-gray-500 font-black text-sm">${cn}</span>
+          <span class="text-xs font-bold text-gray-600 tracking-wider">${pending > 0 ? '배정 대기' : '운영 종료'}</span>
+        </div>
+      </div>
+
+      <!-- 중앙 -->
+      <div class="flex-1 flex flex-col justify-center items-center py-4">
+        <i class="fas ${pending > 0 ? 'fa-hourglass-half text-gray-600' : 'fa-check-circle text-gray-700'} text-3xl mb-2"></i>
+        <span class="text-sm text-gray-600 font-bold">${pending > 0 ? `${pending}경기 대기중` : '경기 없음'}</span>
+        ${recentInfo}
+      </div>
+    </div>`;
+}
+
+// 이름 자르기 유틸
+function truncateName(name, maxLen) {
+  if (!name) return '';
+  return name.length > maxLen ? name.substring(0, maxLen) + '…' : name;
 }
 
 function exitCourt() {
@@ -2345,6 +2877,14 @@ document.addEventListener('DOMContentLoaded', () => {
   
   if (courtState.tournamentId && courtState.courtNumber) {
     refreshCourtData();
+  } else if (courtState.tournamentId && courtState.readOnly) {
+    // tid만 있고 court 없이 mode=view → 대형 전광판 대시보드
+    courtState.page = 'dashboard';
+    selectTournament(parseInt(courtState.tournamentId)).then(() => {
+      courtState.page = 'dashboard';
+      renderCourt();
+      startDashboardRefresh();
+    });
   } else if (courtState.tournamentId) {
     selectTournament(parseInt(courtState.tournamentId));
   } else {
