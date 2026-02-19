@@ -1623,7 +1623,17 @@ async function confirmFinish() {
     const loserName = loserTeam === 1 ? (m.team1_name || '팀1') : (m.team2_name || '팀2');
     
     courtState.finishedMatch = m;
-    courtState.finishedScore = { team1: getTeam1Score(), team2: getTeam2Score() };
+    // 테니스: 세트별 점수 보존
+    if (isTennis()) {
+      const setScores = getTennisSetScores();
+      courtState.finishedScore = {
+        team1: getTeam1Score(), team2: getTeam2Score(),
+        isTennis: true,
+        sets: setScores
+      };
+    } else {
+      courtState.finishedScore = { team1: getTeam1Score(), team2: getTeam2Score() };
+    }
     courtState.finishedWinner = winnerTeam;
     courtState.finishedNames = { winner: winnerName, loser: loserName };
     courtState.page = 'signature';
@@ -1662,6 +1672,34 @@ function renderSignatureScreen() {
   const winnerScore = courtState.finishedWinner === 1 ? fs.team1 : fs.team2;
   const loserScore = courtState.finishedWinner === 1 ? fs.team2 : fs.team1;
 
+  // 테니스 세트별 점수 표시
+  let setScoreHtml = '';
+  if (fs.isTennis && fs.sets) {
+    const s = fs.sets;
+    const setLines = [];
+    if (s.team1_set1 || s.team2_set1) {
+      const w1 = courtState.finishedWinner === 1 ? s.team1_set1 : s.team2_set1;
+      const l1 = courtState.finishedWinner === 1 ? s.team2_set1 : s.team1_set1;
+      setLines.push(`<span class="px-2 py-0.5 rounded-lg ${w1 > l1 ? 'bg-yellow-500/20 text-yellow-300' : 'bg-white/5 text-gray-400'} text-sm font-bold">${w1}-${l1}</span>`);
+    }
+    if (s.team1_set2 || s.team2_set2) {
+      const w2 = courtState.finishedWinner === 1 ? s.team1_set2 : s.team2_set2;
+      const l2 = courtState.finishedWinner === 1 ? s.team2_set2 : s.team1_set2;
+      setLines.push(`<span class="px-2 py-0.5 rounded-lg ${w2 > l2 ? 'bg-yellow-500/20 text-yellow-300' : 'bg-white/5 text-gray-400'} text-sm font-bold">${w2}-${l2}</span>`);
+    }
+    if (s.team1_set3 || s.team2_set3) {
+      const w3 = courtState.finishedWinner === 1 ? s.team1_set3 : s.team2_set3;
+      const l3 = courtState.finishedWinner === 1 ? s.team2_set3 : s.team1_set3;
+      setLines.push(`<span class="px-2 py-0.5 rounded-lg ${w3 > l3 ? 'bg-yellow-500/20 text-yellow-300' : 'bg-white/5 text-gray-400'} text-sm font-bold">${w3}-${l3}</span>`);
+    }
+    if (setLines.length > 0) {
+      setScoreHtml = `<div class="mt-2 flex items-center justify-center gap-2">
+        <span class="text-[10px] text-gray-500">세트:</span>
+        ${setLines.join('<span class="text-gray-600">·</span>')}
+      </div>`;
+    }
+  }
+
   return `<div class="h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col select-none" style="touch-action:none;overflow:hidden;">
     <!-- 상단 바 -->
     <div class="flex items-center justify-between px-4 py-2 bg-black/40 border-b border-white/10 shrink-0">
@@ -1692,6 +1730,7 @@ function renderSignatureScreen() {
             <p class="text-2xl font-black">${loserScore}</p>
           </div>
         </div>
+        ${setScoreHtml}
       </div>
     </div>
 
