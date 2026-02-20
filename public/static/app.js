@@ -568,6 +568,7 @@ function renderTournament() {
       <div id="admin-panel" class="hidden">
         <div class="flex flex-wrap gap-2 p-3 bg-white rounded-xl border border-gray-200">
           <button onclick="navigate('scoreboard')" class="px-3 py-2 ${T.bg50} ${T.text700} rounded-lg text-xs font-medium ${T.hoverBg100} transition"><i class="fas fa-tv mr-1"></i>스코어보드</button>
+          <button onclick="showSponsorManager()" class="px-3 py-2 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 transition"><i class="fas fa-ad mr-1"></i>스폰서 배너</button>
           <button onclick="exportTournament(${t.id})" class="px-3 py-2 bg-${P}-50 text-${P}-700 rounded-lg text-xs font-medium hover:bg-${P}-100 transition"><i class="fas fa-download mr-1"></i>데이터 백업</button>
           <button onclick="showImportModal()" class="px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-100 transition"><i class="fas fa-upload mr-1"></i>데이터 복원</button>
           <button onclick="deleteTournament(${t.id})" class="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition"><i class="fas fa-trash-alt mr-1"></i>대회 삭제</button>
@@ -1723,6 +1724,12 @@ function bindEvents() {
     e.preventDefault();
     searchMyMatches();
   });
+  
+  // MyPage 스폰서 배너 로드
+  const sponsorEl = document.getElementById('my-page-sponsor');
+  if (sponsorEl && state.currentTournament) {
+    loadMyPageSponsors(sponsorEl);
+  }
 }
 
 // ==========================================
@@ -2824,6 +2831,8 @@ function renderMyPage() {
   <div class="bg-slate-50 min-h-screen">
   <div class="max-w-4xl mx-auto px-4 sm:px-6 -mt-1 pb-10 fade-in">
     <div id="my-result"></div>
+    <!-- 스폰서 배너 영역 -->
+    <div id="my-page-sponsor" class="mt-6"></div>
   </div>
   </div>`;
 }
@@ -3060,4 +3069,171 @@ async function selectDuplicate(pid) {
   } catch(e) {
     resultEl.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-exclamation-circle text-3xl mb-2"></i><p>조회에 실패했습니다.</p></div>';
   }
+}
+
+// ==========================================
+// 스폰서 배너 관리 시스템
+// ==========================================
+let sponsorList = [];
+
+async function showSponsorManager() {
+  const tid = state.currentTournament.id;
+  try {
+    sponsorList = await api('/tournaments/' + tid + '/sponsors');
+  } catch(e) { sponsorList = []; }
+  
+  const modal = document.createElement('div');
+  modal.id = 'sponsor-modal';
+  modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-overlay';
+  modal.innerHTML = renderSponsorManagerContent();
+  document.body.appendChild(modal);
+}
+
+function renderSponsorManagerContent() {
+  const list = sponsorList.map((s, i) => `
+    <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200 group hover:bg-white hover:shadow-sm transition">
+      <div class="w-16 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+        <img src="${s.image_url}" alt="${s.name}" class="max-w-full max-h-full object-contain" onerror="this.parentElement.innerHTML='<i class=\\'fas fa-image text-gray-300\\'></i>'">
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="font-bold text-sm text-gray-800 truncate">${s.name}</div>
+        <div class="text-xs text-gray-400 truncate">${s.link_url || '링크 없음'}</div>
+      </div>
+      <div class="flex items-center gap-1.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition">
+        <button onclick="toggleSponsor(${s.id}, ${s.is_active === 0 ? 1 : 0})" class="w-8 h-8 rounded-lg flex items-center justify-center text-xs ${s.is_active ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-400'} hover:scale-110 transition" title="${s.is_active ? '비활성화' : '활성화'}">
+          <i class="fas ${s.is_active ? 'fa-eye' : 'fa-eye-slash'}"></i>
+        </button>
+        <button onclick="deleteSponsor(${s.id})" class="w-8 h-8 rounded-lg flex items-center justify-center text-xs bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 hover:scale-110 transition" title="삭제">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+    </div>
+  `).join('');
+
+  return `
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-amber-50 to-orange-50">
+        <div>
+          <h3 class="text-lg font-extrabold text-gray-800"><i class="fas fa-ad mr-2 text-amber-500"></i>스폰서 배너 관리</h3>
+          <p class="text-xs text-gray-400 mt-0.5">대시보드, 전광판, 참가자 페이지에 노출됩니다</p>
+        </div>
+        <button onclick="closeSponsorModal()" class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <!-- 등록 폼 -->
+      <div class="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+        <form id="sponsor-form" onsubmit="addSponsor(event)" class="space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-gray-500 mb-1">스폰서 이름 <span class="text-red-400">*</span></label>
+              <input name="name" required placeholder="예: OO배드민턴" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-500 mb-1">이미지 URL <span class="text-red-400">*</span></label>
+              <input name="image_url" required placeholder="https://..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition">
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <div class="flex-1">
+              <label class="block text-xs font-bold text-gray-500 mb-1">링크 URL (선택)</label>
+              <input name="link_url" placeholder="https://..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition">
+            </div>
+            <button type="submit" class="self-end px-5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg text-sm font-bold hover:from-amber-600 hover:to-orange-600 shadow-md shadow-amber-500/20 transition-all flex-shrink-0">
+              <i class="fas fa-plus mr-1"></i>등록
+            </button>
+          </div>
+        </form>
+      </div>
+      
+      <!-- 목록 -->
+      <div class="flex-1 overflow-y-auto px-6 py-4">
+        ${sponsorList.length === 0 ? `
+          <div class="text-center py-10 text-gray-300">
+            <i class="fas fa-ad text-4xl mb-3"></i>
+            <p class="font-bold">등록된 스폰서가 없습니다</p>
+            <p class="text-xs mt-1">위 양식으로 첫 스폰서를 등록해보세요</p>
+          </div>
+        ` : `
+          <div class="space-y-2">${list}</div>
+          <p class="text-xs text-gray-400 mt-3 text-center"><i class="fas fa-info-circle mr-1"></i>배너는 6초 간격으로 자동 롤링됩니다</p>
+        `}
+      </div>
+    </div>`;
+}
+
+async function addSponsor(e) {
+  e.preventDefault();
+  const form = e.target;
+  const tid = state.currentTournament.id;
+  const data = {
+    name: form.name.value,
+    image_url: form.image_url.value,
+    link_url: form.link_url.value || '',
+    position: 'all',
+    sort_order: sponsorList.length
+  };
+  try {
+    await api('/tournaments/' + tid + '/sponsors', {
+      method: 'POST', body: JSON.stringify(data)
+    });
+    showToast('스폰서가 등록되었습니다!', 'success');
+    closeSponsorModal();
+    showSponsorManager();
+  } catch(e) {}
+}
+
+async function toggleSponsor(sid, newState) {
+  const tid = state.currentTournament.id;
+  try {
+    await api('/tournaments/' + tid + '/sponsors/' + sid, {
+      method: 'PUT', body: JSON.stringify({ is_active: newState })
+    });
+    closeSponsorModal();
+    showSponsorManager();
+  } catch(e) {}
+}
+
+async function deleteSponsor(sid) {
+  if (!confirm('이 스폰서를 삭제할까요?')) return;
+  const tid = state.currentTournament.id;
+  try {
+    await api('/tournaments/' + tid + '/sponsors/' + sid, { method: 'DELETE' });
+    showToast('삭제되었습니다.', 'success');
+    closeSponsorModal();
+    showSponsorManager();
+  } catch(e) {}
+}
+
+function closeSponsorModal() {
+  const modal = document.getElementById('sponsor-modal');
+  if (modal) modal.remove();
+}
+
+// MyPage 하단 스폰서 배너 표시
+async function loadMyPageSponsors(container) {
+  try {
+    const tid = state.currentTournament.id;
+    const sponsors = await api('/tournaments/' + tid + '/sponsors');
+    if (!sponsors || sponsors.length === 0) return;
+    
+    let idx = 0;
+    function renderBanner() {
+      const s = sponsors[idx % sponsors.length];
+      const link = s.link_url ? `onclick="window.open('${s.link_url}','_blank')" style="cursor:pointer"` : '';
+      container.innerHTML = `
+        <div class="bg-white/80 border border-gray-200 rounded-xl p-3 text-center shadow-sm" ${link}>
+          <div class="text-[10px] text-gray-400 mb-1 font-bold">SPONSORED BY</div>
+          <div class="flex items-center justify-center gap-3">
+            <img src="${s.image_url}" alt="${s.name}" class="h-8 max-w-[140px] object-contain" onerror="this.style.display='none'">
+            <span class="text-sm font-bold text-gray-600">${s.name}</span>
+          </div>
+        </div>`;
+    }
+    renderBanner();
+    if (sponsors.length > 1) {
+      setInterval(() => { idx++; renderBanner(); }, 6000);
+    }
+  } catch(e) { /* 스폰서 미설정 시 무시 */ }
 }

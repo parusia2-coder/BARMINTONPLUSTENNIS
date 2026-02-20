@@ -7,6 +7,7 @@ import { eventRoutes } from './routes/events'
 import { matchRoutes } from './routes/matches'
 import { bracketRoutes } from './routes/brackets'
 import { notificationRoutes } from './routes/notifications'
+import { sponsorRoutes } from './routes/sponsors'
 
 // sportConfig 편의 변수 (기본 = badminton)
 const SC = sportConfig
@@ -40,6 +41,7 @@ app.route('/api/tournaments', eventRoutes)
 app.route('/api/tournaments', matchRoutes)
 app.route('/api/tournaments', bracketRoutes)
 app.route('/api/tournaments', notificationRoutes)
+app.route('/api/tournaments', sponsorRoutes)
 
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))
@@ -92,6 +94,7 @@ function getCourtHtml(): string {
   <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
   <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="/static/style.css" rel="stylesheet">
   <script>
     tailwind.config = {
       theme: {
@@ -105,8 +108,7 @@ function getCourtHtml(): string {
     }
   </script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap');
-    body { font-family: 'Noto Sans KR', sans-serif; overscroll-behavior: none; -webkit-user-select: none; user-select: none; }
+    body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; }
     .fade-in { animation: fadeIn 0.3s ease-in; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .score-btn { transition: all 0.15s; -webkit-tap-highlight-color: transparent; }
@@ -214,8 +216,7 @@ function getIndexHtml(): string {
     }
   </script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap');
-    body { font-family: 'Noto Sans KR', sans-serif; }
+    body { }
     .fade-in { animation: fadeIn 0.5s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
     .fade-in-delay-1 { animation: fadeIn 0.5s ease-out 0.1s both; }
@@ -363,6 +364,7 @@ function getMyPageHtml(): string {
   <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
   <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="/static/style.css" rel="stylesheet">
   <script>
     tailwind.config = {
       theme: { extend: { colors: {
@@ -372,8 +374,8 @@ function getMyPageHtml(): string {
     }
   </script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap');
-    body { font-family: 'Noto Sans KR', sans-serif; }
+    
+    body {  }
     .fade-in { animation: fadeIn 0.3s ease-in; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
@@ -705,6 +707,7 @@ function getDashboardHtml(): string {
   <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
   <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="/static/style.css" rel="stylesheet">
   <script>
     tailwind.config = {
       theme: { extend: { colors: {
@@ -714,8 +717,8 @@ function getDashboardHtml(): string {
     }
   </script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap');
-    body { font-family: 'Noto Sans KR', sans-serif; }
+    
+    body {  }
     .fade-in { animation: fadeIn 0.3s ease-in; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
@@ -789,6 +792,7 @@ function getTimelineHtml(): string {
   <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
   <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="/static/style.css" rel="stylesheet">
   <script>
     tailwind.config = {
       theme: { extend: { colors: {
@@ -798,8 +802,8 @@ function getTimelineHtml(): string {
     }
   </script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap');
-    body { font-family: 'Noto Sans KR', sans-serif; }
+    
+    body {  }
     .fade-in { animation: fadeIn 0.3s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     .pulse-live { animation: pulse 1.5s infinite; }
@@ -1047,7 +1051,7 @@ function getPrintHtml(): string {
 <style>
   /* ===== 기본 ===== */
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif; background: #f3f4f6; color: #1a1a1a; }
+  body {  background: #f3f4f6; color: #1a1a1a; }
   
   /* ===== 화면용 컨트롤 패널 ===== */
   .control-panel {

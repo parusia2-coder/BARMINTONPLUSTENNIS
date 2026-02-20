@@ -246,6 +246,8 @@ function tennisGameWon(side) {
   // 세트 표시 (멀티세트일 때)
   const setLabel = t.setsToWin > 1 ? ' [세트 ' + t.currentSet + ']' : '';
   showCourtToast(winnerName + ' 게임! (' + gL + '-' + gR + ')' + setLabel, 'success');
+  // ★ 게임 승리 파티클
+  spawnScoreParticles(side, false);
 
   // 체인지오버 체크: 게임 합이 홀수일 때
   const totalGames = gL + gR;
@@ -279,6 +281,8 @@ function tennisGameWon(side) {
       setTimeout(function() {
         var setScores = t.sets.map(function(s) { return s.left + '-' + s.right; }).join(', ');
         showCourtToast('🏆 ' + matchWinnerName + ' 승리! (' + setScores + ')', 'success');
+        spawnConfetti();
+        spawnFireworks(window.innerWidth/2, window.innerHeight/3);
         setTimeout(function() { showFinishModal(); }, 500);
       }, 300);
       return;
@@ -286,6 +290,7 @@ function tennisGameWon(side) {
 
     // 다음 세트 시작
     showCourtToast('🎾 세트 ' + t.currentSet + ' 종료! (' + gL + '-' + gR + ') → 세트 ' + (t.currentSet + 1) + ' 시작', 'info');
+    spawnScoreParticles(setWinner, true);
     t.currentSet++;
     t.games = { left: 0, right: 0 };
     t.point = { left: 0, right: 0 };
@@ -1467,6 +1472,22 @@ function changeScore(side, delta) {
     setTimeout(() => el.classList.remove('score-flash'), 300);
   }
 
+  // ★ 득점 파티클 애니메이션
+  if (delta > 0) {
+    const target = courtState.targetScore;
+    const isMatchPoint = (newVal === target - 1 && newVal > courtState.score[side === 'left' ? 'right' : 'left']);
+    const isWinning = (newVal >= target);
+    if (isWinning) {
+      spawnScoreParticles(side, true);
+      setTimeout(() => spawnConfetti(), 200);
+      setTimeout(() => spawnFireworks(window.innerWidth/2, window.innerHeight/3), 400);
+    } else if (isMatchPoint) {
+      spawnScoreParticles(side, true);
+    } else {
+      spawnScoreParticles(side, false);
+    }
+  }
+
   // 중간 교체 점수 체크 (아직 교체 안 했을 때만, 모달 미표시 중일 때만)
   if (!courtState.swapDone && !courtState.swapPending) {
     if (checkAutoSwap()) {
@@ -2612,9 +2633,12 @@ function renderDashboardView() {
 
   // 하단 바
   const bottomBar = `
-    <div class="flex items-center justify-between px-6 py-2 border-t border-white/10 bg-gray-900/60 text-xs text-gray-500">
-      <span>${emoji} ${t.name} — ${numCourts}코트 운영</span>
-      <span>자동 갱신 3초 <i class="fas fa-sync-alt ml-1 animate-spin" style="animation-duration:3s"></i></span>
+    <div class="flex items-center justify-between px-6 py-2 border-t border-white/10 bg-gray-900/60">
+      <div class="flex items-center gap-3 flex-1">
+        <span class="text-xs text-gray-500">${emoji} ${t.name} — ${numCourts}코트</span>
+        <div class="sponsor-banner-slot flex-1 max-w-xs"></div>
+      </div>
+      <span class="text-xs text-gray-500">자동 갱신 3초 <i class="fas fa-sync-alt ml-1 animate-spin" style="animation-duration:3s"></i></span>
     </div>`;
 
   app.innerHTML = `
@@ -2725,10 +2749,7 @@ function renderDashboardCardPlayingBadminton(cn, m, targetScore, tournament) {
       </div>
 
       <div class="mt-3">
-        <div class="h-1 rounded-full bg-gray-700 overflow-hidden">
-          <div class="h-full rounded-full transition-all duration-1000 ${isMatchPoint ? 'bg-red-500 animate-pulse' : isCloseGame ? 'bg-yellow-500' : 'bg-blue-500'}" style="width:${progress}%"></div>
-        </div>
-        <div class="text-[10px] text-gray-500 mt-1 text-center">${targetScore}점 목표</div>
+        ${renderCourtTimeline(m, targetScore, false)}
       </div>
     </div>`;
 }
@@ -2907,10 +2928,7 @@ function renderDashboardCardPlayingTennis(cn, m, targetScore, tournament) {
 
       <!-- 프로그레스 바 -->
       <div class="mt-3">
-        <div class="h-1 rounded-full bg-gray-700 overflow-hidden">
-          <div class="h-full rounded-full transition-all duration-1000 ${progressBarColor}" style="width:${progress}%"></div>
-        </div>
-        <div class="text-[10px] text-gray-500 mt-1 text-center">${scoringLabel}</div>
+        ${renderCourtTimeline(m, gamesTarget, true)}
       </div>
     </div>`;
 }
@@ -3254,4 +3272,182 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   startAutoRefresh();
+  // 대시보드용 스폰서 배너 로드
+  loadSponsorBanners();
 });
+
+// ==========================================
+// 득점 파티클 애니메이션 시스템
+// ==========================================
+function spawnScoreParticles(side, isSpecial) {
+  const container = document.createElement('div');
+  container.className = 'particle-container';
+  document.body.appendChild(container);
+
+  const colors = isSpecial 
+    ? ['#fbbf24','#f59e0b','#ef4444','#ec4899','#8b5cf6','#3b82f6']
+    : ['#60a5fa','#34d399','#fbbf24','#f472b6'];
+  
+  const rect = document.getElementById(side + '-zone');
+  const cx = rect ? rect.getBoundingClientRect().left + rect.getBoundingClientRect().width/2 : window.innerWidth/2;
+  const cy = rect ? rect.getBoundingClientRect().top + rect.getBoundingClientRect().height/2 : window.innerHeight/2;
+
+  const count = isSpecial ? 40 : 15;
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const angle = (Math.PI * 2 * i) / count + (Math.random()-0.5)*0.5;
+    const dist = 60 + Math.random() * (isSpecial ? 180 : 100);
+    const size = 4 + Math.random() * (isSpecial ? 10 : 6);
+    p.style.cssText = `
+      width:${size}px;height:${size}px;
+      left:${cx}px;top:${cy}px;
+      background:${colors[i % colors.length]};
+      --px:${Math.cos(angle)*dist}px;
+      --py:${Math.sin(angle)*dist}px;
+      animation-duration:${0.5 + Math.random()*0.5}s;
+      animation-delay:${Math.random()*0.1}s;
+    `;
+    container.appendChild(p);
+  }
+  setTimeout(() => container.remove(), 1500);
+}
+
+function spawnConfetti() {
+  const container = document.createElement('div');
+  container.className = 'particle-container';
+  document.body.appendChild(container);
+  const colors = ['#fbbf24','#ef4444','#3b82f6','#22c55e','#ec4899','#8b5cf6','#f97316'];
+  for (let i = 0; i < 60; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    const shape = Math.random() > 0.5 ? '50%' : '2px';
+    c.style.cssText = `
+      left:${Math.random()*100}%;
+      width:${6+Math.random()*6}px;
+      height:${6+Math.random()*6}px;
+      background:${colors[i%colors.length]};
+      border-radius:${shape};
+      animation-delay:${Math.random()*1}s;
+      animation-duration:${1.5+Math.random()*1.5}s;
+    `;
+    container.appendChild(c);
+  }
+  setTimeout(() => container.remove(), 4000);
+}
+
+function spawnFireworks(cx, cy) {
+  const container = document.createElement('div');
+  container.className = 'particle-container';
+  document.body.appendChild(container);
+  const colors = ['rgba(251,191,36,0.8)','rgba(239,68,68,0.8)','rgba(59,130,246,0.8)','rgba(34,197,94,0.8)'];
+  for (let burst = 0; burst < 3; burst++) {
+    const bx = cx + (Math.random()-0.5)*200;
+    const by = cy + (Math.random()-0.5)*100;
+    setTimeout(() => {
+      for (let i = 0; i < 20; i++) {
+        const spark = document.createElement('div');
+        const angle = (Math.PI*2*i)/20;
+        const dist = 40 + Math.random()*80;
+        spark.style.cssText = `
+          position:absolute;
+          left:${bx}px;top:${by}px;
+          width:4px;height:4px;
+          border-radius:50%;
+          --fw-x:${Math.cos(angle)*dist}px;
+          --fw-y:${Math.sin(angle)*dist}px;
+          --fw-color:${colors[burst%colors.length]};
+          animation:firework 0.8s ease-out forwards;
+          animation-delay:${Math.random()*0.2}s;
+        `;
+        container.appendChild(spark);
+      }
+    }, burst * 300);
+  }
+  setTimeout(() => container.remove(), 3000);
+}
+
+// ==========================================
+// 스폰서 배너 시스템
+// ==========================================
+let sponsorBanners = [];
+let sponsorBannerIndex = 0;
+let sponsorBannerTimer = null;
+
+async function loadSponsorBanners() {
+  if (!courtState.tournamentId) return;
+  try {
+    const data = await courtApi('/tournaments/' + courtState.tournamentId + '/sponsors');
+    sponsorBanners = data || [];
+    if (sponsorBanners.length > 0) startSponsorBannerRotation();
+  } catch(e) { /* 스폰서 없으면 무시 */ }
+}
+
+function startSponsorBannerRotation() {
+  if (sponsorBannerTimer) clearInterval(sponsorBannerTimer);
+  if (sponsorBanners.length === 0) return;
+  sponsorBannerIndex = 0;
+  sponsorBannerTimer = setInterval(() => {
+    sponsorBannerIndex = (sponsorBannerIndex + 1) % sponsorBanners.length;
+    updateSponsorBannerDisplay();
+  }, 6000);
+}
+
+function updateSponsorBannerDisplay() {
+  const els = document.querySelectorAll('.sponsor-banner-slot');
+  els.forEach(el => {
+    if (sponsorBanners.length === 0) { el.innerHTML = ''; return; }
+    const s = sponsorBanners[sponsorBannerIndex];
+    const link = s.link_url ? `onclick="window.open('${s.link_url}','_blank')" style="cursor:pointer"` : '';
+    el.innerHTML = `<div class="sponsor-banner-item flex items-center justify-center gap-2 h-full" ${link}>
+      <img src="${s.image_url}" alt="${s.name}" class="h-6 max-w-[120px] object-contain opacity-70">
+      <span class="text-xs text-white/40 font-medium">${s.name}</span>
+    </div>`;
+  });
+}
+
+function renderSponsorBannerSlot() {
+  if (sponsorBanners.length === 0) return '';
+  const s = sponsorBanners[sponsorBannerIndex % sponsorBanners.length];
+  return `<div class="sponsor-banner sponsor-banner-slot rounded-lg px-3 py-1.5 flex items-center justify-center" style="min-height:32px;">
+    <div class="sponsor-banner-item flex items-center justify-center gap-2 h-full">
+      <img src="${s.image_url}" alt="${s.name}" class="h-5 max-w-[100px] object-contain opacity-70">
+      <span class="text-[10px] text-white/40 font-medium">${s.name}</span>
+    </div>
+  </div>`;
+}
+
+// ==========================================
+// 대시보드 코트 타임라인 바
+// ==========================================
+function renderCourtTimeline(m, targetScore, isTen) {
+  if (!m) return '';
+  let progress = 0;
+  let label = '';
+  
+  if (isTen) {
+    const s1 = m.team1_set1 || 0;
+    const s2 = m.team2_set1 || 0;
+    const maxG = Math.max(s1, s2, 1);
+    progress = Math.min((maxG / targetScore) * 100, 100);
+    label = Math.max(s1,s2) + '/' + targetScore + ' 게임';
+  } else {
+    const s1 = m.team1_set1 || 0;
+    const s2 = m.team2_set1 || 0;
+    const maxS = Math.max(s1, s2, 1);
+    progress = Math.min((maxS / targetScore) * 100, 100);
+    label = Math.max(s1,s2) + '/' + targetScore + '점';
+  }
+  
+  const colorClass = progress >= 90 ? 'bg-red-500' : progress >= 70 ? 'bg-yellow-500' : isTen ? 'bg-emerald-500' : 'bg-blue-500';
+  
+  return `<div class="mt-2">
+    <div class="flex justify-between items-center mb-1">
+      <span class="text-[10px] text-gray-500">${label}</span>
+      <span class="text-[10px] font-bold ${progress >= 90 ? 'text-red-400' : 'text-gray-400'}">${Math.round(progress)}%</span>
+    </div>
+    <div class="timeline-bar">
+      <div class="timeline-bar-fill ${colorClass}" style="width:${progress}%"></div>
+    </div>
+  </div>`;
+}
