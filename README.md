@@ -894,7 +894,7 @@ npm run deploy
 - **프로덕션 URL**: https://badminton-tournament-5ny.pages.dev
 - **상태**: ✅ 프로덕션 배포 완료
 - **마지막 업데이트**: 2026-02-20 (v4.1)
-- **백업 (v4.1)**: (백업 후 업데이트 예정)
-- **백업 (v4.0)**: https://www.genspark.ai/api/files/s/nm2QkMu7 (~269MB, 팟캐스트 미디어 포함)
+- **백업 (v4.1)**: https://www.genspark.ai/api/files/s/a5kyZ85f (~270MB, 팟캐스트 미디어 포함)
+- **백업 (v4.0)**: https://www.genspark.ai/api/files/s/nm2QkMu7 (~269MB)
 - **백업 (v3.2)**: https://www.genspark.ai/api/files/s/hG8bLbgu (~3.6MB)
 - **사업계획서**: https://fnvqjlie.gensparkspace.com/ (MATCH POINT 투자유치 덱, 23슬라이드)
