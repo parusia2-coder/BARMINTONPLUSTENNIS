@@ -2575,19 +2575,23 @@ function renderDashboardView() {
   else if (numCourts <= 6) { gridCols = 'grid-cols-2 lg:grid-cols-3'; }
   else { gridCols = 'grid-cols-2 lg:grid-cols-4'; }
 
+  const isTen = sport === 'tennis';
+  const accentColor = isTen ? 'emerald' : 'blue';
+  const sportLabel = isTen ? 'Tennis' : 'Badminton';
+
   // 상단 바
   const topBar = `
-    <div class="flex items-center justify-between px-6 py-3 border-b border-white/10 bg-gray-900/80 backdrop-blur-lg">
+    <div class="flex items-center justify-between px-6 py-3 border-b ${isTen ? 'border-emerald-500/20' : 'border-blue-500/20'} bg-gray-900/80 backdrop-blur-lg">
       <div class="flex items-center gap-3">
         <span class="text-2xl">${emoji}</span>
         <div>
           <h1 class="text-xl font-extrabold text-white tracking-tight">${t.name || '대회'}</h1>
-          <p class="text-xs text-gray-400">${sport === 'tennis' ? 'Tennis' : 'Badminton'} Tournament Dashboard</p>
+          <p class="text-xs text-${accentColor}-400/60">${sportLabel} Tournament Dashboard</p>
         </div>
       </div>
       <div class="flex items-center gap-4">
         <div class="flex items-center gap-2 text-xs">
-          <span class="px-2 py-1 rounded-full bg-green-500/20 text-green-400 font-bold">
+          <span class="px-2 py-1 rounded-full bg-${accentColor}-500/20 text-${accentColor}-400 font-bold">
             <i class="fas fa-play mr-1"></i>${stats?.playing || 0} 경기중
           </span>
           <span class="px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400 font-bold">
@@ -2597,8 +2601,8 @@ function renderDashboardView() {
             <i class="fas fa-check mr-1"></i>${stats?.completed || 0} 완료
           </span>
         </div>
-        <div class="flex items-center gap-1 text-green-400 text-xs">
-          <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> LIVE
+        <div class="flex items-center gap-1 text-${accentColor}-400 text-xs">
+          <span class="w-2 h-2 rounded-full bg-${accentColor}-400 animate-pulse"></span> LIVE
         </div>
       </div>
     </div>`;
@@ -2652,24 +2656,30 @@ function renderDashboardCourtCard(court, sport, tournament) {
   } else if (next) {
     return renderDashboardCardNext(cn, next, pending, isTen);
   } else {
-    return renderDashboardCardEmpty(cn, pending, recent);
+    return renderDashboardCardEmpty(cn, pending, recent, isTen);
   }
 }
 
 // --- 경기중 카드 ---
 function renderDashboardCardPlaying(cn, m, isTen, targetScore, tournament) {
+  if (isTen) {
+    return renderDashboardCardPlayingTennis(cn, m, targetScore, tournament);
+  }
+  return renderDashboardCardPlayingBadminton(cn, m, targetScore, tournament);
+}
+
+// --- 배드민턴 경기중 카드 ---
+function renderDashboardCardPlayingBadminton(cn, m, targetScore, tournament) {
   const s1 = m.team1_set1 || 0;
   const s2 = m.team2_set1 || 0;
   
-  // 점수 진행률
   const maxScore = Math.max(s1, s2, 1);
   const progress = Math.min(maxScore / targetScore * 100, 100);
   
-  // 매치포인트 감지
   const isMatchPoint = (s1 === targetScore - 1 && s1 > s2) || (s2 === targetScore - 1 && s2 > s1);
   const isCloseGame = Math.abs(s1 - s2) <= 1 && (s1 >= targetScore - 3 || s2 >= targetScore - 3);
   
-  let borderColor = 'border-green-500/50';
+  let borderColor = 'border-blue-500/50';
   let glowClass = '';
   let badge = '';
   if (isMatchPoint) {
@@ -2681,29 +2691,16 @@ function renderDashboardCardPlaying(cn, m, isTen, targetScore, tournament) {
     badge = `<span class="absolute top-2 right-2 px-2 py-0.5 text-[10px] font-bold bg-yellow-500/80 text-black rounded-full">접전</span>`;
   }
 
-  // 테니스: 세트 스코어 표시
-  let setInfo = '';
-  if (isTen) {
-    const sets = [];
-    if (m.team1_set2 || m.team2_set2) sets.push(`S1: ${m.team1_set1||0}-${m.team2_set1||0}`);
-    if (m.team1_set3 || m.team2_set3) sets.push(`S2: ${m.team1_set2||0}-${m.team2_set2||0}`);
-    if (sets.length > 0) {
-      setInfo = `<div class="text-[10px] text-gray-400 mt-1 text-center">${sets.join(' / ')}</div>`;
-    }
-  }
-
-  // 이벤트/라운드 정보
   const eventInfo = m.event_name || '';
   const roundInfo = m.round ? `R${m.round}` : '';
 
   return `
     <div class="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border-2 ${borderColor} ${glowClass} p-4 flex flex-col transition-all duration-500 overflow-hidden">
       ${badge}
-      <!-- 코트 번호 + 상태 -->
       <div class="flex items-center justify-between mb-3">
         <div class="flex items-center gap-2">
-          <span class="w-8 h-8 rounded-xl bg-green-500/20 flex items-center justify-center text-green-400 font-black text-sm">${cn}</span>
-          <span class="text-xs font-bold text-green-400 tracking-wider">경기중</span>
+          <span class="w-8 h-8 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 font-black text-sm">${cn}</span>
+          <span class="text-xs font-bold text-blue-400 tracking-wider">🏸 경기중</span>
         </div>
         <div class="text-[10px] text-gray-500 text-right leading-tight">
           ${eventInfo ? `<div>${eventInfo}</div>` : ''}
@@ -2711,36 +2708,209 @@ function renderDashboardCardPlaying(cn, m, isTen, targetScore, tournament) {
         </div>
       </div>
 
-      <!-- 스코어보드 -->
       <div class="flex-1 flex flex-col justify-center">
-        <!-- 팀1 -->
         <div class="flex items-center justify-between mb-1">
           <span class="text-sm font-bold text-white truncate flex-1 mr-2" title="${m.team1_name||''}">${truncateName(m.team1_name||'팀1', 10)}</span>
           <span class="text-3xl lg:text-4xl font-black ${s1 > s2 ? 'text-white' : 'text-gray-400'} tabular-nums min-w-[2ch] text-right">${s1}</span>
         </div>
-        
-        <!-- 구분선 + VS -->
         <div class="flex items-center gap-2 my-1">
           <div class="flex-1 h-px bg-white/10"></div>
           <span class="text-[10px] text-gray-600 font-bold">VS</span>
           <div class="flex-1 h-px bg-white/10"></div>
         </div>
-
-        <!-- 팀2 -->
         <div class="flex items-center justify-between mt-1">
           <span class="text-sm font-bold text-white truncate flex-1 mr-2" title="${m.team2_name||''}">${truncateName(m.team2_name||'팀2', 10)}</span>
           <span class="text-3xl lg:text-4xl font-black ${s2 > s1 ? 'text-white' : 'text-gray-400'} tabular-nums min-w-[2ch] text-right">${s2}</span>
         </div>
+      </div>
 
-        ${setInfo}
+      <div class="mt-3">
+        <div class="h-1 rounded-full bg-gray-700 overflow-hidden">
+          <div class="h-full rounded-full transition-all duration-1000 ${isMatchPoint ? 'bg-red-500 animate-pulse' : isCloseGame ? 'bg-yellow-500' : 'bg-blue-500'}" style="width:${progress}%"></div>
+        </div>
+        <div class="text-[10px] text-gray-500 mt-1 text-center">${targetScore}점 목표</div>
+      </div>
+    </div>`;
+}
+
+// --- 테니스 경기중 카드 ---
+function renderDashboardCardPlayingTennis(cn, m, targetScore, tournament) {
+  // 세트별 게임 스코어 추출
+  const g1s1 = m.team1_set1 || 0, g2s1 = m.team2_set1 || 0; // 세트1 (또는 현재 프로세트)
+  const g1s2 = m.team1_set2 || 0, g2s2 = m.team2_set2 || 0; // 세트2
+  const g1s3 = m.team1_set3 || 0, g2s3 = m.team2_set3 || 0; // 세트3
+
+  // 스코어링 타입 판단
+  const scoringType = tournament.scoring_type || 'pro8';
+  const isMultiSet = scoringType === 'set2' || scoringType === 'set3';
+
+  // 현재 세트와 현재 게임 스코어 결정
+  let currentG1, currentG2;
+  let completedSets = [];
+  let currentSetNum = 1;
+
+  if (isMultiSet) {
+    // 멀티세트: 어떤 세트가 진행 중인지 판단
+    if (g1s2 > 0 || g2s2 > 0 || (g1s1 > 0 || g2s1 > 0)) {
+      // 세트2 데이터 있으면 세트1은 완료
+      if (g1s2 > 0 || g2s2 > 0) {
+        completedSets.push({ t1: g1s1, t2: g2s1 });
+        currentSetNum = 2;
+        if (g1s3 > 0 || g2s3 > 0) {
+          completedSets.push({ t1: g1s2, t2: g2s2 });
+          currentSetNum = 3;
+          currentG1 = g1s3; currentG2 = g2s3;
+        } else {
+          currentG1 = g1s2; currentG2 = g2s2;
+        }
+      } else {
+        currentG1 = g1s1; currentG2 = g2s1;
+      }
+    } else {
+      currentG1 = 0; currentG2 = 0;
+    }
+  } else {
+    // 프로세트 (단일 세트)
+    currentG1 = g1s1; currentG2 = g2s1;
+  }
+
+  // 세트 승수 계산 (멀티세트일 때)
+  let setsWon1 = 0, setsWon2 = 0;
+  completedSets.forEach(s => {
+    if (s.t1 > s.t2) setsWon1++;
+    else if (s.t2 > s.t1) setsWon2++;
+  });
+
+  // 게임포인트/세트포인트/매치포인트 감지
+  const gamesTarget = targetScore;
+  let badge = '';
+  let borderColor = 'border-emerald-500/50';
+  let glowClass = '';
+  let progressBarColor = 'bg-emerald-500';
+
+  // 프로세트: 목표 게임 -1에 도달하고 리드 중이면 매치포인트
+  // 멀티세트: 세트포인트/매치포인트 분리
+  const leading = currentG1 > currentG2 ? 1 : (currentG2 > currentG1 ? 2 : 0);
+  const maxG = Math.max(currentG1, currentG2);
+  const minG = Math.min(currentG1, currentG2);
+  const isGameClose = maxG >= gamesTarget - 2 && maxG - minG <= 1;
+
+  if (!isMultiSet) {
+    // 프로세트: 매치포인트 = 목표-1 이상이고 리드
+    if (maxG >= gamesTarget - 1 && leading > 0 && maxG > minG) {
+      borderColor = 'border-red-500/80';
+      glowClass = 'shadow-[0_0_25px_rgba(239,68,68,0.3)]';
+      badge = `<span class="absolute top-2 right-2 px-2 py-0.5 text-[10px] font-black bg-red-500 text-white rounded-full animate-pulse tracking-wider">MATCH POINT</span>`;
+      progressBarColor = 'bg-red-500 animate-pulse';
+    } else if (isGameClose) {
+      borderColor = 'border-yellow-500/60';
+      badge = `<span class="absolute top-2 right-2 px-2 py-0.5 text-[10px] font-bold bg-yellow-500/80 text-black rounded-full">접전</span>`;
+      progressBarColor = 'bg-yellow-500';
+    }
+  } else {
+    // 멀티세트
+    const setsToWin = scoringType === 'set3' ? 2 : 2;
+    const isMatchPointSet = (setsWon1 === setsToWin - 1 || setsWon2 === setsToWin - 1);
+    if (isMatchPointSet && maxG >= 5 && leading > 0 && maxG > minG) {
+      borderColor = 'border-red-500/80';
+      glowClass = 'shadow-[0_0_25px_rgba(239,68,68,0.3)]';
+      badge = `<span class="absolute top-2 right-2 px-2 py-0.5 text-[10px] font-black bg-red-500 text-white rounded-full animate-pulse tracking-wider">MATCH POINT</span>`;
+      progressBarColor = 'bg-red-500 animate-pulse';
+    } else if (maxG >= 5 && leading > 0 && maxG > minG) {
+      borderColor = 'border-orange-500/60';
+      badge = `<span class="absolute top-2 right-2 px-2 py-0.5 text-[10px] font-bold bg-orange-500/80 text-white rounded-full">SET POINT</span>`;
+      progressBarColor = 'bg-orange-500';
+    } else if (isGameClose) {
+      borderColor = 'border-yellow-500/60';
+      badge = `<span class="absolute top-2 right-2 px-2 py-0.5 text-[10px] font-bold bg-yellow-500/80 text-black rounded-full">접전</span>`;
+      progressBarColor = 'bg-yellow-500';
+    }
+  }
+
+  const eventInfo = m.event_name || '';
+  const roundInfo = m.round ? `R${m.round}` : '';
+  const progress = Math.min(maxG / gamesTarget * 100, 100);
+
+  // 세트 스코어 라벨 (프로세트는 포맷명, 멀티세트는 세트 점수)
+  let scoringLabel = '';
+  if (scoringType === 'pro8') scoringLabel = '8게임 프로세트';
+  else if (scoringType === 'pro10') scoringLabel = '10게임 프로세트';
+  else if (scoringType === 'set2') scoringLabel = '2세트 선취';
+  else if (scoringType === 'set3') scoringLabel = '3세트 매치';
+  else scoringLabel = gamesTarget + '게임 목표';
+
+  // 완료된 세트 점수 표시 (테이블 형태)
+  let setScoreRow = '';
+  if (isMultiSet && completedSets.length > 0) {
+    const setCells = completedSets.map((s, i) => {
+      const t1Won = s.t1 > s.t2;
+      return `<div class="flex flex-col items-center px-2">
+        <span class="text-[9px] text-gray-600 font-bold mb-0.5">S${i+1}</span>
+        <span class="text-xs font-bold ${t1Won ? 'text-emerald-400' : 'text-gray-500'}">${s.t1}</span>
+        <span class="text-xs font-bold ${!t1Won ? 'text-emerald-400' : 'text-gray-500'}">${s.t2}</span>
+      </div>`;
+    }).join('');
+    setScoreRow = `<div class="flex items-center justify-center gap-1 border-l border-white/10 ml-2 pl-2">${setCells}</div>`;
+  }
+
+  return `
+    <div class="relative bg-gradient-to-br from-gray-800 via-emerald-950/20 to-gray-900 rounded-2xl border-2 ${borderColor} ${glowClass} p-4 flex flex-col transition-all duration-500 overflow-hidden">
+      ${badge}
+      <!-- 코트 번호 + 상태 -->
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-black text-sm">${cn}</span>
+          <span class="text-xs font-bold text-emerald-400 tracking-wider">🎾 경기중</span>
+          ${isMultiSet ? `<span class="text-[10px] text-gray-500 font-bold ml-1">세트 ${currentSetNum}</span>` : ''}
+        </div>
+        <div class="text-[10px] text-gray-500 text-right leading-tight">
+          ${eventInfo ? `<div>${eventInfo}</div>` : ''}
+          ${roundInfo ? `<div>${roundInfo} #${m.match_order || ''}</div>` : ''}
+        </div>
+      </div>
+
+      <!-- 테니스 스코어보드 -->
+      <div class="flex-1 flex flex-col justify-center">
+        <div class="flex items-stretch">
+          <!-- 메인 스코어 (현재 게임 수) -->
+          <div class="flex-1">
+            <!-- 선수1 -->
+            <div class="flex items-center justify-between mb-1.5 py-1 px-2 rounded-lg ${currentG1 > currentG2 ? 'bg-emerald-500/10' : ''}">
+              <div class="flex items-center flex-1 min-w-0 mr-2">
+                ${isMultiSet ? `<span class="w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-400 text-[10px] font-black flex items-center justify-center mr-1.5">${setsWon1}</span>` : ''}
+                <span class="text-sm font-bold text-white truncate" title="${m.team1_name||''}">${truncateName(m.team1_name||'팀1', isMultiSet ? 7 : 10)}</span>
+              </div>
+              <span class="text-3xl lg:text-4xl font-black ${currentG1 > currentG2 ? 'text-emerald-300' : 'text-gray-400'} tabular-nums min-w-[2ch] text-right">${currentG1}</span>
+            </div>
+            
+            <!-- 구분선 -->
+            <div class="flex items-center gap-2 my-0.5 px-2">
+              <div class="flex-1 h-px bg-emerald-500/20"></div>
+              <span class="text-[10px] text-emerald-700 font-bold">VS</span>
+              <div class="flex-1 h-px bg-emerald-500/20"></div>
+            </div>
+
+            <!-- 선수2 -->
+            <div class="flex items-center justify-between mt-1.5 py-1 px-2 rounded-lg ${currentG2 > currentG1 ? 'bg-emerald-500/10' : ''}">
+              <div class="flex items-center flex-1 min-w-0 mr-2">
+                ${isMultiSet ? `<span class="w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-400 text-[10px] font-black flex items-center justify-center mr-1.5">${setsWon2}</span>` : ''}
+                <span class="text-sm font-bold text-white truncate" title="${m.team2_name||''}">${truncateName(m.team2_name||'팀2', isMultiSet ? 7 : 10)}</span>
+              </div>
+              <span class="text-3xl lg:text-4xl font-black ${currentG2 > currentG1 ? 'text-emerald-300' : 'text-gray-400'} tabular-nums min-w-[2ch] text-right">${currentG2}</span>
+            </div>
+          </div>
+
+          <!-- 완료된 세트 점수 (멀티세트일 때만) -->
+          ${setScoreRow}
+        </div>
       </div>
 
       <!-- 프로그레스 바 -->
       <div class="mt-3">
         <div class="h-1 rounded-full bg-gray-700 overflow-hidden">
-          <div class="h-full rounded-full transition-all duration-1000 ${isMatchPoint ? 'bg-red-500 animate-pulse' : isCloseGame ? 'bg-yellow-500' : 'bg-green-500'}" style="width:${progress}%"></div>
+          <div class="h-full rounded-full transition-all duration-1000 ${progressBarColor}" style="width:${progress}%"></div>
         </div>
-        <div class="text-[10px] text-gray-500 mt-1 text-center">${isTen ? `${targetScore}게임 목표` : `${targetScore}점 목표`}</div>
+        <div class="text-[10px] text-gray-500 mt-1 text-center">${scoringLabel}</div>
       </div>
     </div>`;
 }
@@ -2750,6 +2920,14 @@ function renderDashboardCardResult(cn, prevState, isTen) {
   const r = prevState.recent || prevState.match;
   if (!r) return renderDashboardCardEmpty(cn, 0, null);
   
+  if (isTen) {
+    return renderDashboardCardResultTennis(cn, prevState, r);
+  }
+  return renderDashboardCardResultBadminton(cn, prevState, r);
+}
+
+// --- 배드민턴 결과 카드 ---
+function renderDashboardCardResultBadminton(cn, prevState, r) {
   const s1 = r.team1_set1 || 0;
   const s2 = r.team2_set1 || 0;
   const winnerName = r.winner_name || (s1 > s2 ? r.team1_name : r.team2_name) || '?';
@@ -2759,16 +2937,13 @@ function renderDashboardCardResult(cn, prevState, isTen) {
   return `
     <div class="relative bg-gradient-to-br from-yellow-900/30 to-amber-900/20 rounded-2xl border-2 border-yellow-500/50 p-4 flex flex-col transition-all duration-700 ${fadeClass} overflow-hidden">
       <div class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2240%22%20height%3D%2240%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M20%200L40%2020L20%2040L0%2020Z%22%20fill%3D%22%23fbbf24%22%20fill-opacity%3D%220.03%22%2F%3E%3C%2Fsvg%3E')] opacity-50"></div>
-      <!-- 코트 번호 -->
       <div class="flex items-center justify-between mb-2 relative z-10">
         <div class="flex items-center gap-2">
           <span class="w-8 h-8 rounded-xl bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-black text-sm">${cn}</span>
-          <span class="text-xs font-bold text-yellow-400 tracking-wider">경기 종료</span>
+          <span class="text-xs font-bold text-yellow-400 tracking-wider">🏸 경기 종료</span>
         </div>
         <span class="text-lg">🏆</span>
       </div>
-
-      <!-- 결과 -->
       <div class="flex-1 flex flex-col justify-center items-center relative z-10 py-2">
         <div class="text-[10px] text-yellow-500/70 font-bold mb-1 tracking-widest">WINNER</div>
         <div class="text-base lg:text-lg font-black text-yellow-300 text-center leading-tight mb-2">${winnerName}</div>
@@ -2779,8 +2954,6 @@ function renderDashboardCardResult(cn, prevState, isTen) {
         </div>
         <div class="text-[10px] text-gray-500 mt-1">${r.event_name || ''}</div>
       </div>
-
-      <!-- 전환 인디케이터 -->
       <div class="mt-2 relative z-10">
         <div class="h-1 rounded-full bg-yellow-900/50 overflow-hidden">
           <div class="h-full rounded-full bg-yellow-500/60 transition-all duration-1000" style="width:${Math.min(((Date.now() - prevState.timestamp) / 8000) * 100, 100)}%"></div>
@@ -2790,17 +2963,93 @@ function renderDashboardCardResult(cn, prevState, isTen) {
     </div>`;
 }
 
+// --- 테니스 결과 카드 ---
+function renderDashboardCardResultTennis(cn, prevState, r) {
+  const g1s1 = r.team1_set1 || 0, g2s1 = r.team2_set1 || 0;
+  const g1s2 = r.team1_set2 || 0, g2s2 = r.team2_set2 || 0;
+  const g1s3 = r.team1_set3 || 0, g2s3 = r.team2_set3 || 0;
+  
+  const winnerName = r.winner_name || (g1s1 > g2s1 ? r.team1_name : r.team2_name) || '?';
+  const elapsed = Date.now() - prevState.timestamp;
+  const fadeClass = elapsed > 6000 ? 'opacity-70' : 'opacity-100';
+
+  // 세트 스코어 빌드
+  const allSets = [];
+  allSets.push({ t1: g1s1, t2: g2s1 });
+  if (g1s2 > 0 || g2s2 > 0) allSets.push({ t1: g1s2, t2: g2s2 });
+  if (g1s3 > 0 || g2s3 > 0) allSets.push({ t1: g1s3, t2: g2s3 });
+
+  const isMultiSet = allSets.length > 1;
+  
+  // 세트 점수 표시
+  let scoreDisplay = '';
+  if (isMultiSet) {
+    const setCells = allSets.map((s, i) => {
+      const t1Won = s.t1 > s.t2;
+      return `<div class="flex flex-col items-center">
+        <span class="text-[9px] text-emerald-700 font-bold mb-0.5">S${i+1}</span>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-sm font-black ${t1Won ? 'text-emerald-300' : 'text-gray-500'} tabular-nums">${s.t1}</span>
+          <span class="text-sm font-black ${!t1Won ? 'text-emerald-300' : 'text-gray-500'} tabular-nums">${s.t2}</span>
+        </div>
+      </div>`;
+    }).join('');
+    scoreDisplay = `
+      <div class="flex items-center gap-3 mb-1">
+        <div class="flex flex-col items-end mr-1 text-[10px]">
+          <span class="text-gray-400 mb-0.5 h-[14px]"></span>
+          <span class="font-bold text-white text-xs leading-tight">${truncateName(r.team1_name||'팀1', 6)}</span>
+          <span class="font-bold text-white text-xs leading-tight mt-0.5">${truncateName(r.team2_name||'팀2', 6)}</span>
+        </div>
+        ${setCells}
+      </div>`;
+  } else {
+    scoreDisplay = `
+      <div class="flex items-center gap-3 text-2xl font-black">
+        <span class="${g1s1 > g2s1 ? 'text-emerald-300' : 'text-gray-500'}">${g1s1}</span>
+        <span class="text-emerald-800 text-sm">:</span>
+        <span class="${g2s1 > g1s1 ? 'text-emerald-300' : 'text-gray-500'}">${g2s1}</span>
+      </div>`;
+  }
+
+  return `
+    <div class="relative bg-gradient-to-br from-emerald-900/30 to-teal-900/20 rounded-2xl border-2 border-emerald-500/50 p-4 flex flex-col transition-all duration-700 ${fadeClass} overflow-hidden">
+      <div class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2240%22%20height%3D%2240%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2220%22%20r%3D%228%22%20fill%3D%22none%22%20stroke%3D%22%2310b981%22%20stroke-opacity%3D%220.04%22%20stroke-width%3D%221.5%22%2F%3E%3C%2Fsvg%3E')] opacity-50"></div>
+      <div class="flex items-center justify-between mb-2 relative z-10">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-black text-sm">${cn}</span>
+          <span class="text-xs font-bold text-emerald-400 tracking-wider">🎾 경기 종료</span>
+        </div>
+        <span class="text-lg">🏆</span>
+      </div>
+      <div class="flex-1 flex flex-col justify-center items-center relative z-10 py-2">
+        <div class="text-[10px] text-emerald-500/70 font-bold mb-1 tracking-widest">WINNER</div>
+        <div class="text-base lg:text-lg font-black text-emerald-300 text-center leading-tight mb-2">${winnerName}</div>
+        ${scoreDisplay}
+        <div class="text-[10px] text-gray-500 mt-1">${r.event_name || ''}</div>
+      </div>
+      <div class="mt-2 relative z-10">
+        <div class="h-1 rounded-full bg-emerald-900/50 overflow-hidden">
+          <div class="h-full rounded-full bg-emerald-500/60 transition-all duration-1000" style="width:${Math.min(((Date.now() - prevState.timestamp) / 8000) * 100, 100)}%"></div>
+        </div>
+        <div class="text-[10px] text-gray-600 mt-1 text-center">다음 경기로 전환 중...</div>
+      </div>
+    </div>`;
+}
+
 // --- 다음 경기 대기 카드 ---
 function renderDashboardCardNext(cn, next, pending, isTen) {
+  const accentColor = isTen ? 'emerald' : 'blue';
+  const sportEmoji = isTen ? '🎾' : '🏸';
   return `
-    <div class="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border-2 border-blue-500/30 p-4 flex flex-col overflow-hidden">
+    <div class="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border-2 border-${accentColor}-500/30 p-4 flex flex-col overflow-hidden">
       <!-- 코트 번호 -->
       <div class="flex items-center justify-between mb-3">
         <div class="flex items-center gap-2">
-          <span class="w-8 h-8 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 font-black text-sm">${cn}</span>
-          <span class="text-xs font-bold text-blue-400 tracking-wider">다음 경기</span>
+          <span class="w-8 h-8 rounded-xl bg-${accentColor}-500/20 flex items-center justify-center text-${accentColor}-400 font-black text-sm">${cn}</span>
+          <span class="text-xs font-bold text-${accentColor}-400 tracking-wider">${sportEmoji} 다음 경기</span>
         </div>
-        <span class="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] rounded-full font-bold">
+        <span class="px-2 py-0.5 bg-${accentColor}-500/10 text-${accentColor}-400 text-[10px] rounded-full font-bold">
           대기 ${pending}경기
         </span>
       </div>
@@ -2825,8 +3074,8 @@ function renderDashboardCardNext(cn, next, pending, isTen) {
       </div>
 
       <!-- 호출 알림 -->
-      <div class="mt-3 py-2 bg-blue-500/10 rounded-xl text-center">
-        <span class="text-xs text-blue-300 font-bold">
+      <div class="mt-3 py-2 bg-${accentColor}-500/10 rounded-xl text-center">
+        <span class="text-xs text-${accentColor}-300 font-bold">
           <i class="fas fa-bullhorn mr-1"></i>선수 호출 대기중
         </span>
       </div>
@@ -2834,15 +3083,31 @@ function renderDashboardCardNext(cn, next, pending, isTen) {
 }
 
 // --- 빈 코트 카드 ---
-function renderDashboardCardEmpty(cn, pending, recent) {
+function renderDashboardCardEmpty(cn, pending, recent, isTen) {
+  const sportEmoji = isTen ? '🎾' : '🏸';
   let recentInfo = '';
   if (recent) {
-    recentInfo = `
-      <div class="mt-2 text-center">
-        <div class="text-[10px] text-gray-600 mb-1">최근 결과</div>
-        <div class="text-xs text-gray-500">${truncateName(recent.team1_name||'',8)} ${recent.team1_set1||0}:${recent.team2_set1||0} ${truncateName(recent.team2_name||'',8)}</div>
-        ${recent.winner_name ? `<div class="text-[10px] text-yellow-600 mt-0.5">🏆 ${recent.winner_name}</div>` : ''}
-      </div>`;
+    if (isTen) {
+      // 테니스: 세트 스코어로 최근 결과 표시
+      const sets = [];
+      sets.push(`${recent.team1_set1||0}-${recent.team2_set1||0}`);
+      if (recent.team1_set2 || recent.team2_set2) sets.push(`${recent.team1_set2||0}-${recent.team2_set2||0}`);
+      if (recent.team1_set3 || recent.team2_set3) sets.push(`${recent.team1_set3||0}-${recent.team2_set3||0}`);
+      recentInfo = `
+        <div class="mt-2 text-center">
+          <div class="text-[10px] text-gray-600 mb-1">최근 결과</div>
+          <div class="text-xs text-gray-500">${truncateName(recent.team1_name||'',8)} vs ${truncateName(recent.team2_name||'',8)}</div>
+          <div class="text-[10px] text-emerald-600 mt-0.5 font-bold">${sets.join(' / ')}</div>
+          ${recent.winner_name ? `<div class="text-[10px] text-emerald-500 mt-0.5">🏆 ${recent.winner_name}</div>` : ''}
+        </div>`;
+    } else {
+      recentInfo = `
+        <div class="mt-2 text-center">
+          <div class="text-[10px] text-gray-600 mb-1">최근 결과</div>
+          <div class="text-xs text-gray-500">${truncateName(recent.team1_name||'',8)} ${recent.team1_set1||0}:${recent.team2_set1||0} ${truncateName(recent.team2_name||'',8)}</div>
+          ${recent.winner_name ? `<div class="text-[10px] text-yellow-600 mt-0.5">🏆 ${recent.winner_name}</div>` : ''}
+        </div>`;
+    }
   }
 
   return `

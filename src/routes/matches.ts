@@ -468,12 +468,13 @@ matchRoutes.get('/:tid/courts/overview', async (c) => {
       SELECT m.id, m.match_order, m.team1_set1, m.team2_set1, m.team1_set2, m.team2_set2, m.team1_set3, m.team2_set3,
         m.winner_team, m.updated_at, e.name as event_name,
         t1.team_name as team1_name, t2.team_name as team2_name,
-        tw.team_name as winner_name
+        CASE WHEN m.winner_team = 1 THEN t1.team_name 
+             WHEN m.winner_team = 2 THEN t2.team_name 
+             ELSE NULL END as winner_name
       FROM matches m
       JOIN events e ON m.event_id = e.id
       LEFT JOIN teams t1 ON m.team1_id = t1.id
       LEFT JOIN teams t2 ON m.team2_id = t2.id
-      LEFT JOIN teams tw ON m.winner_team = tw.id
       WHERE m.tournament_id=? AND m.court_number=? AND m.status='completed'
       ORDER BY m.updated_at DESC
       LIMIT 1
