@@ -518,7 +518,7 @@ function renderTournament() {
 
     <!-- Quick Access Grid -->
     <div class="mb-6">
-      <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3">
+      <div class="grid grid-cols-4 sm:grid-cols-7 gap-2 sm:gap-3">
         <button onclick="window.open('/court?tid='+state.currentTournament.id,'_blank')" class="group rounded-xl border border-gray-200 bg-white p-3 sm:p-4 text-center cursor-pointer hover:shadow-lg hover:border-green-300 transition-all">
           <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-green-400 to-green-600 mx-auto mb-1.5 sm:mb-2 flex items-center justify-center shadow-md shadow-green-500/20">
             <i class="fas fa-tablet-alt text-white text-sm"></i>
@@ -554,6 +554,12 @@ function renderTournament() {
             <i class="fas fa-stream text-white text-sm"></i>
           </div>
           <span class="font-bold text-gray-800 text-xs group-hover:text-cyan-600 transition">타임라인</span>
+        </button>
+        <button onclick="window.open('/watch?tid='+state.currentTournament.id,'_blank')" class="group rounded-xl border border-gray-200 bg-white p-3 sm:p-4 text-center cursor-pointer hover:shadow-lg hover:border-rose-300 transition-all">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-rose-400 to-rose-600 mx-auto mb-1.5 sm:mb-2 flex items-center justify-center shadow-md shadow-rose-500/20">
+            <span class="text-white text-sm">⌚</span>
+          </div>
+          <span class="font-bold text-gray-800 text-xs group-hover:text-rose-600 transition">스마트워치</span>
         </button>
       </div>
     </div>

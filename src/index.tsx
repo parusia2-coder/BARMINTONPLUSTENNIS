@@ -71,6 +71,11 @@ app.get('/timeline', (c) => {
   return c.html(getTimelineHtml())
 })
 
+// 스마트워치 전용 점수판
+app.get('/watch', (c) => {
+  return c.html(getWatchHtml())
+})
+
 // Service Worker (루트에서 접근 필요)
 app.get('/sw.js', (c) => {
   return c.text(getServiceWorkerJs(), 200, { 'Content-Type': 'application/javascript', 'Service-Worker-Allowed': '/' })
@@ -1027,6 +1032,114 @@ function getTimelineHtml(): string {
     load();
     if(tid)setInterval(load,20000); // 20초 간격 갱신 (15→20)
   </script>
+</body>
+</html>`
+}
+
+function getWatchHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f172a">
+<title>⌚ 점수판</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;}
+html,body{width:100%;height:100%;overflow:hidden;background:#0f172a;color:#fff;font-family:-apple-system,system-ui,sans-serif;}
+body{display:flex;align-items:center;justify-content:center;}
+.container{width:100%;height:100%;max-width:400px;max-height:400px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+
+/* 로딩 */
+.loading{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.spinner{width:28px;height:28px;border:3px solid rgba(255,255,255,0.15);border-top-color:#3b82f6;border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:11px;color:rgba(255,255,255,0.5);}
+
+/* 대회/코트 선택 */
+.select-screen{display:flex;flex-direction:column;align-items:center;padding:20px 12px;gap:6px;width:100%;}
+.select-title{font-size:13px;font-weight:700;margin-bottom:4px;text-align:center;}
+.select-list{width:100%;max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;}
+.select-btn{width:100%;padding:10px 8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-size:12px;font-weight:600;text-align:center;cursor:pointer;transition:all .15s;}
+.select-btn:active{background:rgba(59,130,246,0.3);transform:scale(0.95);}
+.select-sub{font-size:9px;color:rgba(255,255,255,0.4);margin-top:2px;}
+
+/* 점수판 메인 */
+.scoreboard{display:flex;flex-direction:column;align-items:center;width:100%;height:100%;justify-content:center;gap:2px;padding:8px;}
+.match-info{font-size:9px;color:rgba(255,255,255,0.4);text-align:center;line-height:1.3;max-width:90%;}
+.match-info .event{color:rgba(255,255,255,0.6);font-weight:600;}
+
+/* 점수 영역 */
+.scores{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;}
+.side{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:0;}
+.team-name{font-size:10px;font-weight:600;color:rgba(255,255,255,0.7);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;padding:0 4px;}
+.score-touch{width:100%;aspect-ratio:1;max-width:120px;max-height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s;position:relative;overflow:hidden;}
+.score-touch:active{transform:scale(0.92);}
+.score-touch.left{background:linear-gradient(135deg,#1e3a5f,#1e40af);border:2px solid rgba(59,130,246,0.4);}
+.score-touch.right{background:linear-gradient(135deg,#5f1e1e,#9a3412);border:2px solid rgba(249,115,22,0.4);}
+.score-touch .num{font-size:clamp(32px,12vw,52px);font-weight:900;line-height:1;font-variant-numeric:tabular-nums;}
+.score-touch .hint{position:absolute;bottom:6px;font-size:7px;color:rgba(255,255,255,0.3);font-weight:500;}
+.vs{font-size:10px;font-weight:700;color:rgba(255,255,255,0.2);flex-shrink:0;}
+.score-flash{animation:pop .3s ease;}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.15)}100%{transform:scale(1)}}
+
+/* 하단 컨트롤 */
+.controls{display:flex;gap:4px;margin-top:4px;}
+.ctrl-btn{padding:6px 10px;border-radius:8px;font-size:9px;font-weight:600;border:none;cursor:pointer;transition:all .12s;color:#fff;}
+.ctrl-btn:active{transform:scale(0.92);}
+.ctrl-btn.undo{background:rgba(255,255,255,0.1);}
+.ctrl-btn.swap{background:rgba(168,85,247,0.2);color:#c084fc;}
+.ctrl-btn.finish{background:rgba(34,197,94,0.2);color:#86efac;}
+.ctrl-btn.back{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.5);}
+
+/* 상태 뱃지 */
+.badge-row{display:flex;gap:4px;margin-top:2px;}
+.badge{padding:2px 6px;border-radius:6px;font-size:8px;font-weight:700;}
+.badge.mp{background:rgba(239,68,68,0.2);color:#fca5a5;animation:pulse 1.5s infinite;}
+.badge.close{background:rgba(234,179,8,0.2);color:#fde047;}
+.badge.live{background:rgba(34,197,94,0.2);color:#86efac;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* 완료 화면 */
+.finish-screen{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px;}
+.finish-title{font-size:14px;font-weight:800;}
+.finish-score{font-size:28px;font-weight:900;letter-spacing:2px;}
+.finish-teams{font-size:10px;color:rgba(255,255,255,0.5);text-align:center;line-height:1.4;}
+.winner-name{color:#86efac;font-weight:700;font-size:12px;}
+
+/* 대기 화면 */
+.waiting{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px;}
+.waiting-icon{font-size:28px;animation:float 2s ease-in-out infinite;}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.waiting-text{font-size:11px;color:rgba(255,255,255,0.4);}
+
+/* 코트 선택 그리드 */
+.court-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%;max-height:180px;overflow-y:auto;}
+.court-btn{aspect-ratio:1;border-radius:12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#fff;font-size:18px;font-weight:800;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;}
+.court-btn:active{background:rgba(59,130,246,0.3);transform:scale(0.92);}
+
+/* 점수 플래시 */
+.flash{animation:pop .3s ease;}
+
+/* 스크롤바 */
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:2px;}
+
+/* 원형 화면 안전 영역 */
+@media (shape: round) {
+  .container{padding:15%;}
+  .score-touch{max-width:100px;max-height:100px;}
+  .court-grid{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+<div class="container" id="app">
+  <div class="loading"><div class="spinner"></div><div class="loading-text">연결 중...</div></div>
+</div>
+<script src="/static/watch.js"></script>
 </body>
 </html>`
 }

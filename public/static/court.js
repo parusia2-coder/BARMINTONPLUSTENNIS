@@ -2414,9 +2414,32 @@ function showQRModal() {
   modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md';
 
   // 모드 탭 상태
-  let qrMode = 'scorer'; // scorer | viewer | dashboard
+  let qrMode = 'scorer'; // scorer | viewer | dashboard | watch
 
   function renderQRContent(mode) {
+    // 스마트워치 모드
+    if (mode === 'watch') {
+      const watchBase = window.location.origin + '/watch';
+      let cards = '';
+      for (let i = 1; i <= numCourts; i++) {
+        const watchUrl = watchBase + '?tid=' + courtState.tournamentId + '&court=' + i;
+        cards += '<div class="bg-white rounded-xl p-3 text-center">' +
+          '<div class="font-bold text-gray-900 mb-2">⌚ ' + i + '코트</div>' +
+          '<div class="flex items-center justify-center" style="min-height:120px;">' +
+            '<img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(watchUrl) + '" alt="Watch QR ' + i + '" class="w-[120px] h-[120px]" loading="lazy">' +
+          '</div>' +
+          '<div class="flex gap-1 mt-2 justify-center">' +
+            '<button onclick="copyToClipboard(\'' + watchUrl.replace(/'/g, "\\'") + '\')" class="text-xs text-purple-600 hover:text-purple-800 px-2 py-1 rounded bg-gray-100">' +
+              '<i class="fas fa-copy mr-0.5"></i>복사</button>' +
+            '<button onclick="window.open(\'' + watchUrl.replace(/'/g, "\\'") + '\', \'_blank\')" class="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded bg-gray-100">' +
+              '<i class="fas fa-external-link-alt mr-0.5"></i>열기</button>' +
+          '</div>' +
+        '</div>';
+      }
+      return '<p class="text-sm text-gray-400 mb-3"><span class="font-bold text-white">⌚ 스마트워치 점수판</span> — 원형 화면 최적화 · 터치로 간편 점수 입력</p>' +
+        '<div class="grid grid-cols-2 sm:grid-cols-3 gap-4">' + cards + '</div>';
+    }
+
     // 대시보드 모드: 단일 QR
     if (mode === 'dashboard') {
       const dashUrl = baseUrl + '?tid=' + courtState.tournamentId + '&locked=1&mode=view';
@@ -2474,6 +2497,8 @@ function showQRModal() {
         '🏓 심판용</button>' +
       '<button id="qr-tab-viewer" onclick="switchQRTab(\'viewer\')" class="flex-1 py-2.5 rounded-xl text-sm font-bold transition bg-white/10 text-gray-400 hover:bg-white/15">' +
         '📺 관람용</button>' +
+      '<button id="qr-tab-watch" onclick="switchQRTab(\'watch\')" class="flex-1 py-2.5 rounded-xl text-sm font-bold transition bg-white/10 text-gray-400 hover:bg-white/15">' +
+        '⌚ 워치</button>' +
       '<button id="qr-tab-dashboard" onclick="switchQRTab(\'dashboard\')" class="flex-1 py-2.5 rounded-xl text-sm font-bold transition bg-white/10 text-gray-400 hover:bg-white/15">' +
         '🖥️ 대시보드</button>' +
     '</div>' +
@@ -2491,11 +2516,14 @@ function showQRModal() {
     var tabScorer = document.getElementById('qr-tab-scorer');
     var tabViewer = document.getElementById('qr-tab-viewer');
     var tabDash = document.getElementById('qr-tab-dashboard');
+    var tabWatch = document.getElementById('qr-tab-watch');
     var inactiveClass = 'bg-white/10 text-gray-400 hover:bg-white/15';
     if (tabScorer) tabScorer.className = 'flex-1 py-2.5 rounded-xl text-sm font-bold transition ' + 
       (mode === 'scorer' ? 'bg-green-600 text-white' : inactiveClass);
     if (tabViewer) tabViewer.className = 'flex-1 py-2.5 rounded-xl text-sm font-bold transition ' + 
       (mode === 'viewer' ? 'bg-blue-600 text-white' : inactiveClass);
+    if (tabWatch) tabWatch.className = 'flex-1 py-2.5 rounded-xl text-sm font-bold transition ' + 
+      (mode === 'watch' ? 'bg-amber-600 text-white' : inactiveClass);
     if (tabDash) tabDash.className = 'flex-1 py-2.5 rounded-xl text-sm font-bold transition ' + 
       (mode === 'dashboard' ? 'bg-purple-600 text-white' : inactiveClass);
   };
