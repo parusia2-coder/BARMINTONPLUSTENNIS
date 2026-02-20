@@ -201,6 +201,7 @@ function getIndexHtml(): string {
   <script>if(!window.tailwind)document.write('<scr'+'ipt src="https://cdn.tailwindcss.com"><\/scr'+'ipt>')</script>
   <link href="/static/vendor/fontawesome.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="/static/style.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script>
@@ -250,6 +251,7 @@ function getIndexHtml(): string {
       height: 600px;
       background: radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%);
       border-radius: 50%;
+      pointer-events: none;
     }
     .hero-bg::after {
       content: '';
@@ -260,6 +262,7 @@ function getIndexHtml(): string {
       height: 400px;
       background: radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%);
       border-radius: 50%;
+      pointer-events: none;
     }
     .glass-card {
       background: rgba(255,255,255,0.08);

@@ -457,7 +457,7 @@ function renderTournament() {
 
   <!-- Hero Banner -->
   <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-gray-900 relative overflow-hidden">
-    <div class="absolute inset-0 opacity-10">
+    <div class="absolute inset-0 opacity-10 pointer-events-none">
       <div class="absolute top-10 left-10 w-32 h-32 rounded-full bg-${P}-400 blur-3xl"></div>
       <div class="absolute bottom-10 right-10 w-40 h-40 rounded-full ${T.bg400} blur-3xl"></div>
     </div>
@@ -1551,7 +1551,7 @@ function renderResults() {
 
   <!-- Hero Banner -->
   <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-gray-900 relative overflow-hidden">
-    <div class="absolute inset-0 opacity-10">
+    <div class="absolute inset-0 opacity-10 pointer-events-none">
       <div class="absolute top-10 left-10 w-32 h-32 rounded-full bg-yellow-400 blur-3xl"></div>
       <div class="absolute bottom-10 right-20 w-40 h-40 rounded-full bg-purple-400 blur-3xl"></div>
     </div>
@@ -2546,7 +2546,7 @@ function renderDashboard() {
 
   <!-- Hero Banner (대회 상세와 동일 구조) -->
   <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-gray-900 relative overflow-hidden">
-    <div class="absolute inset-0 opacity-10">
+    <div class="absolute inset-0 opacity-10 pointer-events-none">
       <div class="absolute top-10 right-20 w-32 h-32 rounded-full bg-orange-400 blur-3xl"></div>
       <div class="absolute bottom-10 left-10 w-40 h-40 rounded-full ${T.bg400} blur-3xl"></div>
     </div>
@@ -2780,7 +2780,7 @@ function renderMyPage() {
 
   <!-- Hero Banner -->
   <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-gray-900 relative overflow-hidden">
-    <div class="absolute inset-0 opacity-10">
+    <div class="absolute inset-0 opacity-10 pointer-events-none">
       <div class="absolute top-10 left-20 w-32 h-32 rounded-full bg-indigo-400 blur-3xl"></div>
       <div class="absolute bottom-10 right-10 w-40 h-40 rounded-full bg-purple-400 blur-3xl"></div>
     </div>
