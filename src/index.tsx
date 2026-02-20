@@ -206,6 +206,22 @@ function getIndexHtml(): string {
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script>
     tailwind.config = {
+      safelist: [
+        'bg-blue-50','bg-blue-100','bg-blue-200','bg-blue-400','bg-blue-500','bg-blue-600','bg-blue-700',
+        'text-blue-400','text-blue-500','text-blue-600','text-blue-700',
+        'border-blue-100','border-blue-200','border-blue-300','border-blue-500',
+        'ring-blue-100','ring-blue-500',
+        'from-blue-400','from-blue-500','to-blue-500','to-blue-600',
+        'hover:bg-blue-50','hover:bg-blue-100','hover:bg-blue-700',
+        'hover:border-blue-300','hover:text-blue-700',
+        'bg-emerald-50','bg-emerald-100','bg-emerald-200','bg-emerald-400','bg-emerald-500','bg-emerald-600','bg-emerald-700',
+        'text-emerald-400','text-emerald-500','text-emerald-600','text-emerald-700',
+        'border-emerald-100','border-emerald-200','border-emerald-300','border-emerald-500',
+        'ring-emerald-100','ring-emerald-500',
+        'from-emerald-400','from-emerald-500','to-emerald-500','to-emerald-600',
+        'hover:bg-emerald-50','hover:bg-emerald-100','hover:bg-emerald-700',
+        'hover:border-emerald-300','hover:text-emerald-700',
+      ],
       theme: {
         extend: {
           colors: {
@@ -217,7 +233,8 @@ function getIndexHtml(): string {
     }
   </script>
   <style>
-    body { }
+    body { touch-action: manipulation; -webkit-tap-highlight-color: rgba(0,0,0,0.1); }
+    button, a, [onclick], [role="button"], .cursor-pointer { touch-action: manipulation; cursor: pointer; -webkit-tap-highlight-color: rgba(0,0,0,0.1); }
     .fade-in { animation: fadeIn 0.5s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
     .fade-in-delay-1 { animation: fadeIn 0.5s ease-out 0.1s both; }
@@ -235,6 +252,8 @@ function getIndexHtml(): string {
     .scoreboard-num { font-variant-numeric: tabular-nums; }
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    /* 모든 ::before, ::after pseudo-element에 pointer-events: none */
+    *::before, *::after { pointer-events: none; }
 
     /* === Sport Command Center Design System === */
     .hero-bg {

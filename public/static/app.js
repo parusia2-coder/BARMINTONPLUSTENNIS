@@ -1,6 +1,14 @@
 // ==========================================
 // 대회 운영 시스템 - Frontend App (멀티스포츠)
 // ==========================================
+// 전역 에러 핸들러 (숨겨진 JS 에러 감지)
+window.onerror = function(msg, url, line, col, err) {
+  console.error('[APP ERROR]', msg, 'at', url, ':', line, ':', col, err);
+};
+window.addEventListener('unhandledrejection', function(e) {
+  console.error('[UNHANDLED PROMISE]', e.reason);
+});
+
 const ALL_CONFIGS = window.ALL_SPORT_CONFIGS || {};
 let SC = window.SPORT_CONFIG || {};
 const API = '/api';
@@ -115,6 +123,7 @@ function showToast(msg, type = 'info') {
 }
 
 function navigate(page, params = {}) {
+  console.log('[NAV] navigate to:', page, params);
   state.currentPage = page;
   Object.assign(state, params);
   // 홈으로 돌아가면 기본 config(badminton)로 복원
@@ -126,6 +135,7 @@ function navigate(page, params = {}) {
 // RENDER
 // ==========================================
 function render() {
+  console.log('[RENDER] page:', state.currentPage);
   const app = document.getElementById('app');
   switch (state.currentPage) {
     case 'home': app.innerHTML = renderHome(); break;
@@ -150,7 +160,7 @@ function renderNav(transparent = false) {
   if (transparent) {
     return `<nav class="glass-nav fixed top-0 left-0 right-0 z-40">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <a onclick="navigate('home')" class="flex items-center gap-3 cursor-pointer group">
+        <a href="javascript:void(0)" onclick="navigate('home')" class="flex items-center gap-3 cursor-pointer group">
           <div class="w-9 h-9 bg-gradient-to-br ${T.gradFrom} ${T.gradTo} rounded-xl flex items-center justify-center shadow-lg shadow-${P}-500/20 group-hover:shadow-${P}-500/40 transition-shadow">
             <i class="fas ${SC.icon || "fa-trophy"} text-white text-sm"></i>
           </div>
@@ -166,7 +176,7 @@ function renderNav(transparent = false) {
   }
   return `<nav class="bg-white/80 backdrop-blur-xl border-b border-gray-200/60 sticky top-0 z-40">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-      <a onclick="navigate('home')" class="flex items-center gap-3 cursor-pointer group">
+      <a href="javascript:void(0)" onclick="navigate('home')" class="flex items-center gap-3 cursor-pointer group">
         <div class="w-9 h-9 bg-gradient-to-br ${T.gradFrom} ${T.gradTo} rounded-xl flex items-center justify-center shadow-lg shadow-${P}-500/20 group-hover:shadow-${P}-500/40 transition-shadow">
           <i class="fas ${SC.icon || "fa-trophy"} text-white text-sm"></i>
         </div>
@@ -598,6 +608,7 @@ function renderTournament() {
 
 // ---- ADMIN PANEL TOGGLE ----
 function toggleAdminPanel() {
+  console.log('[UI] toggleAdminPanel called');
   const panel = document.getElementById('admin-panel');
   const arrow = document.getElementById('admin-panel-arrow');
   if (panel) {
@@ -1743,6 +1754,7 @@ async function loadTournaments() {
 }
 
 async function openTournament(id) {
+  console.log('[NAV] openTournament:', id);
   try {
     const d = await api(`/tournaments/${id}`); state.currentTournament = d.tournament;
     // 대회의 종목에 맞게 config 전환
@@ -1762,10 +1774,26 @@ async function loadStandingsAndNavigate(tid) {
 }
 
 function switchTab(tab) {
+  console.log('[UI] switchTab:', tab);
   state.activeTab = tab;
-  document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('bg-white','shadow-sm','text-gray-900'); b.classList.add('text-gray-500'); });
+  // 모든 탭에서 활성 클래스 제거
+  document.querySelectorAll('.tab-btn').forEach(b => { 
+    b.className = b.className
+      .replace(/bg-\w+-500/g, '')
+      .replace(/text-white/g, '')
+      .replace(/shadow-sm/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!b.classList.contains('text-gray-500')) b.classList.add('text-gray-500');
+    if (!b.classList.contains('hover:text-gray-700')) b.classList.add('hover:text-gray-700');
+    if (!b.classList.contains('hover:bg-gray-50')) b.classList.add('hover:bg-gray-50');
+  });
+  // 선택된 탭에 활성 클래스 추가
   const btn = document.getElementById(`tab-${tab}`);
-  if (btn) { btn.classList.add('bg-white','shadow-sm','text-gray-900'); btn.classList.remove('text-gray-500'); }
+  if (btn) { 
+    btn.classList.remove('text-gray-500','hover:text-gray-700','hover:bg-gray-50'); 
+    btn.classList.add(`bg-${P}-500`,'text-white','shadow-sm'); 
+  }
   const content = document.getElementById('tab-content');
   const isAdmin = state.adminAuth[state.currentTournament?.id];
   if (tab==='participants') content.innerHTML = renderParticipantsTab(isAdmin);
@@ -1775,7 +1803,7 @@ function switchTab(tab) {
 }
 
 // Auth (세션 유지: localStorage)
-function showAuthModal(tid) { document.getElementById('auth-modal').classList.remove('hidden'); document.getElementById('auth-password').focus(); state._authTid = tid; }
+function showAuthModal(tid) { console.log('[UI] showAuthModal:', tid); document.getElementById('auth-modal').classList.remove('hidden'); document.getElementById('auth-password').focus(); state._authTid = tid; }
 function closeAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
 async function authenticate() {
   const pw = document.getElementById('auth-password').value.trim();
@@ -3077,6 +3105,7 @@ async function selectDuplicate(pid) {
 let sponsorList = [];
 
 async function showSponsorManager() {
+  console.log('[UI] showSponsorManager called');
   const tid = state.currentTournament.id;
   try {
     sponsorList = await api('/tournaments/' + tid + '/sponsors');
