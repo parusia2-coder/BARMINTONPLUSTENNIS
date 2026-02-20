@@ -1050,94 +1050,175 @@ function getWatchHtml(): string {
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;}
 html,body{width:100%;height:100%;overflow:hidden;background:#0f172a;color:#fff;font-family:-apple-system,system-ui,sans-serif;}
 body{display:flex;align-items:center;justify-content:center;}
-.container{width:100%;height:100%;max-width:400px;max-height:400px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.W{width:100%;height:100%;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;}
 
 /* 로딩 */
-.loading{display:flex;flex-direction:column;align-items:center;gap:8px;}
-.spinner{width:28px;height:28px;border:3px solid rgba(255,255,255,0.15);border-top-color:#3b82f6;border-radius:50%;animation:spin .8s linear infinite;}
+.ld{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.sp{width:28px;height:28px;border:3px solid rgba(255,255,255,0.15);border-top-color:#3b82f6;border-radius:50%;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg)}}
-.loading-text{font-size:11px;color:rgba(255,255,255,0.5);}
+.lt{font-size:12px;color:rgba(255,255,255,0.5);}
+
+/* 네트워크 상태 표시줄 */
+.net{position:fixed;top:0;left:0;right:0;height:3px;z-index:100;transition:opacity .3s;}
+.net.ok{background:#22c55e;opacity:0;}
+.net.off{background:#ef4444;opacity:1;animation:pulse 1.5s infinite;}
+.net.saving{background:#3b82f6;opacity:1;animation:slide 1s linear infinite;}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 
 /* 대회/코트 선택 */
-.select-screen{display:flex;flex-direction:column;align-items:center;padding:20px 12px;gap:6px;width:100%;}
-.select-title{font-size:13px;font-weight:700;margin-bottom:4px;text-align:center;}
-.select-list{width:100%;max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;}
-.select-btn{width:100%;padding:10px 8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-size:12px;font-weight:600;text-align:center;cursor:pointer;transition:all .15s;}
-.select-btn:active{background:rgba(59,130,246,0.3);transform:scale(0.95);}
-.select-sub{font-size:9px;color:rgba(255,255,255,0.4);margin-top:2px;}
+.sel{display:flex;flex-direction:column;align-items:center;padding:16px 12px;gap:6px;width:100%;overflow-y:auto;max-height:100%;}
+.sel-t{font-size:14px;font-weight:700;margin-bottom:4px;text-align:center;}
+.sel-l{width:100%;display:flex;flex-direction:column;gap:5px;}
+.sel-b{width:100%;padding:12px 10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:12px;color:#fff;font-size:13px;font-weight:600;text-align:center;cursor:pointer;transition:all .15s;min-height:44px;}
+.sel-b:active{background:rgba(59,130,246,0.3);transform:scale(0.96);}
+.sel-s{font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;}
 
-/* 점수판 메인 */
-.scoreboard{display:flex;flex-direction:column;align-items:center;width:100%;height:100%;justify-content:center;gap:2px;padding:8px;}
-.match-info{font-size:9px;color:rgba(255,255,255,0.4);text-align:center;line-height:1.3;max-width:90%;}
-.match-info .event{color:rgba(255,255,255,0.6);font-weight:600;}
+/* 코트 그리드 */
+.cg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;}
+.cb{aspect-ratio:1;border-radius:14px;background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.12);color:#fff;font-size:22px;font-weight:800;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;min-height:52px;}
+.cb:active{background:rgba(59,130,246,0.3);transform:scale(0.92);}
 
-/* 점수 영역 */
-.scores{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;}
-.side{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:0;}
-.team-name{font-size:10px;font-weight:600;color:rgba(255,255,255,0.7);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;padding:0 4px;}
-.score-touch{width:100%;aspect-ratio:1;max-width:120px;max-height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s;position:relative;overflow:hidden;}
-.score-touch:active{transform:scale(0.92);}
-.score-touch.left{background:linear-gradient(135deg,#1e3a5f,#1e40af);border:2px solid rgba(59,130,246,0.4);}
-.score-touch.right{background:linear-gradient(135deg,#5f1e1e,#9a3412);border:2px solid rgba(249,115,22,0.4);}
-.score-touch .num{font-size:clamp(32px,12vw,52px);font-weight:900;line-height:1;font-variant-numeric:tabular-nums;}
-.score-touch .hint{position:absolute;bottom:6px;font-size:7px;color:rgba(255,255,255,0.3);font-weight:500;}
-.vs{font-size:10px;font-weight:700;color:rgba(255,255,255,0.2);flex-shrink:0;}
-.score-flash{animation:pop .3s ease;}
-@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.15)}100%{transform:scale(1)}}
+/* 점수판 - 핵심 */
+.sb{display:flex;flex-direction:column;align-items:center;width:100%;height:100%;justify-content:center;gap:2px;padding:env(safe-area-inset-top,4px) 8px env(safe-area-inset-bottom,4px);}
+.mi{font-size:10px;color:rgba(255,255,255,0.5);text-align:center;line-height:1.3;font-weight:600;}
+.sc{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;}
+.sd{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;min-width:0;}
+.tn{font-size:11px;font-weight:700;color:rgba(255,255,255,0.75);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;padding:0 4px;}
+.st{width:100%;aspect-ratio:1;max-width:140px;max-height:140px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s;position:relative;overflow:hidden;flex-direction:column;}
+.st:active{transform:scale(0.90);}
+.st.L{background:linear-gradient(135deg,#1e3a5f,#1e40af);border:2.5px solid rgba(59,130,246,0.5);}
+.st.R{background:linear-gradient(135deg,#5f1e1e,#9a3412);border:2.5px solid rgba(249,115,22,0.5);}
+.st .n{font-size:clamp(36px,14vw,60px);font-weight:900;line-height:1;font-variant-numeric:tabular-nums;}
+.st .h{position:absolute;bottom:8px;font-size:8px;color:rgba(255,255,255,0.3);font-weight:500;}
+.vs{font-size:11px;font-weight:700;color:rgba(255,255,255,0.15);flex-shrink:0;}
+.fl{animation:pop .3s ease;}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.2)}100%{transform:scale(1)}}
+
+/* -1 버튼 */
+.mn{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.5);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2;line-height:1;}
+.mn:active{background:rgba(239,68,68,0.4);transform:scale(0.85);}
 
 /* 하단 컨트롤 */
-.controls{display:flex;gap:4px;margin-top:4px;}
-.ctrl-btn{padding:6px 10px;border-radius:8px;font-size:9px;font-weight:600;border:none;cursor:pointer;transition:all .12s;color:#fff;}
-.ctrl-btn:active{transform:scale(0.92);}
-.ctrl-btn.undo{background:rgba(255,255,255,0.1);}
-.ctrl-btn.swap{background:rgba(168,85,247,0.2);color:#c084fc;}
-.ctrl-btn.finish{background:rgba(34,197,94,0.2);color:#86efac;}
-.ctrl-btn.back{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.5);}
+.ct{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;justify-content:center;}
+.bt{padding:8px 14px;border-radius:10px;font-size:10px;font-weight:700;border:none;cursor:pointer;transition:all .12s;color:#fff;min-height:36px;display:flex;align-items:center;gap:4px;}
+.bt:active{transform:scale(0.90);}
+.bt.u{background:rgba(255,255,255,0.1);}
+.bt.sw{background:rgba(168,85,247,0.25);color:#c084fc;}
+.bt.f{background:rgba(34,197,94,0.25);color:#86efac;}
+.bt.bk{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);}
+.bt.dn{background:rgba(34,197,94,0.3);color:#86efac;}
+.bt.nx{background:rgba(59,130,246,0.25);color:#93c5fd;}
 
-/* 상태 뱃지 */
-.badge-row{display:flex;gap:4px;margin-top:2px;}
-.badge{padding:2px 6px;border-radius:6px;font-size:8px;font-weight:700;}
-.badge.mp{background:rgba(239,68,68,0.2);color:#fca5a5;animation:pulse 1.5s infinite;}
-.badge.close{background:rgba(234,179,8,0.2);color:#fde047;}
-.badge.live{background:rgba(34,197,94,0.2);color:#86efac;}
+/* 뱃지 */
+.br{display:flex;gap:4px;margin:2px 0;flex-wrap:wrap;justify-content:center;}
+.bg{padding:2px 8px;border-radius:8px;font-size:9px;font-weight:700;}
+.bg.mp{background:rgba(239,68,68,0.25);color:#fca5a5;animation:pulse 1.5s infinite;}
+.bg.cl{background:rgba(234,179,8,0.2);color:#fde047;}
+.bg.lv{background:rgba(34,197,94,0.2);color:#86efac;}
+.bg.tb{background:rgba(239,68,68,0.3);color:#f87171;animation:pulse 1.5s infinite;}
+.bg.dc{background:rgba(234,179,8,0.3);color:#fde047;animation:pulse 2s infinite;}
+.bg.ad{background:rgba(168,85,247,0.3);color:#c4b5fd;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 
+/* 테니스 전용 */
+.sb.tennis .st.L{background:linear-gradient(135deg,#064e3b,#047857);border-color:rgba(16,185,129,0.5);}
+.sb.tennis .st.R{background:linear-gradient(135deg,#78350f,#92400e);border-color:rgba(245,158,11,0.5);}
+.tennis-st .n{font-size:clamp(32px,12vw,52px)!important;}
+.pt{font-size:16px;font-weight:800;margin-top:2px;min-height:20px;text-align:center;transition:all .2s;}
+.srv{color:#fde047;font-size:8px;vertical-align:middle;margin:0 2px;animation:srvPulse 1.5s ease-in-out infinite;}
+@keyframes srvPulse{0%,100%{opacity:1;text-shadow:0 0 4px rgba(253,224,71,0.5);}50%{opacity:0.6;text-shadow:none;}}
+
+/* 세트 히스토리 */
+.sets-row{display:flex;gap:4px;justify-content:center;margin:2px 0;}
+.set-sc{padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.5);}
+
+/* 다음 경기 미리보기 */
+.nxt-preview{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:6px 10px;margin-top:6px;text-align:center;}
+
 /* 완료 화면 */
-.finish-screen{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px;}
-.finish-title{font-size:14px;font-weight:800;}
-.finish-score{font-size:28px;font-weight:900;letter-spacing:2px;}
-.finish-teams{font-size:10px;color:rgba(255,255,255,0.5);text-align:center;line-height:1.4;}
-.winner-name{color:#86efac;font-weight:700;font-size:12px;}
+.fn{display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;}
+.fn-t{font-size:16px;font-weight:800;}
+.fn-s{font-size:28px;font-weight:900;letter-spacing:2px;}
+.fn-w{color:#86efac;font-weight:700;font-size:13px;}
 
 /* 대기 화면 */
-.waiting{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px;}
-.waiting-icon{font-size:28px;animation:float 2s ease-in-out infinite;}
-@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-.waiting-text{font-size:11px;color:rgba(255,255,255,0.4);}
+.wt{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px;overflow-y:auto;max-height:100%;}
+.wt-i{font-size:32px;animation:fl 2s ease-in-out infinite;}
+@keyframes fl{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.wt-t{font-size:12px;color:rgba(255,255,255,0.4);}
 
-/* 코트 선택 그리드 */
-.court-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%;max-height:180px;overflow-y:auto;}
-.court-btn{aspect-ratio:1;border-radius:12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#fff;font-size:18px;font-weight:800;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;}
-.court-btn:active{background:rgba(59,130,246,0.3);transform:scale(0.92);}
-
-/* 점수 플래시 */
-.flash{animation:pop .3s ease;}
+/* 화면 꺼짐 방지 표시 */
+.wl{position:fixed;bottom:4px;right:4px;width:8px;height:8px;border-radius:50%;z-index:50;}
+.wl.on{background:#22c55e;box-shadow:0 0 4px #22c55e;}
+.wl.off{background:#64748b;}
 
 /* 스크롤바 */
 ::-webkit-scrollbar{width:3px;}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:2px;}
 
-/* 원형 화면 안전 영역 */
-@media (shape: round) {
-  .container{padding:15%;}
-  .score-touch{max-width:100px;max-height:100px;}
-  .court-grid{grid-template-columns:repeat(2,1fr);}
+/* ===== 스마트폰 반응형 (>400px) ===== */
+@media (min-width:401px){
+  .W{max-width:480px;margin:0 auto;}
+  .sel{padding:24px 16px;gap:8px;}
+  .sel-t{font-size:18px;}
+  .sel-b{padding:14px 12px;font-size:15px;border-radius:14px;min-height:52px;}
+  .sel-s{font-size:12px;}
+  .cg{gap:10px;}
+  .cb{font-size:26px;border-radius:16px;min-height:64px;}
+  .sb{gap:4px;padding:12px;}
+  .mi{font-size:13px;}
+  .tn{font-size:14px;}
+  .st{max-width:160px;max-height:160px;border-width:3px;}
+  .st .n{font-size:clamp(40px,16vw,72px);}
+  .st .h{bottom:10px;font-size:10px;}
+  .tennis-st .n{font-size:clamp(36px,14vw,60px)!important;}
+  .pt{font-size:20px;}
+  .srv{font-size:10px;}
+  .mn{width:28px;height:28px;font-size:14px;top:6px;right:6px;}
+  .vs{font-size:14px;}
+  .ct{gap:8px;margin-top:10px;}
+  .bt{padding:10px 18px;font-size:12px;border-radius:12px;min-height:42px;}
+  .br{gap:6px;margin:4px 0;}
+  .bg{padding:3px 10px;font-size:11px;}
+  .fn{gap:10px;padding:30px;}
+  .fn-t{font-size:20px;}
+  .fn-s{font-size:36px;}
+  .fn-w{font-size:16px;}
+  .wt{gap:10px;padding:30px;}
+  .wt-i{font-size:40px;}
+  .wt-t{font-size:14px;}
+  .sets-row{gap:6px;margin:4px 0;}
+  .set-sc{padding:2px 8px;font-size:11px;}
+  .nxt-preview{padding:8px 14px;border-radius:12px;}
+}
+
+/* ===== 스마트폰 가로모드 ===== */
+@media (orientation:landscape) and (max-height:500px){
+  .sb{flex-direction:row;gap:8px;padding:4px 16px;}
+  .sc{flex-direction:row;gap:12px;flex:1;}
+  .st{max-width:120px;max-height:120px;}
+  .ct{flex-direction:column;gap:4px;position:absolute;right:8px;top:50%;transform:translateY(-50%);}
+  .mi{position:absolute;top:4px;left:50%;transform:translateX(-50%);}
+  .br{position:absolute;top:20px;left:50%;transform:translateX(-50%);}
+}
+
+/* ===== 원형 워치 안전 영역 ===== */
+@media (shape:round){
+  .W{padding:12%;}
+  .st{max-width:100px;max-height:100px;}
+  .tennis-st .n{font-size:clamp(28px,10vw,44px)!important;}
+  .pt{font-size:13px;}
+  .cg{grid-template-columns:repeat(2,1fr);}
+  .bt{padding:5px 8px;font-size:8px;min-height:28px;}
+  .sel-b{padding:8px 6px;font-size:11px;min-height:36px;}
 }
 </style>
 </head>
 <body>
-<div class="container" id="app">
-  <div class="loading"><div class="spinner"></div><div class="loading-text">연결 중...</div></div>
+<div class="net ok" id="net"></div>
+<div class="wl off" id="wl"></div>
+<div class="W" id="app">
+  <div class="ld"><div class="sp"></div><div class="lt">연결 중...</div></div>
 </div>
 <script src="/static/watch.js"></script>
 </body>
