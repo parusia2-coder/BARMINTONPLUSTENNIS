@@ -1,14 +1,6 @@
 // ==========================================
 // 대회 운영 시스템 - Frontend App (멀티스포츠)
 // ==========================================
-// 전역 에러 핸들러 (숨겨진 JS 에러 감지)
-window.onerror = function(msg, url, line, col, err) {
-  console.error('[APP ERROR]', msg, 'at', url, ':', line, ':', col, err);
-};
-window.addEventListener('unhandledrejection', function(e) {
-  console.error('[UNHANDLED PROMISE]', e.reason);
-});
-
 const ALL_CONFIGS = window.ALL_SPORT_CONFIGS || {};
 let SC = window.SPORT_CONFIG || {};
 const API = '/api';
@@ -123,7 +115,6 @@ function showToast(msg, type = 'info') {
 }
 
 function navigate(page, params = {}) {
-  console.log('[NAV] navigate to:', page, params);
   state.currentPage = page;
   Object.assign(state, params);
   // 홈으로 돌아가면 기본 config(badminton)로 복원
@@ -135,7 +126,6 @@ function navigate(page, params = {}) {
 // RENDER
 // ==========================================
 function render() {
-  console.log('[RENDER] page:', state.currentPage);
   const app = document.getElementById('app');
   switch (state.currentPage) {
     case 'home': app.innerHTML = renderHome(); break;
@@ -571,26 +561,26 @@ function renderTournament() {
     ${isAdmin ? `
     <!-- Admin Actions (Collapsible) -->
     <div class="mb-6">
-      <button onclick="toggleAdminPanel()" id="admin-panel-toggle" class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition mb-2">
+      <button onclick="toggleAdminPanel()" id="admin-panel-toggle" class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition mb-2 py-2 px-3 -ml-3 rounded-lg hover:bg-gray-100 active:bg-gray-200" style="min-height:44px;position:relative;z-index:10;">
         <i class="fas fa-chevron-right text-xs transition-transform" id="admin-panel-arrow"></i>
         <i class="fas fa-cog text-gray-400"></i>관리자 메뉴
       </button>
       <div id="admin-panel" class="hidden">
-        <div class="flex flex-wrap gap-2 p-3 bg-white rounded-xl border border-gray-200">
-          <button onclick="navigate('scoreboard')" class="px-3 py-2 ${T.bg50} ${T.text700} rounded-lg text-xs font-medium ${T.hoverBg100} transition"><i class="fas fa-tv mr-1"></i>스코어보드</button>
-          <button onclick="showSponsorManager()" class="px-3 py-2 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 transition"><i class="fas fa-ad mr-1"></i>스폰서 배너</button>
-          <button onclick="exportTournament(${t.id})" class="px-3 py-2 bg-${P}-50 text-${P}-700 rounded-lg text-xs font-medium hover:bg-${P}-100 transition"><i class="fas fa-download mr-1"></i>데이터 백업</button>
-          <button onclick="showImportModal()" class="px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-100 transition"><i class="fas fa-upload mr-1"></i>데이터 복원</button>
-          <button onclick="deleteTournament(${t.id})" class="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition"><i class="fas fa-trash-alt mr-1"></i>대회 삭제</button>
+        <div class="flex flex-wrap gap-2 p-3 bg-white rounded-xl border border-gray-200" style="position:relative;z-index:10;">
+          <button onclick="navigate('scoreboard')" class="px-4 py-3 ${T.bg50} ${T.text700} rounded-lg text-xs font-medium ${T.hoverBg100} transition" style="min-height:44px;"><i class="fas fa-tv mr-1"></i>스코어보드</button>
+          <button onclick="showSponsorManager()" class="px-4 py-3 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 transition" style="min-height:44px;"><i class="fas fa-ad mr-1"></i>스폰서 배너</button>
+          <button onclick="exportTournament(${t.id})" class="px-4 py-3 bg-${P}-50 text-${P}-700 rounded-lg text-xs font-medium hover:bg-${P}-100 transition" style="min-height:44px;"><i class="fas fa-download mr-1"></i>데이터 백업</button>
+          <button onclick="showImportModal()" class="px-4 py-3 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-100 transition" style="min-height:44px;"><i class="fas fa-upload mr-1"></i>데이터 복원</button>
+          <button onclick="deleteTournament(${t.id})" class="px-4 py-3 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition" style="min-height:44px;"><i class="fas fa-trash-alt mr-1"></i>대회 삭제</button>
         </div>
       </div>
     </div>` : ''}
 
     <!-- Tabs -->
-    <div class="flex gap-1 mb-6 bg-white p-1 rounded-xl shadow-sm border border-gray-200">
-      <button onclick="switchTab('participants')" id="tab-participants" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='participants' ? 'bg-${P}-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}"><i class="fas fa-users mr-1"></i>참가자 <span class="hidden sm:inline">(${state.participants.length})</span></button>
-      <button onclick="switchTab('events')" id="tab-events" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='events' ? 'bg-${P}-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}"><i class="fas fa-layer-group mr-1"></i>종목/팀 <span class="hidden sm:inline">(${state.events.length})</span></button>
-      <button onclick="switchTab('matches')" id="tab-matches" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='matches' ? 'bg-${P}-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}"><i class="fas ${SC.icon || "fa-trophy"} mr-1"></i>경기</button>
+    <div class="flex gap-1 mb-6 bg-white p-1 rounded-xl shadow-sm border border-gray-200" style="position:relative;z-index:5;">
+      <button onclick="switchTab('participants')" id="tab-participants" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='participants' ? `bg-${P}-500 text-white shadow-sm` : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}" style="min-height:44px;"><i class="fas fa-users mr-1"></i>참가자 <span class="hidden sm:inline">(${state.participants.length})</span></button>
+      <button onclick="switchTab('events')" id="tab-events" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='events' ? `bg-${P}-500 text-white shadow-sm` : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}" style="min-height:44px;"><i class="fas fa-layer-group mr-1"></i>종목/팀 <span class="hidden sm:inline">(${state.events.length})</span></button>
+      <button onclick="switchTab('matches')" id="tab-matches" class="tab-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${state.activeTab==='matches' ? `bg-${P}-500 text-white shadow-sm` : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}" style="min-height:44px;"><i class="fas ${SC.icon || "fa-trophy"} mr-1"></i>경기</button>
     </div>
     <div id="tab-content">${state.activeTab==='participants' ? renderParticipantsTab(isAdmin) : state.activeTab==='events' ? renderEventsTab(isAdmin) : renderMatchesTab(isAdmin)}</div>
   </div>
@@ -608,7 +598,6 @@ function renderTournament() {
 
 // ---- ADMIN PANEL TOGGLE ----
 function toggleAdminPanel() {
-  console.log('[UI] toggleAdminPanel called');
   const panel = document.getElementById('admin-panel');
   const arrow = document.getElementById('admin-panel-arrow');
   if (panel) {
@@ -1754,7 +1743,6 @@ async function loadTournaments() {
 }
 
 async function openTournament(id) {
-  console.log('[NAV] openTournament:', id);
   try {
     const d = await api(`/tournaments/${id}`); state.currentTournament = d.tournament;
     // 대회의 종목에 맞게 config 전환
@@ -1774,7 +1762,6 @@ async function loadStandingsAndNavigate(tid) {
 }
 
 function switchTab(tab) {
-  console.log('[UI] switchTab:', tab);
   state.activeTab = tab;
   // 모든 탭에서 활성 클래스 제거
   document.querySelectorAll('.tab-btn').forEach(b => { 
@@ -1803,7 +1790,7 @@ function switchTab(tab) {
 }
 
 // Auth (세션 유지: localStorage)
-function showAuthModal(tid) { console.log('[UI] showAuthModal:', tid); document.getElementById('auth-modal').classList.remove('hidden'); document.getElementById('auth-password').focus(); state._authTid = tid; }
+function showAuthModal(tid) { document.getElementById('auth-modal').classList.remove('hidden'); document.getElementById('auth-password').focus(); state._authTid = tid; }
 function closeAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
 async function authenticate() {
   const pw = document.getElementById('auth-password').value.trim();
@@ -3105,7 +3092,6 @@ async function selectDuplicate(pid) {
 let sponsorList = [];
 
 async function showSponsorManager() {
-  console.log('[UI] showSponsorManager called');
   const tid = state.currentTournament.id;
   try {
     sponsorList = await api('/tournaments/' + tid + '/sponsors');
