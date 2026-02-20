@@ -252,6 +252,7 @@ function tennisGameWon(side) {
   if (totalGames % 2 === 1 && totalGames > t.lastSwapGames && !t.tiebreak) {
     t.lastSwapGames = totalGames;
     courtState.swapPending = true;
+    autoSaveScore(); // ★ 체인지오버 시에도 서버 저장
     renderCourt();
     setTimeout(function() { showSwapModal(); }, 500);
     return;
@@ -273,6 +274,7 @@ function tennisGameWon(side) {
       const matchWinnerName = matchWinner === 'left' ? getLeftName() : getRightName();
       // DB에 저장할 세트별 점수 동기화
       syncTennisScoreToDB();
+      autoSaveScore(); // ★ 매치 종료 시 서버 저장
       renderCourt();
       setTimeout(function() {
         var setScores = t.sets.map(function(s) { return s.left + '-' + s.right; }).join(', ');
@@ -294,6 +296,7 @@ function tennisGameWon(side) {
     courtState.score.left = 0;
     courtState.score.right = 0;
     syncTennisScoreToDB();
+    autoSaveScore(); // ★ 다음 세트 시작 시 서버 저장
     renderCourt();
     return;
   }
@@ -304,6 +307,9 @@ function tennisGameWon(side) {
     t.tbPoint = { left: 0, right: 0 };
     showCourtToast('🎯 TIEBREAK! 먼저 7포인트 + 2점 차 승리', 'info');
   }
+
+  // ★ 테니스 게임 승리 시 서버 저장 (전광판 실시간 반영)
+  autoSaveScore();
 
   renderCourt();
 }
@@ -357,6 +363,7 @@ function tennisUndoGame(side) {
     courtState.score.left = t.games.left;
     courtState.score.right = t.games.right;
     syncTennisScoreToDB();
+    autoSaveScore(); // ★ 게임 취소 후 서버 저장
     renderCourt();
     showCourtToast('게임 취소 (' + t.games.left + '-' + t.games.right + ')', 'info');
   }
@@ -1112,6 +1119,8 @@ function executeAutoSwap() {
     }
   }
 
+  // ★ 좌우 교체 후 서버 저장 (전광판 실시간 반영)
+  autoSaveScore();
   renderCourt();
   showCourtToast('🔄 ' + SWAP_LABEL + ' 완료!', 'success');
 }
@@ -1399,6 +1408,48 @@ function manualSwapSides() {
 // ==========================================
 let actionHistory = [];
 
+// ==========================================
+// 디바운스 자동저장 (점수 변경 시 서버에 즉시 반영)
+// 전광판(대시보드)이 3초마다 서버를 조회하므로
+// 점수가 바뀔 때마다 서버에 저장해야 실시간 반영됨
+// ==========================================
+let _autoSaveTimer = null;
+const AUTO_SAVE_DELAY = 500; // 500ms 디바운스
+
+function autoSaveScore() {
+  if (!courtState.currentMatch) return;
+  if (courtState.readOnly) return;  // 관람 모드에서는 저장 안 함
+
+  if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = setTimeout(async () => {
+    const m = courtState.currentMatch;
+    if (!m) return;
+
+    var data;
+    if (isTennis()) {
+      data = getTennisSetScores();
+      data.status = 'playing';
+    } else {
+      data = {
+        team1_set1: getTeam1Score(),
+        team1_set2: 0, team1_set3: 0,
+        team2_set1: getTeam2Score(),
+        team2_set2: 0, team2_set3: 0,
+        status: 'playing'
+      };
+    }
+
+    try {
+      await courtApi(`/tournaments/${courtState.tournamentId}/matches/${m.id}/score`, {
+        method: 'PUT', body: JSON.stringify(data)
+      });
+      console.log('[AutoSave] 점수 서버 저장 완료', data);
+    } catch(e) {
+      console.warn('[AutoSave] 저장 실패', e);
+    }
+  }, AUTO_SAVE_DELAY);
+}
+
 function changeScore(side, delta) {
   const oldVal = courtState.score[side];
   const maxScore = courtState.targetScore + 10;
@@ -1420,12 +1471,16 @@ function changeScore(side, delta) {
   if (!courtState.swapDone && !courtState.swapPending) {
     if (checkAutoSwap()) {
       // 교체 모달이 표시되므로 renderCourt 스킵 (모달 안에서 처리)
+      autoSaveScore(); // 교체 시에도 서버에 저장
       return;
     }
   }
 
   // 목표 점수 도달 체크
   checkGameEnd();
+
+  // ★ 점수 변경 시 서버에 자동 저장 (전광판 실시간 반영)
+  autoSaveScore();
 
   renderCourt();
 }
@@ -1474,6 +1529,8 @@ function undoLastAction() {
   // undo 시 swapDone, swapPending도 복원
   courtState.swapDone = last.swapDone;
   if (last.swapPending !== undefined) courtState.swapPending = last.swapPending;
+  // ★ 실행취소 후에도 서버에 저장 (전광판 반영)
+  autoSaveScore();
   renderCourt();
   showCourtToast('실행취소 완료', 'info');
 }
