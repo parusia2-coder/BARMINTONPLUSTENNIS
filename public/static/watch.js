@@ -378,7 +378,7 @@ function startAutoRefresh() {
   stopAutoRefresh();
   watchState.autoRefreshTimer = setInterval(function() {
     loadCourtData();
-  }, 8000);
+  }, 4000);
 }
 
 function stopAutoRefresh() {
@@ -888,7 +888,7 @@ async function startNextMatch() {
 }
 
 // ==========================================
-// 자동 저장 (500ms 디바운스)
+// 자동 저장 (200ms 디바운스 - 빠른 전광판 반영)
 // ==========================================
 function autoSave() {
   if (!watchState.currentMatch || watchState.readOnly) return;
@@ -923,7 +923,7 @@ function autoSave() {
       // 오프라인 큐에 추가
       watchState.offlineQueue.push({ path: '/tournaments/' + watchState.tournamentId + '/matches/' + m.id + '/score', data: data });
     }
-  }, 500);
+  }, 200);
 }
 
 // 오프라인 큐 처리

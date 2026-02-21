@@ -1419,7 +1419,7 @@ let actionHistory = [];
 // 점수가 바뀔 때마다 서버에 저장해야 실시간 반영됨
 // ==========================================
 let _autoSaveTimer = null;
-const AUTO_SAVE_DELAY = 500; // 500ms 디바운스
+const AUTO_SAVE_DELAY = 200; // 200ms 디바운스 (빠른 전광판 반영)
 
 function autoSaveScore() {
   if (!courtState.currentMatch) return;
@@ -2553,7 +2553,7 @@ function startDashboardRefresh() {
   dashboardTimer = setInterval(async () => {
     if (courtState.page !== 'dashboard') return;
     await fetchDashboardData();
-  }, 3000);
+  }, 1500);
 }
 
 function enterDashboardMode() {
@@ -3273,7 +3273,7 @@ function startAutoRefresh() {
         }
       } catch(e) {}
     }
-  }, courtState.readOnly ? 3000 : 10000);
+  }, courtState.readOnly ? 1500 : 5000);
 }
 
 // ==========================================
