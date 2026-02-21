@@ -198,7 +198,8 @@
 <div class="toc-item toc-sub"><span>8-2. 점수 입력 흐름 (터치)</span></div>
 <div class="toc-item toc-sub"><span>8-3. 코트 교체 & 서명</span></div>
 <div class="toc-item toc-sub"><span>8-4. 테니스 점수판 운영</span></div>
-<div class="toc-item toc-sub"><span>8-5. 대형 전광판 대시보드</span></div>
+<div class="toc-item toc-sub"><span>8-5. ⌚ 스마트워치 점수판</span></div>
+<div class="toc-item toc-sub"><span>8-6. 대형 전광판 대시보드</span></div>
 <div class="toc-item"><span>9. STEP 8 — 결선 토너먼트</span></div>
 <div class="toc-item"><span>10. 결과 확인 & PDF 출력</span></div>
 <div class="toc-item"><span>11. 보조 도구 활용</span></div>
@@ -897,7 +898,179 @@
   </table>
 </div>
 
-<h3>8-5. 대형 전광판 대시보드</h3>
+<!-- ========================================== -->
+<!--       8-5. 스마트워치 점수판                   -->
+<!-- ========================================== -->
+<div class="page-break"></div>
+<h3>8-5. ⌚ 스마트워치 점수판 (Watch Scoreboard)</h3>
+
+<p>스마트워치(갤럭시워치 등)의 브라우저에서 직접 점수를 입력할 수 있는 <strong>초경량 전용 UI</strong>입니다. 
+앱 설치 없이 웹 브라우저만으로 동작하며, 태블릿 없이도 코트에서 바로 점수를 기록할 수 있습니다.</p>
+
+<div class="box box-green">
+  <div class="box-title">⌚ 접속 방법 3가지</div>
+  <table>
+    <tr><th style="width:10%">#</th><th style="width:30%">방법</th><th>설명</th></tr>
+    <tr>
+      <td>①</td>
+      <td><strong>QR 코드 전송 (추천 ⭐)</strong></td>
+      <td>
+        스마트폰에서 대회 관리앱 → QR 코드 버튼 → "관전자" 탭<br>
+        → 워치 URL 복사 → <strong>카카오톡/메시지로 워치에 전송</strong><br>
+        → 워치에서 링크 탭 → 삼성 인터넷에서 자동 열림
+      </td>
+    </tr>
+    <tr>
+      <td>②</td>
+      <td><strong>워치 브라우저 직접 입력</strong></td>
+      <td>
+        갤럭시워치 → 삼성 인터넷(🌐) 앱 열기<br>
+        → 주소창에 <code>/watch</code> 입력<br>
+        → 대회 선택 → 코트 선택
+      </td>
+    </tr>
+    <tr>
+      <td>③</td>
+      <td><strong>특정 코트 바로 진입</strong></td>
+      <td>
+        URL에 코트 번호를 포함하면 선택 과정 생략:<br>
+        <code>/watch?tid=대회ID&court=코트번호</code>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="box box-blue">
+  <div class="box-title">📱 워치 URL 파라미터</div>
+  <table>
+    <tr><th style="width:25%">파라미터</th><th style="width:20%">값</th><th>설명</th></tr>
+    <tr><td><code>tid</code></td><td>대회 ID (숫자)</td><td>해당 대회 자동 선택</td></tr>
+    <tr><td><code>court</code></td><td>코트 번호</td><td>해당 코트 바로 진입</td></tr>
+    <tr><td><code>mode=view</code></td><td>선택</td><td>관람 전용 모드 (점수 입력 불가)</td></tr>
+    <tr><td><code>readonly=1</code></td><td>선택</td><td>관람 전용 (mode=view와 동일)</td></tr>
+  </table>
+  <div class="code-block">예시 URL:
+/watch                         ← 대회 선택부터 시작
+/watch?tid=1                   ← 안양대회 → 코트 선택
+/watch?tid=2&court=3           ← 강북구대회 코트3 바로 입력
+/watch?tid=2&court=1&mode=view ← 코트1 관람 전용</div>
+</div>
+
+<div class="box box-yellow">
+  <div class="box-title">⌚ 스마트워치 점수 입력 흐름</div>
+  <div class="diagram">  ① 대회 선택          ② 코트 선택           ③ 대기 화면
+  ┌──────────────┐   ┌──────────────┐    ┌──────────────────┐
+  │ 🏸 안양대회    │   │  1  2  3     │    │  🏸 코트 3        │
+  │ 🎾 강북구대회  │→  │  4  5  6     │ →  │  다음 경기 대기중... │
+  └──────────────┘   └──────────────┘    │  다음: A vs B      │
+                                         └──────────────────┘
+                                                  │ ▶ 시작
+  ⑤ 경기 완료           ④ 점수 입력          ↓
+  ┌──────────────┐    ┌──────────────────┐
+  │  🏆 경기 종료  │    │  ┌───┐  :  ┌───┐ │
+  │  A팀 승리!    │ ←  │  │12 │     │ 8 │ │  ← 원형 터치로 +1
+  │  12 : 8      │    │  └───┘     └───┘ │
+  │  [✓확인] [←] │    │  [↩] [⇄] [✕]    │
+  └──────────────┘    └──────────────────┘</div>
+</div>
+
+<div class="box box-green">
+  <div class="box-title">🎯 워치 조작법</div>
+  <table>
+    <tr><th style="width:25%">동작</th><th style="width:35%">방법</th><th>설명</th></tr>
+    <tr>
+      <td><strong>점수 +1</strong></td>
+      <td>왼쪽/오른쪽 원형 영역 <strong>탭</strong></td>
+      <td>해당 팀 +1점. 진동 피드백 제공</td>
+    </tr>
+    <tr>
+      <td><strong>점수 -1</strong></td>
+      <td>원형 영역 <strong>우상단 [-] 버튼</strong> 탭</td>
+      <td>오입력 시 해당 팀 -1점 감소</td>
+    </tr>
+    <tr>
+      <td><strong>되돌리기</strong></td>
+      <td>하단 <strong>↩</strong> 버튼</td>
+      <td>마지막 동작 취소 (스왑 포함 완벽 복원)</td>
+    </tr>
+    <tr>
+      <td><strong>사이드 교체</strong></td>
+      <td>하단 <strong>⇄</strong> 버튼</td>
+      <td>좌우 팀 수동 교체. KDK/체인지오버 시 자동 처리됨</td>
+    </tr>
+    <tr>
+      <td><strong>나가기</strong></td>
+      <td>하단 <strong>✕</strong> 버튼</td>
+      <td>코트 선택 화면으로 돌아감</td>
+    </tr>
+    <tr>
+      <td><strong>경기 완료</strong></td>
+      <td>목표점 도달 시 <strong>자동 표시</strong></td>
+      <td>[✓ 확인] = 저장 + 다음 경기 / [← 계속] = 취소</td>
+    </tr>
+  </table>
+</div>
+
+<div class="box box-blue">
+  <div class="box-title">🎾 테니스 워치 전용 기능</div>
+  <p>테니스 대회에서는 자동으로 테니스 전용 점수판이 표시됩니다:</p>
+  <table>
+    <tr><th style="width:25%">기능</th><th>설명</th></tr>
+    <tr><td><strong>포인트 표시</strong></td><td>원형 아래에 현재 포인트 표시 (0/15/30/40/AD)</td></tr>
+    <tr><td><strong>게임 카운트</strong></td><td>원형 안에 큰 숫자로 게임 수 표시</td></tr>
+    <tr><td><strong>서브 인디케이터</strong></td><td>서브권 가진 팀 이름 옆에 노란색 ● 표시</td></tr>
+    <tr><td><strong>뱃지 표시</strong></td><td>DEUCE / TB(타이브레이크) / AD / MATCH 상태 뱃지</td></tr>
+    <tr><td><strong>세트 히스토리</strong></td><td>멀티세트(set2/set3) 시 완료된 세트 점수 표시</td></tr>
+    <tr><td><strong>체인지오버</strong></td><td>홀수 게임합 시 자동 사이드 교체</td></tr>
+    <tr><td><strong>타이브레이크</strong></td><td>동점 시 자동 진입, 7포인트+2점차 승리</td></tr>
+  </table>
+</div>
+
+<div class="box box-yellow">
+  <div class="box-title">⚡ 안정성 기능</div>
+  <table>
+    <tr><th style="width:25%">기능</th><th>설명</th></tr>
+    <tr>
+      <td><strong>화면 꺼짐 방지</strong></td>
+      <td>점수판 진입 시 Wake Lock API 자동 활성화. 경기 중 화면이 꺼지지 않음<br>우하단 초록 점(●) = 활성화 상태</td>
+    </tr>
+    <tr>
+      <td><strong>네트워크 표시</strong></td>
+      <td>상단 3px 바로 연결 상태 표시: 초록=정상, 빨강=끊김, 파랑=저장중</td>
+    </tr>
+    <tr>
+      <td><strong>오프라인 큐</strong></td>
+      <td>네트워크 끊김 시 점수 변경을 큐에 저장 → 연결 복구 시 자동 동기화</td>
+    </tr>
+    <tr>
+      <td><strong>자동 저장</strong></td>
+      <td>점수 변경 후 500ms 디바운스로 서버 자동 저장. 전광판에 실시간 반영</td>
+    </tr>
+    <tr>
+      <td><strong>자동 새로고침</strong></td>
+      <td>대기 화면에서 8초마다 새 경기 확인</td>
+    </tr>
+    <tr>
+      <td><strong>진동 피드백</strong></td>
+      <td>점수 +1(짧은 진동), 교체(더블 진동), 경기 완료(트리플 진동)</td>
+    </tr>
+  </table>
+</div>
+
+<div class="box box-green">
+  <div class="box-title">💡 갤럭시워치 사용 팁</div>
+  <table>
+    <tr><th style="width:25%">항목</th><th>설명</th></tr>
+    <tr><td><strong>브라우저</strong></td><td>삼성 인터넷(🌐) 기본 설치됨. 없으면 Galaxy Store에서 설치</td></tr>
+    <tr><td><strong>즐겨찾기</strong></td><td>한번 접속 후 ★ 즐겨찾기 등록 → 다음부터 바로 진입</td></tr>
+    <tr><td><strong>네트워크</strong></td><td>WiFi 또는 LTE 연결 필요. Bluetooth 연결만으로는 불가</td></tr>
+    <tr><td><strong>배터리</strong></td><td>화면 상시 켜짐으로 소모 증가. 충분한 충전 상태에서 사용 권장</td></tr>
+    <tr><td><strong>화면 크기</strong></td><td>원형 360×360px 최적화. 사각형 워치도 호환됨</td></tr>
+    <tr><td><strong>Apple Watch</strong></td><td>Safari 브라우저 지원되지만, 독립 WiFi/LTE 모델만 가능</td></tr>
+  </table>
+</div>
+
+<h3>8-6. 대형 전광판 대시보드</h3>
 
 <p>체육관 메인 스크린이나 대형 모니터에서 <strong>전 코트의 경기 현황을 한 화면에</strong> 표시하는 전용 대시보드입니다.</p>
 
