@@ -1419,13 +1419,14 @@ let actionHistory = [];
 // 점수가 바뀔 때마다 서버에 저장해야 실시간 반영됨
 // ==========================================
 let _autoSaveTimer = null;
-const AUTO_SAVE_DELAY = 200; // 200ms 디바운스 (빠른 전광판 반영)
+const AUTO_SAVE_DELAY = 0; // ★ 즉시 저장 (전광판 실시간 반영)
 
 function autoSaveScore() {
   if (!courtState.currentMatch) return;
   if (courtState.readOnly) return;  // 관람 모드에서는 저장 안 함
 
   if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+  // 즉시 실행 (디바운스 없음)
   _autoSaveTimer = setTimeout(async () => {
     const m = courtState.currentMatch;
     if (!m) return;
@@ -2545,15 +2546,55 @@ function copyToClipboard(text) {
 // 대형 전광판 대시보드 (전 코트 통합 뷰)
 // ==========================================
 let dashboardTimer = null;
+let dashboardScoreTimer = null; // ★ 경량 점수 전용 빠른 폴링
 let dashboardData = null;     // 마지막 API 응답 캐시
 let dashboardPrevState = {};  // 코트별 이전 상태 (경기종료→결과 전환용)
+let _dashboardScoreHash = ''; // 변경 감지용
 
 function startDashboardRefresh() {
   if (dashboardTimer) clearInterval(dashboardTimer);
+  if (dashboardScoreTimer) clearInterval(dashboardScoreTimer);
+  
+  // ★ 경량 점수 폴링: 1초마다 (단일 쿼리, 점수만)
+  dashboardScoreTimer = setInterval(async () => {
+    if (courtState.page !== 'dashboard' || !dashboardData) return;
+    try {
+      const data = await courtApi(`/tournaments/${courtState.tournamentId}/courts/scores`);
+      const scores = data.scores || [];
+      const hash = scores.map(s => `${s.court_number}:${s.team1_set1}:${s.team2_set1}:${s.team1_set2}:${s.team2_set2}:${s.team1_set3}:${s.team2_set3}`).join('|');
+      if (hash !== _dashboardScoreHash) {
+        _dashboardScoreHash = hash;
+        // 기존 dashboardData에 점수만 패치
+        scores.forEach(s => {
+          const court = dashboardData.courts.find(c => c.court_number === s.court_number);
+          if (court && court.current_match) {
+            court.current_match.team1_set1 = s.team1_set1;
+            court.current_match.team1_set2 = s.team1_set2;
+            court.current_match.team1_set3 = s.team1_set3;
+            court.current_match.team2_set1 = s.team2_set1;
+            court.current_match.team2_set2 = s.team2_set2;
+            court.current_match.team2_set3 = s.team2_set3;
+          }
+        });
+        // 경기 종료 감지: 기존에 playing이었는데 scores에 없으면
+        dashboardData.courts.forEach(c => {
+          if (c.current_match && !scores.find(s => s.court_number === c.court_number)) {
+            dashboardPrevState[c.court_number] = {
+              phase: 'result', match: c.current_match, recent: c.recent_match, timestamp: Date.now()
+            };
+            c.current_match = null;
+          }
+        });
+        renderDashboardView();
+      }
+    } catch(e) {}
+  }, 1000);
+
+  // 전체 데이터 갱신 (이름, 다음 경기 등): 5초마다
   dashboardTimer = setInterval(async () => {
     if (courtState.page !== 'dashboard') return;
     await fetchDashboardData();
-  }, 1500);
+  }, 5000);
 }
 
 function enterDashboardMode() {
@@ -2562,6 +2603,7 @@ function enterDashboardMode() {
   courtState.locked = true;
   dashboardData = null;
   dashboardPrevState = {};
+  _dashboardScoreHash = '';
   // URL 업데이트
   const url = new URL(window.location);
   url.searchParams.set('tid', courtState.tournamentId);
@@ -3248,6 +3290,8 @@ function goBackFromSideSelect() {
 // ==========================================
 // 자동 새로고침
 // ==========================================
+let _lastScoreHash = ''; // 변경 감지용
+
 function startAutoRefresh() {
   if (courtState.autoRefreshTimer) clearInterval(courtState.autoRefreshTimer);
   courtState.autoRefreshTimer = setInterval(async () => {
@@ -3255,25 +3299,33 @@ function startAutoRefresh() {
     if (courtState.page === 'court' && !courtState.currentMatch) {
       await refreshCourtData();
     }
-    // 읽기 전용 모드에서는 진행중 경기도 자동 새로고침 (점수 표시 업데이트)
+    // ★ 읽기 전용 모드: 경량 score API로 빠르게 폴링 (변경 시에만 렌더링)
     if (courtState.readOnly && courtState.page === 'court' && courtState.currentMatch) {
       try {
-        const data = await courtApi(`/tournaments/${courtState.tournamentId}/court/${courtState.courtNumber}`);
-        if (data.current_match) {
-          const m = data.current_match;
-          courtState.currentMatch = m;
-          courtState.score = { left: m.team1_set1 || 0, right: m.team2_set1 || 0 };
-          renderCourt();
+        const data = await courtApi(`/tournaments/${courtState.tournamentId}/court/${courtState.courtNumber}/score`);
+        if (data.match) {
+          const m = data.match;
+          const hash = `${m.id}:${m.team1_set1}:${m.team2_set1}:${m.team1_set2}:${m.team2_set2}:${m.team1_set3}:${m.team2_set3}:${m.status}`;
+          if (hash !== _lastScoreHash) {
+            _lastScoreHash = hash;
+            // 점수만 업데이트 (나머지 메타데이터는 유지)
+            courtState.currentMatch.team1_set1 = m.team1_set1;
+            courtState.currentMatch.team1_set2 = m.team1_set2;
+            courtState.currentMatch.team1_set3 = m.team1_set3;
+            courtState.currentMatch.team2_set1 = m.team2_set1;
+            courtState.currentMatch.team2_set2 = m.team2_set2;
+            courtState.currentMatch.team2_set3 = m.team2_set3;
+            courtState.score = { left: m.team1_set1 || 0, right: m.team2_set1 || 0 };
+            renderCourt();
+          }
         } else {
-          courtState.currentMatch = null;
-          courtState.nextMatches = data.next_matches;
-          courtState.recentMatches = data.recent_matches;
-          courtState.page = 'court';
-          renderCourt();
+          // 경기 종료됨 → full refresh로 전환
+          _lastScoreHash = '';
+          await refreshCourtData();
         }
       } catch(e) {}
     }
-  }, courtState.readOnly ? 1500 : 5000);
+  }, courtState.readOnly ? 1000 : 5000); // ★ 읽기전용 1초 간격 (경량 API라 부담 없음)
 }
 
 // ==========================================

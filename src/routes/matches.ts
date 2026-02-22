@@ -506,6 +506,36 @@ matchRoutes.get('/:tid/courts/overview', async (c) => {
   return c.json({ tournament, courts, stats, target_score: targetScore })
 })
 
+// ★★★ 경량 점수 전용 API (전광판 빠른 갱신용) ★★★
+// 단일 코트 - 진행 중 경기의 점수만 반환 (단일 쿼리, 최소 데이터)
+matchRoutes.get('/:tid/court/:courtNum/score', async (c) => {
+  const tid = c.req.param('tid')
+  const courtNum = c.req.param('courtNum')
+  const db = c.env.DB
+  const m = await db.prepare(`
+    SELECT id, team1_set1, team1_set2, team1_set3, team2_set1, team2_set2, team2_set3, status, winner_team, updated_at
+    FROM matches WHERE tournament_id=? AND court_number=? AND status='playing' LIMIT 1
+  `).bind(tid, courtNum).first()
+  return c.json({ match: m || null, ts: Date.now() })
+})
+
+// 전체 코트 점수 일괄 조회 (대시보드용 - 단일 쿼리!)
+matchRoutes.get('/:tid/courts/scores', async (c) => {
+  const tid = c.req.param('tid')
+  const db = c.env.DB
+  const { results } = await db.prepare(`
+    SELECT m.id, m.court_number, m.team1_set1, m.team1_set2, m.team1_set3,
+      m.team2_set1, m.team2_set2, m.team2_set3, m.status, m.winner_team, m.updated_at,
+      t1.team_name as team1_name, t2.team_name as team2_name
+    FROM matches m
+    LEFT JOIN teams t1 ON m.team1_id = t1.id
+    LEFT JOIN teams t2 ON m.team2_id = t2.id
+    WHERE m.tournament_id=? AND m.status='playing'
+    ORDER BY m.court_number ASC
+  `).bind(tid).all()
+  return c.json({ scores: results || [], ts: Date.now() })
+})
+
 // 감사 로그 조회
 matchRoutes.get('/:tid/audit-logs', async (c) => {
   const tid = c.req.param('tid')
