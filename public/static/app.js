@@ -1476,23 +1476,25 @@ function renderMatchesTab(isAdmin) {
 }
 
 function renderMatchCard(m, isAdmin) {
-  const st = { pending: { l: '대기', c: 'bg-gray-100 text-gray-600', bc: 'border-gray-200' }, playing: { l: '진행중', c: 'bg-green-100 text-green-700', bc: 'border-green-300 ring-2 ring-green-100' }, completed: { l: '완료', c: T.bg100+' '+T.text700, bc: 'border-gray-200' } };
+  const isForfeit = m.is_forfeit === 1;
+  const st = { pending: { l: '대기', c: 'bg-gray-100 text-gray-600', bc: 'border-gray-200' }, playing: { l: '진행중', c: 'bg-green-100 text-green-700', bc: 'border-green-300 ring-2 ring-green-100' }, completed: { l: isForfeit ? '부전승' : '완료', c: isForfeit ? 'bg-red-100 text-red-700' : T.bg100+' '+T.text700, bc: isForfeit ? 'border-red-200' : 'border-gray-200' } };
   const s = st[m.status] || st.pending;
   const t1 = m.team1_name || 'BYE', t2 = m.team2_name || 'BYE';
   const t1T = m.team1_set1||0, t2T = m.team2_set1||0;
+  const forfeitBadge = isForfeit ? `<span class="badge bg-red-50 text-red-600 text-xs border border-red-200"><i class="fas fa-user-slash mr-0.5"></i>부전승</span>` : '';
   return `<div class="bg-white rounded-xl border ${s.bc} p-3 shadow-sm hover:shadow-md transition-shadow">
     <div class="flex items-center justify-between mb-2">
-      <div class="flex items-center gap-1.5"><span class="text-xs text-gray-400 font-mono">#${m.match_order}</span>${m.court_number?`<span class="badge bg-yellow-50 text-yellow-700 text-xs border border-yellow-200">${m.court_number}코트</span>`:''} ${m.group_num ? `<span class="badge bg-indigo-50 text-indigo-600 text-xs border border-indigo-200">${m.group_num}조</span>` : ''}</div>
+      <div class="flex items-center gap-1.5"><span class="text-xs text-gray-400 font-mono">#${m.match_order}</span>${m.court_number?`<span class="badge bg-yellow-50 text-yellow-700 text-xs border border-yellow-200">${m.court_number}코트</span>`:''} ${m.group_num ? `<span class="badge bg-indigo-50 text-indigo-600 text-xs border border-indigo-200">${m.group_num}조</span>` : ''} ${forfeitBadge}</div>
       <div class="flex items-center gap-1">${m.status==='playing'?'<span class="w-2 h-2 rounded-full bg-green-500 pulse-live"></span>':''}<span class="badge ${s.c} text-xs">${s.l}</span></div>
     </div>
     <div class="space-y-1.5">
-      <div class="flex items-center justify-between ${m.winner_team===1?'font-bold text-${P}-700':''}"><span class="text-sm truncate mr-2">${m.winner_team===1?'🏆 ':''}${t1}</span><span class="scoreboard-num text-lg font-bold">${t1T}</span></div>
+      <div class="flex items-center justify-between ${m.winner_team===1?'font-bold text-${P}-700':''}"><span class="text-sm truncate mr-2">${m.winner_team===1?(isForfeit?'🚫 ':'🏆 '):''}${isForfeit && m.forfeit_team===1?'<s class="text-red-400">'+t1+'</s>':t1}</span>${isForfeit ? '' : `<span class="scoreboard-num text-lg font-bold">${t1T}</span>`}</div>
       <div class="h-px bg-gray-100"></div>
-      <div class="flex items-center justify-between ${m.winner_team===2?'font-bold text-${P}-700':''}"><span class="text-sm truncate mr-2">${m.winner_team===2?'🏆 ':''}${t2}</span><span class="scoreboard-num text-lg font-bold">${t2T}</span></div>
+      <div class="flex items-center justify-between ${m.winner_team===2?'font-bold text-${P}-700':''}"><span class="text-sm truncate mr-2">${m.winner_team===2?(isForfeit?'🚫 ':'🏆 '):''}${isForfeit && m.forfeit_team===2?'<s class="text-red-400">'+t2+'</s>':t2}</span>${isForfeit ? '' : `<span class="scoreboard-num text-lg font-bold">${t2T}</span>`}</div>
     </div>
     ${isAdmin && m.status!=='cancelled' ? `<div class="mt-2 pt-2 border-t border-gray-100 flex gap-2">
-      ${m.status==='pending'?`<button onclick="startMatch(${m.id})" class="flex-1 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100"><i class="fas fa-play mr-1"></i>시작</button>`:''}
-      ${m.status==='playing'?`<button onclick="showScoreModal(${m.id})" class="flex-1 py-1.5 bg-${P}-50 text-${P}-700 rounded-lg text-xs font-medium hover:bg-${P}-100"><i class="fas fa-edit mr-1"></i>점수</button>`:''}
+      ${m.status==='pending'?`<button onclick="startMatch(${m.id})" class="flex-1 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100"><i class="fas fa-play mr-1"></i>시작</button><button onclick="showForfeitModalApp(${m.id})" class="py-1.5 px-2 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100" title="부전승"><i class="fas fa-user-slash"></i></button>`:''}
+      ${m.status==='playing'?`<button onclick="showScoreModal(${m.id})" class="flex-1 py-1.5 bg-${P}-50 text-${P}-700 rounded-lg text-xs font-medium hover:bg-${P}-100"><i class="fas fa-edit mr-1"></i>점수</button><button onclick="showForfeitModalApp(${m.id})" class="py-1.5 px-2 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100" title="부전승"><i class="fas fa-user-slash"></i></button>`:''}
       ${m.status==='completed'?`<button onclick="showScoreModal(${m.id})" class="flex-1 py-1.5 bg-gray-50 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-100"><i class="fas fa-edit mr-1"></i>수정</button>`:''}
       ${m.status!=='playing'?`<button onclick="showCourtChangeModal(${m.id})" class="py-1.5 px-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-100" title="코트 변경"><i class="fas fa-exchange-alt"></i></button>`:''}
     </div>` : ''}
@@ -1528,15 +1530,16 @@ function renderScoreCard(m) {
   const t1 = m.team1_name || 'BYE', t2 = m.team2_name || 'BYE';
   const t1T = m.team1_set1||0, t2T = m.team2_set1||0;
   const live = m.status==='playing';
+  const isForfeit = m.is_forfeit === 1;
   return `<div class="bg-white/10 rounded-xl p-3 ${live?'ring-2 ring-green-500/50':''}">
     <div class="flex justify-between mb-2">
-      <span class="text-xs text-gray-400">${m.court_number ? m.court_number+'코트 ' : ''}#${m.match_order} ${m.event_name||''} ${m.group_num ? m.group_num+'조' : ''}</span>
-      ${live?'<span class="text-xs text-green-400 flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 pulse-live"></span>LIVE</span>':`<span class="text-xs ${T.text400}">완료</span>`}
+      <span class="text-xs text-gray-400">${m.court_number ? m.court_number+'코트 ' : ''}#${m.match_order} ${m.event_name||''} ${m.group_num ? m.group_num+'조' : ''} ${isForfeit ? '<span class="text-red-400 font-bold">부전승</span>' : ''}</span>
+      ${live?'<span class="text-xs text-green-400 flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 pulse-live"></span>LIVE</span>':`<span class="text-xs ${T.text400}">${isForfeit ? '부전승' : '완료'}</span>`}
     </div>
     <div class="space-y-1">
-      <div class="flex justify-between items-center ${m.winner_team===1?'text-yellow-400':''}"><span class="text-sm font-medium">${m.winner_team===1?'🏆 ':''}${t1}</span><span class="text-2xl font-extrabold scoreboard-num">${t1T}</span></div>
+      <div class="flex justify-between items-center ${m.winner_team===1?'text-yellow-400':''}"><span class="text-sm font-medium">${m.winner_team===1?(isForfeit?'🚫 ':'🏆 '):''}${isForfeit && m.forfeit_team===1?'<s class="opacity-50">'+t1+'</s>':t1}</span>${isForfeit ? '' : `<span class="text-2xl font-extrabold scoreboard-num">${t1T}</span>`}</div>
       <div class="h-px bg-white/10"></div>
-      <div class="flex justify-between items-center ${m.winner_team===2?'text-yellow-400':''}"><span class="text-sm font-medium">${m.winner_team===2?'🏆 ':''}${t2}</span><span class="text-2xl font-extrabold scoreboard-num">${t2T}</span></div>
+      <div class="flex justify-between items-center ${m.winner_team===2?'text-yellow-400':''}"><span class="text-sm font-medium">${m.winner_team===2?(isForfeit?'🚫 ':'🏆 '):''}${isForfeit && m.forfeit_team===2?'<s class="opacity-50">'+t2+'</s>':t2}</span>${isForfeit ? '' : `<span class="text-2xl font-extrabold scoreboard-num">${t2T}</span>`}</div>
     </div>
   </div>`;
 }
@@ -2993,6 +2996,7 @@ function renderMyResult(data) {
         ${completed.map(m => {
           const isTeam1 = teams.some(t => t.id === m.team1_id);
           const isWinner = (isTeam1 && m.winner_team === 1) || (!isTeam1 && m.winner_team === 2);
+          const isForfeit = m.is_forfeit === 1;
           const myScore = isTeam1 ? (m.team1_set1||0) : (m.team2_set1||0);
           const oppScore = isTeam1 ? (m.team2_set1||0) : (m.team1_set1||0);
           const myTeam = isTeam1 ? m.team1_name : m.team2_name;
@@ -3013,8 +3017,12 @@ function renderMyResult(data) {
                 </div>
               </div>
               <div class="text-right flex-shrink-0">
+                ${isForfeit ? `
+                <div class="text-sm font-bold ${isWinner ? 'text-green-600' : 'text-red-500'}"><i class="fas fa-user-slash mr-1"></i>부전${isWinner ? '승' : '패'}</div>
+                ` : `
                 <div class="text-xl sm:text-2xl font-extrabold ${isWinner ? 'text-green-600' : 'text-red-500'}">${myScore} <span class="text-sm text-gray-300">:</span> ${oppScore}</div>
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 ${isWinner ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-600 border-red-200'} rounded-full text-xs font-bold border mt-1">${isWinner ? '<i class="fas fa-check text-[9px]"></i>승리' : '<i class="fas fa-times text-[9px]"></i>패배'}</span>
+                `}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 ${isWinner ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-600 border-red-200'} rounded-full text-xs font-bold border mt-1">${isWinner ? '<i class="fas fa-check text-[9px]"></i>승리' : '<i class="fas fa-times text-[9px]"></i>패배'}${isForfeit ? ' (부전)' : ''}</span>
               </div>
             </div>
           </div>`;
@@ -3441,4 +3449,73 @@ function esc(s) {
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
+}
+
+// ==========================================
+// 부전승(Forfeit) 처리 - 관리자 UI
+// ==========================================
+function showForfeitModalApp(matchId) {
+  const m = state.matches.find(x => x.id === matchId);
+  if (!m) return;
+  const team1 = m.team1_name || '팀1';
+  const team2 = m.team2_name || '팀2';
+
+  const existing = document.getElementById('forfeit-modal-app');
+  if (existing) existing.remove();
+
+  const html = `
+  <div id="forfeit-modal-app" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)this.remove()">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden" onclick="event.stopPropagation()">
+      <div class="p-5 text-center border-b border-gray-100 bg-red-50">
+        <div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3">
+          <i class="fas fa-user-slash text-2xl text-red-500"></i>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800">부전승 처리</h3>
+        <p class="text-xs text-gray-500 mt-1">#${m.match_order} ${m.event_name || ''} ${m.group_num ? m.group_num+'조' : ''}</p>
+        <p class="text-xs text-red-500 mt-1">불참/기권 팀을 선택하세요</p>
+      </div>
+      <div class="p-4 space-y-2">
+        <button onclick="executeForfeit(${matchId}, 1)" class="w-full py-3 bg-gray-50 border-2 border-gray-200 hover:border-red-400 hover:bg-red-50 rounded-xl text-center transition active:scale-95">
+          <div class="text-xs text-red-500 mb-0.5"><i class="fas fa-user-slash mr-1"></i>부전패 (불참/기권)</div>
+          <div class="font-bold text-gray-800">${esc(team1)}</div>
+          <div class="text-xs text-gray-500 mt-0.5">→ <span class="text-green-600 font-bold">${esc(team2)}</span> 부전승</div>
+        </button>
+        <button onclick="executeForfeit(${matchId}, 2)" class="w-full py-3 bg-gray-50 border-2 border-gray-200 hover:border-red-400 hover:bg-red-50 rounded-xl text-center transition active:scale-95">
+          <div class="text-xs text-red-500 mb-0.5"><i class="fas fa-user-slash mr-1"></i>부전패 (불참/기권)</div>
+          <div class="font-bold text-gray-800">${esc(team2)}</div>
+          <div class="text-xs text-gray-500 mt-0.5">→ <span class="text-green-600 font-bold">${esc(team1)}</span> 부전승</div>
+        </button>
+      </div>
+      <div class="p-4 border-t border-gray-100">
+        <button onclick="document.getElementById('forfeit-modal-app').remove()" class="w-full py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">취소</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+async function executeForfeit(matchId, forfeitTeam) {
+  const m = state.matches.find(x => x.id === matchId);
+  if (!m) return;
+  const teamName = forfeitTeam === 1 ? (m.team1_name || '팀1') : (m.team2_name || '팀2');
+  const winnerName = forfeitTeam === 1 ? (m.team2_name || '팀2') : (m.team1_name || '팀1');
+
+  if (!confirm(`"${teamName}" 부전패 처리하시겠습니까?\n\n"${winnerName}"이(가) 부전승합니다.`)) return;
+
+  try {
+    const tid = state.currentTournament.id;
+    await api('/tournaments/' + tid + '/matches/' + matchId + '/forfeit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ forfeit_team: forfeitTeam })
+    });
+    showToast(`부전승 처리: ${winnerName} 승`, 'success');
+    // 모달 제거 후 데이터 새로고침
+    const modal = document.getElementById('forfeit-modal-app');
+    if (modal) modal.remove();
+    await loadMatches();
+    switchTab('matches');
+  } catch(e) {
+    // api() 함수에서 이미 토스트 표시
+  }
 }

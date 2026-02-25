@@ -675,6 +675,13 @@ function renderSideSelect() {
         class="w-full max-w-lg py-4 bg-gradient-to-r from-green-600 to-green-500 rounded-2xl text-xl font-bold shadow-xl hover:shadow-green-500/30 active:scale-95 transition">
         <i class="fas fa-play mr-2"></i>이 배치로 경기 시작
       </button>
+
+      <!-- 부전승 처리 -->
+      ${!courtState.readOnly ? `
+      <button onclick="showForfeitModal()" 
+        class="w-full max-w-lg mt-3 py-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl text-sm font-bold hover:bg-red-500/20 active:scale-95 transition">
+        <i class="fas fa-user-slash mr-2"></i>부전승 처리
+      </button>` : ''}
     </div>
   </div>`;
 }
@@ -3140,6 +3147,7 @@ function renderDashboardCardResult(cn, prevState, isTen) {
 function renderDashboardCardResultBadminton(cn, prevState, r) {
   const s1 = r.team1_set1 || 0;
   const s2 = r.team2_set1 || 0;
+  const isForfeit = r.is_forfeit === 1;
   const winnerName = r.winner_name || (s1 > s2 ? r.team1_name : r.team2_name) || '?';
   const elapsed = Date.now() - prevState.timestamp;
   const fadeClass = elapsed > 6000 ? 'opacity-70' : 'opacity-100';
@@ -3150,18 +3158,21 @@ function renderDashboardCardResultBadminton(cn, prevState, r) {
       <div class="flex items-center justify-between mb-2 relative z-10">
         <div class="flex items-center gap-2">
           <span class="w-8 h-8 rounded-xl bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-black text-sm">${cn}</span>
-          <span class="text-xs font-bold text-yellow-400 tracking-wider">🏸 경기 종료</span>
+          <span class="text-xs font-bold text-yellow-400 tracking-wider">${isForfeit ? '🚫 부전승' : '🏸 경기 종료'}</span>
         </div>
-        <span class="text-lg">🏆</span>
+        <span class="text-lg">${isForfeit ? '🚫' : '🏆'}</span>
       </div>
       <div class="flex-1 flex flex-col justify-center items-center relative z-10 py-2">
-        <div class="text-[10px] text-yellow-500/70 font-bold mb-1 tracking-widest">WINNER</div>
+        <div class="text-[10px] text-yellow-500/70 font-bold mb-1 tracking-widest">${isForfeit ? 'WALKOVER' : 'WINNER'}</div>
         <div class="text-base lg:text-lg font-black text-yellow-300 text-center leading-tight mb-2">${winnerName}</div>
+        ${isForfeit ? `
+        <div class="px-3 py-1 bg-red-500/20 rounded-full text-xs text-red-400 font-bold">부전승</div>
+        ` : `
         <div class="flex items-center gap-3 text-2xl font-black">
           <span class="${s1 > s2 ? 'text-yellow-300' : 'text-gray-500'}">${s1}</span>
           <span class="text-gray-600 text-sm">:</span>
           <span class="${s2 > s1 ? 'text-yellow-300' : 'text-gray-500'}">${s2}</span>
-        </div>
+        </div>`}
         <div class="text-[10px] text-gray-500 mt-1">${r.event_name || ''}</div>
       </div>
       <div class="mt-2 relative z-10">
@@ -3652,4 +3663,78 @@ function renderCourtTimeline(m, targetScore, isTen) {
       <div class="timeline-bar-fill ${colorClass}" style="width:${progress}%"></div>
     </div>
   </div>`;
+}
+
+// ==========================================
+// 부전승(Forfeit) 처리
+// ==========================================
+function showForfeitModal() {
+  const m = courtState.currentMatch;
+  if (!m) return;
+  const team1 = m.team1_name || '팀1';
+  const team2 = m.team2_name || '팀2';
+
+  const existing = document.getElementById('forfeit-modal');
+  if (existing) existing.remove();
+
+  const html = `
+  <div id="forfeit-modal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm" onclick="if(event.target===this)this.remove()">
+    <div class="bg-gray-900 border border-red-500/30 rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden" onclick="event.stopPropagation()">
+      <div class="p-5 text-center border-b border-white/10 bg-red-500/10">
+        <div class="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-3">
+          <i class="fas fa-user-slash text-3xl text-red-400"></i>
+        </div>
+        <h3 class="text-xl font-extrabold text-white mb-1">부전승 처리</h3>
+        <p class="text-sm text-gray-400">불참/기권 팀을 선택하세요</p>
+        <p class="text-xs text-red-400/60 mt-1">* 경기는 0:0 부전승으로 기록됩니다</p>
+      </div>
+      <div class="p-5 space-y-3">
+        <button onclick="confirmForfeit(1)" class="w-full py-4 bg-white/5 border-2 border-white/10 hover:border-red-500/50 hover:bg-red-500/10 rounded-xl text-center transition active:scale-95">
+          <div class="text-xs text-red-400 mb-1"><i class="fas fa-user-slash mr-1"></i>부전패 (불참/기권)</div>
+          <div class="text-lg font-bold text-white">${team1}</div>
+          <div class="text-xs text-gray-500 mt-1">→ <span class="text-green-400 font-bold">${team2}</span> 부전승</div>
+        </button>
+        <button onclick="confirmForfeit(2)" class="w-full py-4 bg-white/5 border-2 border-white/10 hover:border-red-500/50 hover:bg-red-500/10 rounded-xl text-center transition active:scale-95">
+          <div class="text-xs text-red-400 mb-1"><i class="fas fa-user-slash mr-1"></i>부전패 (불참/기권)</div>
+          <div class="text-lg font-bold text-white">${team2}</div>
+          <div class="text-xs text-gray-500 mt-1">→ <span class="text-green-400 font-bold">${team1}</span> 부전승</div>
+        </button>
+      </div>
+      <div class="p-4 border-t border-white/10">
+        <button onclick="document.getElementById('forfeit-modal').remove()" class="w-full py-3 bg-white/10 text-gray-400 rounded-xl text-sm font-medium hover:bg-white/20 transition">
+          <i class="fas fa-times mr-1"></i>취소
+        </button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+async function confirmForfeit(forfeitTeam) {
+  const m = courtState.currentMatch;
+  if (!m) return;
+  const teamName = forfeitTeam === 1 ? (m.team1_name || '팀1') : (m.team2_name || '팀2');
+  const winnerName = forfeitTeam === 1 ? (m.team2_name || '팀2') : (m.team1_name || '팀1');
+
+  if (!confirm(`"${teamName}" 부전패 처리하시겠습니까?\n\n"${winnerName}"이(가) 부전승합니다.`)) return;
+
+  try {
+    await courtApi(`/tournaments/${courtState.tournamentId}/matches/${m.id}/forfeit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ forfeit_team: forfeitTeam })
+    });
+    // 모달 제거
+    const modal = document.getElementById('forfeit-modal');
+    if (modal) modal.remove();
+    // 다음 경기 로드
+    await refreshCourtData();
+    if (!courtState.currentMatch) {
+      courtState.page = 'court';
+      renderCourt();
+      if (courtState.autoNext) loadCourtGrid();
+    }
+  } catch(e) {
+    alert('부전승 처리 실패: ' + (e.message || ''));
+  }
 }

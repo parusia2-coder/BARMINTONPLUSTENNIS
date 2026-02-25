@@ -118,7 +118,7 @@ matchRoutes.post('/:tid/matches/:mid/reset', async (c) => {
     `UPDATE matches SET status='pending', winner_team=NULL,
       team1_set1=0, team1_set2=0, team1_set3=0,
       team2_set1=0, team2_set2=0, team2_set3=0,
-      winner_signature=NULL, loser_signature=NULL, signature_at=NULL,
+      is_forfeit=0, forfeit_team=NULL,
       updated_at=datetime('now') WHERE id=? AND tournament_id=?`
   ).bind(mid, tid).run()
 
@@ -126,6 +126,55 @@ matchRoutes.post('/:tid/matches/:mid/reset', async (c) => {
   await recalculateStandings(db, parseInt(tid), match.event_id)
 
   return c.json({ message: '경기가 초기화되었습니다.' })
+})
+
+// 🟡 부전승 처리
+matchRoutes.post('/:tid/matches/:mid/forfeit', async (c) => {
+  const tid = c.req.param('tid')
+  const mid = c.req.param('mid')
+  const db = c.env.DB
+  const body = await c.req.json()
+  const { forfeit_team } = body  // 기권/불참 팀 번호 (1 또는 2)
+
+  if (forfeit_team !== 1 && forfeit_team !== 2) {
+    return c.json({ error: '부전패 팀(forfeit_team)은 1 또는 2여야 합니다.' }, 400)
+  }
+
+  const match = await db.prepare(
+    `SELECT * FROM matches WHERE id=? AND tournament_id=?`
+  ).bind(mid, tid).first() as any
+  if (!match) return c.json({ error: '경기를 찾을 수 없습니다.' }, 404)
+
+  if (match.status === 'completed') {
+    return c.json({ error: '이미 완료된 경기입니다. 리셋 후 부전승 처리하세요.' }, 400)
+  }
+
+  const winner_team = forfeit_team === 1 ? 2 : 1
+
+  // 감사 로그
+  await db.prepare(
+    `INSERT INTO audit_logs (tournament_id, match_id, action, old_value, new_value, updated_by)
+     VALUES (?, ?, 'FORFEIT', ?, ?, 'admin')`
+  ).bind(
+    tid, mid,
+    JSON.stringify({ status: match.status, forfeit_team: null }),
+    JSON.stringify({ status: 'completed', forfeit_team, winner_team })
+  ).run()
+
+  // 부전승 처리: 점수 0:0, is_forfeit=1, completed
+  await db.prepare(
+    `UPDATE matches SET status='completed', winner_team=?, 
+      is_forfeit=1, forfeit_team=?,
+      team1_set1=0, team1_set2=0, team1_set3=0,
+      team2_set1=0, team2_set2=0, team2_set3=0,
+      updated_at=datetime('now')
+     WHERE id=? AND tournament_id=?`
+  ).bind(winner_team, forfeit_team, mid, tid).run()
+
+  // 순위 재계산
+  await recalculateStandings(db, parseInt(tid), match.event_id)
+
+  return c.json({ message: `팀${forfeit_team} 부전패 처리되었습니다. 팀${winner_team} 부전승.` })
 })
 
 // 🔴 코트 재배정
@@ -979,9 +1028,10 @@ async function recalculateStandings(db: D1Database, tournamentId: number, eventI
 
   for (const m of (matches || [])) {
     const match = m as any
-    // 1세트 단판: set1만 사용
-    const t1Score = match.team1_set1 || 0
-    const t2Score = match.team2_set1 || 0
+    // 부전승 경기: 승패만 카운트, 점수 차이는 제외
+    const isForfeit = match.is_forfeit === 1
+    const t1Score = isForfeit ? 0 : (match.team1_set1 || 0)
+    const t2Score = isForfeit ? 0 : (match.team2_set1 || 0)
 
     if (match.team1_id && stats[match.team1_id]) {
       stats[match.team1_id].scoreFor += t1Score
@@ -1028,7 +1078,7 @@ matchRoutes.get('/:tid/timeline', async (c) => {
     SELECT m.id, m.match_order as o, m.court_number as c,
       m.team1_set1+m.team1_set2+m.team1_set3 as s1,
       m.team2_set1+m.team2_set2+m.team2_set3 as s2,
-      m.status as st, m.winner_team as w, m.group_num as g,
+      m.status as st, m.winner_team as w, m.group_num as g, m.is_forfeit as ff,
       e.category as cat,
       t1.team_name as t1, t2.team_name as t2
     FROM matches m
@@ -1048,8 +1098,8 @@ matchRoutes.get('/:tid/timeline', async (c) => {
   for (const m of (matches.results || []) as any[]) {
     const cn = m.c
     if (cn >= 1 && cn <= numCourts) {
-      courts[cn].push([m.st, m.cat, m.s1, m.s2, m.w, m.g, m.t1, m.t2, m.o])
-      // idx:               0      1     2    3   4   5   6    7    8
+      courts[cn].push([m.st, m.cat, m.s1, m.s2, m.w, m.g, m.t1, m.t2, m.o, m.ff])
+      // idx:               0      1     2    3   4   5   6    7    8    9
     }
     if (m.st === 'completed') cntDone++
     else if (m.st === 'playing') cntPlay++
