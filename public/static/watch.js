@@ -18,6 +18,8 @@ var watchState = {
   sport: 'badminton',
   courtNumber: null,
   courts: 0,
+  venues: [],          // 장소 목록
+  venueId: null,       // 선택된 장소 (null = 전체)
   currentMatch: null,
   nextMatches: [],
   recentMatches: [],
@@ -1036,8 +1038,17 @@ function selectTournament(id) {
     watchState.courts = t.courts || 4;
     watchState.sport = t.sport || 'badminton';
   }
-  watchState.page = 'courts';
-  render();
+  // venues 로드
+  watchApi('/tournaments/' + id).then(function(data) {
+    watchState.venues = (data && data.venues) || [];
+    watchState.venueId = null;
+    watchState.page = 'courts';
+    render();
+  }).catch(function() {
+    watchState.venues = [];
+    watchState.page = 'courts';
+    render();
+  });
 }
 
 // ==========================================
@@ -1046,19 +1057,78 @@ function selectTournament(id) {
 function renderCourts() {
   var n = watchState.courts;
   var emoji = isTennis() ? '🎾' : '🏸';
+  var venues = watchState.venues || [];
+  var vid = watchState.venueId;
+
   var html = '<div class="sel">' +
     '<div class="sel-t">' + emoji + ' 코트 선택</div>' +
-    '<div style="font-size:9px;color:rgba(255,255,255,0.3);margin-bottom:4px;text-align:center;">' + esc(watchState.tournamentName) + '</div>' +
-    '<div class="cg">';
+    '<div style="font-size:9px;color:rgba(255,255,255,0.3);margin-bottom:4px;text-align:center;">' + esc(watchState.tournamentName) + '</div>';
 
-  for (var i = 1; i <= n; i++) {
-    html += '<button class="cb" onclick="selectCourt(' + i + ')">' + i + '</button>';
+  // 장소 탭 (장소가 있을 때만)
+  if (venues.length > 0) {
+    html += '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:3px;margin-bottom:6px;">';
+    html += '<button onclick="filterWatchVenue(null)" style="font-size:8px;padding:2px 6px;border-radius:6px;border:none;' +
+      (!vid ? 'background:#3b82f6;color:#fff;' : 'background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);') + '">전체</button>';
+    for (var vi = 0; vi < venues.length; vi++) {
+      var v = venues[vi];
+      html += '<button onclick="filterWatchVenue(' + v.id + ')" style="font-size:8px;padding:2px 6px;border-radius:6px;border:none;' +
+        (vid == v.id ? 'background:#3b82f6;color:#fff;' : 'background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);') + '">' +
+        (v.short_name || v.name) + '</button>';
+    }
+    html += '</div>';
+  }
+
+  html += '<div class="cg">';
+
+  if (venues.length > 0 && !vid) {
+    // 전체: 장소별 그룹핑
+    var assigned = {};
+    for (var vi2 = 0; vi2 < venues.length; vi2++) {
+      var vn = venues[vi2];
+      html += '<div style="grid-column:1/-1;font-size:8px;color:rgba(255,255,255,0.4);text-align:center;margin-top:2px;">' +
+        (vn.short_name || vn.name) + '</div>';
+      for (var ci = vn.court_start; ci <= vn.court_end; ci++) {
+        if (ci <= n) {
+          html += '<button class="cb" onclick="selectCourt(' + ci + ')">' + ci + '</button>';
+          assigned[ci] = true;
+        }
+      }
+    }
+    // 미지정 코트
+    var hasUnassigned = false;
+    for (var ui = 1; ui <= n; ui++) {
+      if (!assigned[ui]) {
+        if (!hasUnassigned) {
+          html += '<div style="grid-column:1/-1;font-size:8px;color:rgba(255,255,255,0.2);text-align:center;margin-top:2px;">기타</div>';
+          hasUnassigned = true;
+        }
+        html += '<button class="cb" onclick="selectCourt(' + ui + ')">' + ui + '</button>';
+      }
+    }
+  } else if (vid) {
+    // 특정 장소 필터
+    var sv = venues.find(function(x) { return x.id == vid; });
+    if (sv) {
+      for (var fi = sv.court_start; fi <= sv.court_end; fi++) {
+        if (fi <= n) html += '<button class="cb" onclick="selectCourt(' + fi + ')">' + fi + '</button>';
+      }
+    }
+  } else {
+    // 장소 없음: 평면 그리드
+    for (var i = 1; i <= n; i++) {
+      html += '<button class="cb" onclick="selectCourt(' + i + ')">' + i + '</button>';
+    }
   }
 
   html += '</div>' +
     '<button class="bt bk" style="margin-top:8px;" onclick="goBack()">← 뒤로</button>' +
     '</div>';
   return html;
+}
+
+function filterWatchVenue(id) {
+  watchState.venueId = id;
+  render();
 }
 
 function selectCourt(num) {

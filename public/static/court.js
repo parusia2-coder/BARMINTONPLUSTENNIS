@@ -70,6 +70,10 @@ const courtState = {
   locked: false,      // 코트 잠금 (나가기 비활성화)
   readOnly: false,     // 읽기 전용 (관람용)
   autoNext: true,      // 경기 종료 후 자동으로 다음 경기 로딩
+  // ====== 장소(Venue) 관련 ======
+  venues: [],          // 장소 목록 [{id, name, short_name, court_start, court_end}, ...]
+  venueId: null,       // 선택된 장소 ID (null = 전체)
+  currentVenue: null,  // 현재 코트가 속한 장소
   // ====== 테니스 전용 상태 ======
   tennis: {
     point: { left: 0, right: 0 },     // 현재 게임 포인트 (0,1,2,3 = 0,15,30,40)
@@ -466,6 +470,7 @@ function parseUrlParams() {
   const params = new URLSearchParams(window.location.search);
   courtState.tournamentId = params.get('tid');
   courtState.courtNumber = params.get('court');
+  courtState.venueId = params.get('venue') || null;
   // 코트 고정 모드 파라미터
   if (params.get('locked') === '1' || params.get('lock') === '1') courtState.locked = true;
   if (params.get('mode') === 'view' || params.get('readonly') === '1') courtState.readOnly = true;
@@ -529,11 +534,27 @@ function renderTournamentPicker() {
 }
 
 function renderCourtPicker() {
+  // 장소 탭 (장소가 등록되어 있을 때만)
+  let venueTabs = '';
+  if (courtState.venues && courtState.venues.length > 0) {
+    venueTabs = `<div class="flex flex-wrap justify-center gap-2 mb-4">
+      <button onclick="filterByVenue(null)" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${!courtState.venueId ? 'bg-'+P+'-500 text-white' : 'bg-white/10 text-gray-400 hover:bg-white/20'}">
+        <i class="fas fa-th mr-1"></i>전체
+      </button>
+      ${courtState.venues.map(v => `
+        <button onclick="filterByVenue(${v.id})" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${courtState.venueId == v.id ? 'bg-'+P+'-500 text-white' : 'bg-white/10 text-gray-400 hover:bg-white/20'}">
+          <i class="fas fa-map-marker-alt mr-1"></i>${v.short_name || v.name} <span class="opacity-60">(${v.court_start}-${v.court_end})</span>
+        </button>
+      `).join('')}
+    </div>`;
+  }
+
   return `<div>
     <h3 class="text-lg font-semibold mb-2 text-center text-${P}-400">
       <span class="mr-1">${EMOJI}</span>${courtState.tournament?.name || '대회'}
     </h3>
     <p class="text-center text-gray-400 mb-4">코트를 선택하세요</p>
+    ${venueTabs}
     <!-- 모드 안내 + QR -->
     <div class="flex justify-center gap-2 mb-4 flex-wrap">
       <button onclick="enterDashboardMode()" class="px-3 py-1.5 bg-blue-500/20 text-blue-300 rounded-lg text-xs hover:bg-blue-500/30">
@@ -546,7 +567,7 @@ function renderCourtPicker() {
     <div id="court-grid" class="grid grid-cols-2 gap-4">
       <div class="col-span-2 text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin text-2xl"></i></div>
     </div>
-    <button onclick="courtState.tournamentId=null;courtState.tournament=null;renderCourt();loadTournamentList()" 
+    <button onclick="courtState.tournamentId=null;courtState.tournament=null;courtState.venues=[];courtState.venueId=null;renderCourt();loadTournamentList()" 
             class="w-full mt-4 py-3 bg-white/5 text-gray-400 rounded-xl text-sm hover:bg-white/10">
       <i class="fas fa-arrow-left mr-2"></i>대회 다시 선택
     </button>
@@ -2110,6 +2131,9 @@ async function refreshCourtData() {
     courtState.recentMatches = data.recent_matches;
     courtState.targetScore = data.target_score || 25;
     courtState.format = data.tournament?.format || 'kdk';
+    // 장소 정보 저장
+    if (data.venue) courtState.currentVenue = data.venue;
+    if (data.venues) courtState.venues = data.venues;
     // 대회 종목에 맞는 config로 전환
     if (data.tournament && data.tournament.sport) {
       applySportConfig(data.tournament.sport);
@@ -2257,6 +2281,7 @@ async function selectTournament(tid) {
   try {
     const data = await courtApi(`/tournaments/${tid}`);
     courtState.tournament = data.tournament;
+    courtState.venues = data.venues || [];
     // 대회 종목에 맞는 config로 전환
     if (data.tournament && data.tournament.sport) {
       applySportConfig(data.tournament.sport);
@@ -2269,29 +2294,105 @@ async function selectTournament(tid) {
 async function loadCourtGrid() {
   if (!courtState.tournamentId) return;
   try {
-    const data = await courtApi(`/tournaments/${courtState.tournamentId}/courts/overview`);
+    const venueParam = courtState.venueId ? `?venue=${courtState.venueId}` : '';
+    const data = await courtApi(`/tournaments/${courtState.tournamentId}/courts/overview${venueParam}`);
     const el = document.getElementById('court-grid');
     if (!el) return;
 
-    el.innerHTML = data.courts.map(c => {
-      const hasMatch = !!c.current_match;
-      const color = hasMatch ? 'from-green-600 to-green-500' : 'from-gray-700 to-gray-600';
-      return `<button onclick="showCourtModeModal(${c.court_number})" 
-        class="bg-gradient-to-br ${color} rounded-2xl p-6 text-center hover:scale-[1.02] transition shadow-lg active:scale-95">
-        <div class="text-4xl font-black mb-2">${c.court_number}</div>
-        <div class="text-sm font-medium opacity-80">${c.court_number}코트</div>
-        ${hasMatch ? `
-          <div class="mt-2 text-xs opacity-70">
-            <div class="bg-black/20 rounded-lg px-2 py-1 mt-1">
-              <span class="pulse-live">🟢</span> ${c.current_match.team1_name||''} vs ${c.current_match.team2_name||''}
+    // 장소 목록 업데이트
+    if (data.venues) courtState.venues = data.venues;
+
+    // 장소별 그룹핑 (장소가 있을 때)
+    const venues = courtState.venues || [];
+    const courts = data.courts;
+
+    if (venues.length > 0 && !courtState.venueId) {
+      // 전체 보기: 장소별 섹션으로 분리
+      let html = '';
+      // 먼저 장소에 속한 코트들
+      venues.forEach(v => {
+        const venueCourts = courts.filter(c => c.court_number >= v.court_start && c.court_number <= v.court_end);
+        if (venueCourts.length > 0) {
+          html += `<div class="col-span-2 mt-2 mb-1">
+            <div class="flex items-center gap-2 px-1">
+              <i class="fas fa-map-marker-alt text-${P}-400 text-xs"></i>
+              <span class="text-sm font-bold text-${P}-300">${v.name}</span>
+              <span class="text-xs text-gray-500">(${v.court_start}~${v.court_end}번)</span>
             </div>
+          </div>`;
+          html += venueCourts.map(c => renderCourtCard(c)).join('');
+        }
+      });
+      // 장소에 속하지 않은 코트들
+      const assignedRange = new Set();
+      venues.forEach(v => { for (let i = v.court_start; i <= v.court_end; i++) assignedRange.add(i); });
+      const unassigned = courts.filter(c => !assignedRange.has(c.court_number));
+      if (unassigned.length > 0) {
+        html += `<div class="col-span-2 mt-2 mb-1">
+          <div class="flex items-center gap-2 px-1">
+            <i class="fas fa-question-circle text-gray-400 text-xs"></i>
+            <span class="text-sm font-bold text-gray-400">장소 미지정</span>
           </div>
-        ` : `
-          <div class="mt-2 text-xs opacity-60">대기: ${c.pending_count}경기</div>
-        `}
-      </button>`;
-    }).join('');
+        </div>`;
+        html += unassigned.map(c => renderCourtCard(c)).join('');
+      }
+      el.innerHTML = html;
+    } else {
+      // 특정 장소 필터 또는 장소 없음: 기존 평면 그리드
+      el.innerHTML = courts.map(c => renderCourtCard(c)).join('');
+    }
   } catch(e) {}
+}
+
+function renderCourtCard(c) {
+  const hasMatch = !!c.current_match;
+  const color = hasMatch ? 'from-green-600 to-green-500' : 'from-gray-700 to-gray-600';
+  const venueLabel = c.venue ? `<span class="text-[10px] opacity-50">${c.venue.short_name || c.venue.name}</span>` : '';
+  return `<button onclick="showCourtModeModal(${c.court_number})" 
+    class="bg-gradient-to-br ${color} rounded-2xl p-6 text-center hover:scale-[1.02] transition shadow-lg active:scale-95">
+    <div class="text-4xl font-black mb-2">${c.court_number}</div>
+    <div class="text-sm font-medium opacity-80">${c.court_number}코트</div>
+    ${venueLabel}
+    ${hasMatch ? `
+      <div class="mt-2 text-xs opacity-70">
+        <div class="bg-black/20 rounded-lg px-2 py-1 mt-1">
+          <span class="pulse-live">🟢</span> ${c.current_match.team1_name||''} vs ${c.current_match.team2_name||''}
+        </div>
+      </div>
+    ` : `
+      <div class="mt-2 text-xs opacity-60">대기: ${c.pending_count}경기</div>
+    `}
+  </button>`;
+}
+
+function filterByVenue(venueId) {
+  courtState.venueId = venueId;
+  // URL 업데이트
+  const url = new URL(window.location);
+  if (venueId) {
+    url.searchParams.set('venue', venueId);
+  } else {
+    url.searchParams.delete('venue');
+  }
+  window.history.replaceState({}, '', url);
+  renderCourt();
+  loadCourtGrid();
+}
+
+function switchDashboardVenue(venueId) {
+  courtState.venueId = venueId;
+  const url = new URL(window.location);
+  if (venueId) {
+    url.searchParams.set('venue', venueId);
+  } else {
+    url.searchParams.delete('venue');
+  }
+  window.history.replaceState({}, '', url);
+  dashboardData = null;
+  dashboardPrevState = {};
+  _dashboardScoreHash = '';
+  renderDashboardView(); // 로딩 표시
+  fetchDashboardData();  // 새 데이터 로드
 }
 
 // ==========================================
@@ -2559,7 +2660,8 @@ function startDashboardRefresh() {
   dashboardScoreTimer = setInterval(async () => {
     if (courtState.page !== 'dashboard' || !dashboardData) return;
     try {
-      const data = await courtApi(`/tournaments/${courtState.tournamentId}/courts/scores`);
+      const venueScoreParam = courtState.venueId ? `?venue=${courtState.venueId}` : '';
+      const data = await courtApi(`/tournaments/${courtState.tournamentId}/courts/scores${venueScoreParam}`);
       const scores = data.scores || [];
       const hash = scores.map(s => `${s.court_number}:${s.team1_set1}:${s.team2_set1}:${s.team1_set2}:${s.team2_set2}:${s.team1_set3}:${s.team2_set3}`).join('|');
       if (hash !== _dashboardScoreHash) {
@@ -2610,6 +2712,7 @@ function enterDashboardMode() {
   url.searchParams.delete('court');
   url.searchParams.set('mode', 'view');
   url.searchParams.set('locked', '1');
+  if (courtState.venueId) url.searchParams.set('venue', courtState.venueId);
   window.history.pushState({}, '', url);
   renderDashboardView();
   startDashboardRefresh();
@@ -2617,7 +2720,8 @@ function enterDashboardMode() {
 
 async function fetchDashboardData() {
   try {
-    const data = await courtApi(`/tournaments/${courtState.tournamentId}/courts/overview`);
+    const venueParam = courtState.venueId ? `?venue=${courtState.venueId}` : '';
+    const data = await courtApi(`/tournaments/${courtState.tournamentId}/courts/overview${venueParam}`);
     // 경기 종료 감지: 이전에 playing이었는데 지금 current_match가 없으면 → 종료 전환
     if (dashboardData) {
       data.courts.forEach((c, idx) => {
@@ -2698,6 +2802,23 @@ function renderDashboardView() {
       </div>
     </div>`;
 
+  // 장소(Venue) 필터 탭 (대시보드용)
+  let venueFilter = '';
+  if (courtState.venues && courtState.venues.length > 0) {
+    venueFilter = `
+    <div class="flex flex-wrap justify-center gap-2 mb-3 px-2">
+      <button onclick="switchDashboardVenue(null)" class="px-3 py-1 rounded-lg text-xs font-bold transition ${!courtState.venueId ? 'bg-'+accentColor+'-500 text-white shadow-lg shadow-'+accentColor+'-500/30' : 'bg-white/10 text-gray-400 hover:bg-white/20'}">
+        <i class="fas fa-th mr-1"></i>전체 (${courts.length})
+      </button>
+      ${courtState.venues.map(v => {
+        const cnt = courts.filter(c => c.court_number >= v.court_start && c.court_number <= v.court_end).length;
+        return `<button onclick="switchDashboardVenue(${v.id})" class="px-3 py-1 rounded-lg text-xs font-bold transition ${courtState.venueId == v.id ? 'bg-'+accentColor+'-500 text-white shadow-lg shadow-'+accentColor+'-500/30' : 'bg-white/10 text-gray-400 hover:bg-white/20'}">
+          <i class="fas fa-map-marker-alt mr-1"></i>${v.short_name || v.name} (${cnt})
+        </button>`;
+      }).join('')}
+    </div>`;
+  }
+
   // 코트 카드들
   const courtCards = courts.map(c => renderDashboardCourtCard(c, sport, t)).join('');
 
@@ -2715,6 +2836,7 @@ function renderDashboardView() {
     <div class="min-h-screen bg-gray-950 flex flex-col">
       ${topBar}
       <div class="flex-1 p-4 lg:p-6 overflow-auto">
+        ${venueFilter}
         <div class="grid ${gridCols} gap-4 lg:gap-5 auto-rows-fr">
           ${courtCards}
         </div>

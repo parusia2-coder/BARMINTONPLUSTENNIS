@@ -8,6 +8,7 @@ import { matchRoutes } from './routes/matches'
 import { bracketRoutes } from './routes/brackets'
 import { notificationRoutes } from './routes/notifications'
 import { sponsorRoutes } from './routes/sponsors'
+import { venueRoutes } from './routes/venues'
 
 // sportConfig 편의 변수 (기본 = badminton)
 const SC = sportConfig
@@ -42,6 +43,7 @@ app.route('/api/tournaments', matchRoutes)
 app.route('/api/tournaments', bracketRoutes)
 app.route('/api/tournaments', notificationRoutes)
 app.route('/api/tournaments', sponsorRoutes)
+app.route('/api/tournaments', venueRoutes)
 
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))

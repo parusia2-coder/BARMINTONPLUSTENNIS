@@ -574,6 +574,7 @@ function renderTournament() {
       <div id="admin-panel" class="hidden">
         <div class="flex flex-wrap gap-2 p-3 bg-white rounded-xl border border-gray-200" style="position:relative;z-index:10;">
           <button onclick="navigate('scoreboard')" class="px-4 py-3 ${T.bg50} ${T.text700} rounded-lg text-xs font-medium ${T.hoverBg100} transition" style="min-height:44px;"><i class="fas fa-tv mr-1"></i>스코어보드</button>
+          <button onclick="showVenueManager()" class="px-4 py-3 bg-teal-50 text-teal-700 rounded-lg text-xs font-medium hover:bg-teal-100 transition" style="min-height:44px;"><i class="fas fa-map-marker-alt mr-1"></i>장소 관리</button>
           <button onclick="showSponsorManager()" class="px-4 py-3 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 transition" style="min-height:44px;"><i class="fas fa-ad mr-1"></i>스폰서 배너</button>
           <button onclick="exportTournament(${t.id})" class="px-4 py-3 bg-${P}-50 text-${P}-700 rounded-lg text-xs font-medium hover:bg-${P}-100 transition" style="min-height:44px;"><i class="fas fa-download mr-1"></i>데이터 백업</button>
           <button onclick="showImportModal()" class="px-4 py-3 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-100 transition" style="min-height:44px;"><i class="fas fa-upload mr-1"></i>데이터 복원</button>
@@ -3257,4 +3258,187 @@ async function loadMyPageSponsors(container) {
       setInterval(() => { idx++; renderBanner(); }, 6000);
     }
   } catch(e) { /* 스폰서 미설정 시 무시 */ }
+}
+
+// ==========================================
+// 장소(Venue) 관리
+// ==========================================
+let venueList = [];
+
+async function showVenueManager() {
+  const tid = state.currentTournament?.id;
+  if (!tid) return;
+  try {
+    const data = await api('/tournaments/' + tid + '/venues');
+    venueList = data.venues || data || [];
+  } catch(e) { venueList = []; }
+  renderVenueModal();
+}
+
+function renderVenueModal() {
+  const tid = state.currentTournament?.id;
+  const existing = document.getElementById('venue-modal');
+  if (existing) existing.remove();
+
+  const rows = venueList.map((v, i) => `
+    <tr class="border-b border-gray-100 hover:bg-gray-50">
+      <td class="py-2.5 px-2 text-center text-gray-500 text-xs">${i + 1}</td>
+      <td class="py-2.5 px-2">
+        <div class="font-semibold text-gray-800 text-sm">${esc(v.name)}</div>
+        ${v.short_name ? `<div class="text-xs text-gray-400">${esc(v.short_name)}</div>` : ''}
+      </td>
+      <td class="py-2.5 px-2 text-center">
+        <span class="px-2 py-0.5 bg-${P}-50 text-${P}-700 rounded text-xs font-bold">${v.court_start} ~ ${v.court_end}</span>
+      </td>
+      <td class="py-2.5 px-2 text-center text-xs text-gray-400">${v.address || '-'}</td>
+      <td class="py-2.5 px-2 text-center">
+        <button onclick="editVenue(${v.id})" class="text-${P}-500 hover:text-${P}-700 text-xs mr-2"><i class="fas fa-edit"></i></button>
+        <button onclick="deleteVenue(${v.id})" class="text-red-400 hover:text-red-600 text-xs"><i class="fas fa-trash"></i></button>
+      </td>
+    </tr>`).join('');
+
+  const html = `
+  <div id="venue-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay" onclick="if(event.target===this)this.remove()">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between p-5 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800"><i class="fas fa-map-marker-alt mr-2 text-teal-500"></i>장소 관리</h3>
+        <button onclick="document.getElementById('venue-modal').remove()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="p-5 overflow-y-auto flex-1">
+        ${venueList.length > 0 ? `
+        <table class="w-full mb-4">
+          <thead><tr class="border-b-2 border-gray-200 text-xs text-gray-500">
+            <th class="py-2 px-2 text-center w-8">#</th>
+            <th class="py-2 px-2 text-left">장소명</th>
+            <th class="py-2 px-2 text-center">코트 범위</th>
+            <th class="py-2 px-2 text-center">주소</th>
+            <th class="py-2 px-2 text-center w-20">관리</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>` : `
+        <div class="text-center py-8 text-gray-400">
+          <i class="fas fa-map-marked-alt text-4xl mb-3 block text-gray-300"></i>
+          <p class="font-medium text-gray-500">등록된 장소가 없습니다</p>
+          <p class="text-sm mt-1">아래에서 장소를 추가하세요</p>
+        </div>`}
+
+        <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+          <h4 class="font-bold text-sm text-gray-700 mb-3" id="venue-form-title"><i class="fas fa-plus mr-1"></i>새 장소 추가</h4>
+          <input type="hidden" id="venue-edit-id" value="">
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="text-xs text-gray-500 mb-1 block">장소명 <span class="text-red-400">*</span></label>
+              <input id="venue-name" type="text" placeholder="예: 체육관 A" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 mb-1 block">약칭</label>
+              <input id="venue-short" type="text" placeholder="예: A관" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-3 mb-3">
+            <div>
+              <label class="text-xs text-gray-500 mb-1 block">시작 코트 <span class="text-red-400">*</span></label>
+              <input id="venue-court-start" type="number" min="1" value="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 mb-1 block">끝 코트 <span class="text-red-400">*</span></label>
+              <input id="venue-court-end" type="number" min="1" value="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 mb-1 block">정렬 순서</label>
+              <input id="venue-sort" type="number" value="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="text-xs text-gray-500 mb-1 block">주소 (선택)</label>
+            <input id="venue-address" type="text" placeholder="예: 서울시 강남구..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+          </div>
+          <div class="flex gap-2">
+            <button onclick="saveVenue()" class="flex-1 py-2.5 bg-teal-500 text-white rounded-lg text-sm font-bold hover:bg-teal-600 transition"><i class="fas fa-save mr-1"></i>저장</button>
+            <button onclick="resetVenueForm()" class="px-4 py-2.5 bg-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-300 transition">초기화</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function resetVenueForm() {
+  document.getElementById('venue-edit-id').value = '';
+  document.getElementById('venue-name').value = '';
+  document.getElementById('venue-short').value = '';
+  document.getElementById('venue-court-start').value = '1';
+  document.getElementById('venue-court-end').value = '4';
+  document.getElementById('venue-sort').value = '0';
+  document.getElementById('venue-address').value = '';
+  document.getElementById('venue-form-title').innerHTML = '<i class="fas fa-plus mr-1"></i>새 장소 추가';
+}
+
+async function saveVenue() {
+  const tid = state.currentTournament?.id;
+  if (!tid) return;
+  const editId = document.getElementById('venue-edit-id').value;
+  const name = document.getElementById('venue-name').value.trim();
+  const short_name = document.getElementById('venue-short').value.trim();
+  const court_start = parseInt(document.getElementById('venue-court-start').value) || 1;
+  const court_end = parseInt(document.getElementById('venue-court-end').value) || 4;
+  const sort_order = parseInt(document.getElementById('venue-sort').value) || 0;
+  const address = document.getElementById('venue-address').value.trim();
+
+  if (!name) { showToast('장소명을 입력하세요', 'error'); return; }
+  if (court_start > court_end) { showToast('시작 코트가 끝 코트보다 클 수 없습니다', 'error'); return; }
+
+  const body = { name, short_name, court_start, court_end, sort_order, address };
+
+  try {
+    if (editId) {
+      await api('/tournaments/' + tid + '/venues/' + editId, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      showToast('장소가 수정되었습니다');
+    } else {
+      await api('/tournaments/' + tid + '/venues', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      showToast('장소가 추가되었습니다');
+    }
+    const d = await api('/tournaments/' + tid + '/venues');
+    venueList = d.venues || d || [];
+    renderVenueModal();
+  } catch(e) {
+    showToast('저장 실패: ' + (e.message || ''), 'error');
+  }
+}
+
+function editVenue(id) {
+  const v = venueList.find(x => x.id === id);
+  if (!v) return;
+  document.getElementById('venue-edit-id').value = v.id;
+  document.getElementById('venue-name').value = v.name || '';
+  document.getElementById('venue-short').value = v.short_name || '';
+  document.getElementById('venue-court-start').value = v.court_start || 1;
+  document.getElementById('venue-court-end').value = v.court_end || 4;
+  document.getElementById('venue-sort').value = v.sort_order || 0;
+  document.getElementById('venue-address').value = v.address || '';
+  document.getElementById('venue-form-title').innerHTML = '<i class="fas fa-edit mr-1"></i>장소 수정';
+}
+
+async function deleteVenue(id) {
+  if (!confirm('이 장소를 삭제하시겠습니까?')) return;
+  const tid = state.currentTournament?.id;
+  if (!tid) return;
+  try {
+    await api('/tournaments/' + tid + '/venues/' + id, { method: 'DELETE' });
+    showToast('장소가 삭제되었습니다');
+    const d2 = await api('/tournaments/' + tid + '/venues');
+    venueList = d2.venues || d2 || [];
+    renderVenueModal();
+  } catch(e) {
+    showToast('삭제 실패: ' + (e.message || ''), 'error');
+  }
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
 }

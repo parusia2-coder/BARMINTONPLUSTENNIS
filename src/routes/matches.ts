@@ -341,6 +341,16 @@ matchRoutes.get('/:tid/court/:courtNum', async (c) => {
     `SELECT name, courts, format, sport, target_games, scoring_type, deuce_rule FROM tournaments WHERE id=? AND deleted=0`
   ).bind(tid).first() as any
 
+  // 해당 코트가 소속된 장소 정보
+  const venue = await db.prepare(
+    `SELECT * FROM venues WHERE tournament_id=? AND court_start <= ? AND court_end >= ? LIMIT 1`
+  ).bind(tid, courtNum, courtNum).first()
+
+  // 장소 목록 (전체)
+  const { results: venues } = await db.prepare(
+    `SELECT * FROM venues WHERE tournament_id=? ORDER BY sort_order ASC, court_start ASC`
+  ).bind(tid).all()
+
   // 점수 규칙: 대회 설정 또는 종목별 기본값 사용
   const { badmintonConfig, tennisConfig } = await import('../config')
   const sc = tournament?.sport === 'tennis' ? tennisConfig : badmintonConfig
@@ -352,7 +362,9 @@ matchRoutes.get('/:tid/court/:courtNum', async (c) => {
     current_match: currentMatch,
     next_matches: nextMatches || [],
     recent_matches: recentMatches || [],
-    target_score: targetScore
+    target_score: targetScore,
+    venue: venue || null,
+    venues: venues || []
   })
 })
 
@@ -422,9 +434,10 @@ matchRoutes.post('/:tid/court/:courtNum/next', async (c) => {
   return c.json({ message: '경기가 시작되었습니다.', match: next })
 })
 
-// 코트 전체 현황 (모든 코트 한눈에)
+// 코트 전체 현황 (모든 코트 한눈에) - venue 쿼리 파라미터로 장소 필터 가능
 matchRoutes.get('/:tid/courts/overview', async (c) => {
   const tid = c.req.param('tid')
+  const venueId = c.req.query('venue') // ?venue=1 → 해당 장소 코트만
   const db = c.env.DB
 
   const tournament = await db.prepare(
@@ -437,8 +450,26 @@ matchRoutes.get('/:tid/courts/overview', async (c) => {
   const sc = tournament?.sport === 'tennis' ? tennisConfig : badmintonConfig
   const targetScore = tournament.target_games || (tournament.format === 'tournament' ? sc.scoring.tournamentTargetScore : sc.scoring.defaultTargetScore)
 
+  // 장소 목록
+  const { results: venues } = await db.prepare(
+    `SELECT * FROM venues WHERE tournament_id=? ORDER BY sort_order ASC, court_start ASC`
+  ).bind(tid).all()
+
+  // 코트 범위 결정: venue 필터가 있으면 해당 장소 코트만
+  let courtStart = 1
+  let courtEnd = tournament.courts || 2
+  let activeVenue: any = null
+
+  if (venueId && venues && venues.length > 0) {
+    activeVenue = venues.find((v: any) => v.id === parseInt(venueId))
+    if (activeVenue) {
+      courtStart = (activeVenue as any).court_start
+      courtEnd = (activeVenue as any).court_end
+    }
+  }
+
   const courts: any[] = []
-  for (let i = 1; i <= (tournament.courts || 2); i++) {
+  for (let i = courtStart; i <= courtEnd; i++) {
     const currentMatch = await db.prepare(`
       SELECT m.*, e.name as event_name, e.category as event_category,
         t1.team_name as team1_name, t2.team_name as team2_name
@@ -484,12 +515,16 @@ matchRoutes.get('/:tid/courts/overview', async (c) => {
       `SELECT COUNT(*) as cnt FROM matches WHERE tournament_id=? AND court_number=? AND status='pending'`
     ).bind(tid, i).first() as any
 
+    // 이 코트가 어느 장소에 속하는지
+    const courtVenue = (venues || []).find((v: any) => i >= (v as any).court_start && i <= (v as any).court_end)
+
     courts.push({
       court_number: i,
       current_match: currentMatch,
       next_match: nextMatch || null,
       recent_match: recentMatch || null,
-      pending_count: pendingCount?.cnt || 0
+      pending_count: pendingCount?.cnt || 0,
+      venue: courtVenue ? { id: (courtVenue as any).id, name: (courtVenue as any).name, short_name: (courtVenue as any).short_name } : null
     })
   }
 
@@ -503,7 +538,7 @@ matchRoutes.get('/:tid/courts/overview', async (c) => {
     FROM matches WHERE tournament_id=?
   `).bind(tid).first()
 
-  return c.json({ tournament, courts, stats, target_score: targetScore })
+  return c.json({ tournament, courts, stats, target_score: targetScore, venues: venues || [], active_venue: activeVenue })
 })
 
 // ★★★ 경량 점수 전용 API (전광판 빠른 갱신용) ★★★
@@ -519,20 +554,35 @@ matchRoutes.get('/:tid/court/:courtNum/score', async (c) => {
   return c.json({ match: m || null, ts: Date.now() })
 })
 
-// 전체 코트 점수 일괄 조회 (대시보드용 - 단일 쿼리!)
+// 전체 코트 점수 일괄 조회 (대시보드용 - 단일 쿼리!) - ?venue=1 으로 장소 필터 가능
 matchRoutes.get('/:tid/courts/scores', async (c) => {
   const tid = c.req.param('tid')
+  const venueId = c.req.query('venue')
   const db = c.env.DB
-  const { results } = await db.prepare(`
+
+  let query = `
     SELECT m.id, m.court_number, m.team1_set1, m.team1_set2, m.team1_set3,
       m.team2_set1, m.team2_set2, m.team2_set3, m.status, m.winner_team, m.updated_at,
       t1.team_name as team1_name, t2.team_name as team2_name
     FROM matches m
     LEFT JOIN teams t1 ON m.team1_id = t1.id
     LEFT JOIN teams t2 ON m.team2_id = t2.id
-    WHERE m.tournament_id=? AND m.status='playing'
-    ORDER BY m.court_number ASC
-  `).bind(tid).all()
+    WHERE m.tournament_id=? AND m.status='playing'`
+  const binds: any[] = [tid]
+
+  if (venueId) {
+    // 장소의 코트 범위 조회
+    const venue = await db.prepare(
+      `SELECT court_start, court_end FROM venues WHERE id=? AND tournament_id=?`
+    ).bind(venueId, tid).first() as any
+    if (venue) {
+      query += ` AND m.court_number >= ? AND m.court_number <= ?`
+      binds.push(venue.court_start, venue.court_end)
+    }
+  }
+
+  query += ` ORDER BY m.court_number ASC`
+  const { results } = await db.prepare(query).bind(...binds).all()
   return c.json({ scores: results || [], ts: Date.now() })
 })
 

@@ -22,7 +22,13 @@ tournamentRoutes.get('/:id', async (c) => {
     `SELECT * FROM tournaments WHERE id = ? AND deleted = 0`
   ).bind(id).first()
   if (!tournament) return c.json({ error: '대회를 찾을 수 없습니다.' }, 404)
-  return c.json({ tournament })
+
+  // 장소 목록도 함께 반환
+  const { results: venues } = await db.prepare(
+    `SELECT * FROM venues WHERE tournament_id=? ORDER BY sort_order ASC, court_start ASC`
+  ).bind(id).all()
+
+  return c.json({ tournament, venues: venues || [] })
 })
 
 // 대회 생성
